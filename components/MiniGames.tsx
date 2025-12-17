@@ -342,18 +342,18 @@ const MatrixGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 6. Lock Pick (Easier Speed)
+// 6. Lock Pick (Significantly Easier)
 const LockPickGame = ({ onComplete, language }: Props) => {
   const [level, setLevel] = useState(0);
   const [angle, setAngle] = useState(0);
   const [targetAngle, setTargetAngle] = useState(0);
-  // Decreased initial speed from 3 to 2, and increment will be smaller
-  const [speed, setSpeed] = useState(2); 
+  // Decreased initial speed from 3/2 to 1.5 for better playability
+  const [speed, setSpeed] = useState(1.5); 
   const reqRef = useRef(0);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
-  const TARGET_WIDTH = 34; // Slightly wider target zone (was 30)
+  const TARGET_WIDTH = 40; // Widened target zone (was 30, then 34)
 
   const startLevel = () => {
     setAngle(0);
@@ -389,7 +389,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
           setTimeout(() => onComplete(true), 300);
        } else {
           setLevel(l => l + 1);
-          setSpeed(s => s + 1.5); // Reduced acceleration (was +2)
+          setSpeed(s => s + 0.5); // Reduced acceleration (was +1.5/2)
           startLevel();
        }
     } else {
@@ -397,7 +397,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
        trigger(false);
        // Reset level
        setLevel(0);
-       setSpeed(2); // Reset to slower speed
+       setSpeed(1.5); // Reset to slower speed
        startLevel();
     }
   };
@@ -426,14 +426,11 @@ const LockPickGame = ({ onComplete, language }: Props) => {
             style={{ 
                transform: `rotate(${targetAngle - 90}deg) rotate(-${TARGET_WIDTH/2}deg)`,
                // Using clip path is cleaner for arcs but rotation works for visual hack
-               // Actually, simpler approach:
             }}
          />
          {/* Better Target Visual using SVG */}
          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100">
              <circle cx="50" cy="50" r="46" fill="none" stroke="#334155" strokeWidth="8" />
-             {/* Calculate arc path for target */}
-             {/* This is complex to render dynamically with simple SVG path, falling back to rotation hack below */}
          </svg>
          
          {/* Re-implementing target zone using conic gradient for perfect arc */}
