@@ -45,24 +45,24 @@ const DEFAULT_STATS: UserStats = {
 // --- Modals ---
 
 const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => (
-  <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-slate-800 border border-slate-600 rounded-2xl p-6 max-w-lg w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
-      <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl">✕</button>
-      <h2 className="text-3xl font-bold mb-4 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-red-400">
+  <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="glass-panel rounded-2xl p-8 max-w-lg w-full relative animate-fade-in border border-white/10">
+      <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">✕</button>
+      <h2 className="text-2xl font-bold mb-6 text-center text-white tracking-widest uppercase">
         {t.rules_title}
       </h2>
-      <div className="space-y-4 text-gray-200 text-sm md:text-base leading-relaxed">
-        <p><strong className="text-white">Goal:</strong> {t.rules_goal}</p>
-        <div className="bg-white/5 p-3 rounded-lg">
-          <strong className="block text-blue-300 mb-1">🏁 Racing</strong>
+      <div className="space-y-6 text-white/80 text-sm md:text-base leading-relaxed font-light">
+        <p><strong className="text-white font-semibold">Goal:</strong> {t.rules_goal}</p>
+        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+          <strong className="block text-blue-400 mb-2 font-semibold">🏁 Racing</strong>
           {t.rules_race}
         </div>
-        <div className="bg-white/5 p-3 rounded-lg">
-          <strong className="block text-yellow-300 mb-1">⚔️ Stealing</strong>
+        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+          <strong className="block text-red-400 mb-2 font-semibold">⚔️ Stealing</strong>
           {t.rules_steal}
         </div>
       </div>
-      <button onClick={onClose} className="w-full mt-6 bg-slate-100 text-slate-900 font-bold py-3 rounded-xl hover:scale-[1.02] transition-transform">
+      <button onClick={onClose} className="w-full mt-8 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-xl transition-all">
         OK
       </button>
     </div>
@@ -83,56 +83,55 @@ const SettingsModal = ({
   t: any 
 }) => {
   return (
-    <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-800 border border-slate-600 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in duration-200">
-        <h2 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-          <Icons.Settings className="w-6 h-6" /> {t.settings_title}
+    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="glass-panel rounded-2xl p-8 max-w-md w-full animate-fade-in">
+        <h2 className="text-xl font-bold mb-8 text-white flex items-center gap-3 tracking-widest uppercase">
+          <Icons.Settings className="w-5 h-5" /> {t.settings_title}
         </h2>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="flex justify-between items-center">
-            <span className="text-slate-300">{t.settings_lang}</span>
-            <div className="flex bg-slate-900 rounded-lg p-1">
+            <span className="text-white/60 font-light">{t.settings_lang}</span>
+            <div className="flex bg-black/20 rounded-lg p-1">
               <button 
                 onClick={() => onUpdate({ ...settings, language: 'en' })}
-                className={`px-3 py-1 rounded ${settings.language === 'en' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'en' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'}`}
               >EN</button>
               <button 
                 onClick={() => onUpdate({ ...settings, language: 'zh' })}
-                className={`px-3 py-1 rounded ${settings.language === 'zh' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'zh' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'}`}
               >中文</button>
             </div>
           </div>
 
           <div className="flex justify-between items-center">
-             <span className="text-slate-300">{t.settings_sound}</span>
+             <span className="text-white/60 font-light">{t.settings_sound}</span>
              <button 
                onClick={() => onUpdate({ ...settings, soundEnabled: !settings.soundEnabled })}
-               className={`w-12 h-6 rounded-full transition-colors relative ${settings.soundEnabled ? 'bg-green-500' : 'bg-slate-700'}`}
+               className={`w-12 h-6 rounded-full transition-colors relative ${settings.soundEnabled ? 'bg-emerald-500/80' : 'bg-white/10'}`}
              >
-               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.soundEnabled ? 'left-7' : 'left-1'}`} />
+               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.soundEnabled ? 'left-7' : 'left-1'}`} />
              </button>
           </div>
 
            <div className="flex justify-between items-center">
-             <span className="text-slate-300">{t.settings_music}</span>
+             <span className="text-white/60 font-light">{t.settings_music}</span>
              <button 
                onClick={() => onUpdate({ ...settings, musicEnabled: !settings.musicEnabled })}
-               className={`w-12 h-6 rounded-full transition-colors relative ${settings.musicEnabled ? 'bg-green-500' : 'bg-slate-700'}`}
+               className={`w-12 h-6 rounded-full transition-colors relative ${settings.musicEnabled ? 'bg-emerald-500/80' : 'bg-white/10'}`}
              >
-               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${settings.musicEnabled ? 'left-7' : 'left-1'}`} />
+               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.musicEnabled ? 'left-7' : 'left-1'}`} />
              </button>
           </div>
 
-          <div className="pt-4 border-t border-white/10">
+          <div className="pt-6 border-t border-white/5">
              <div className="flex justify-between items-center">
                <div>
-                  <div className="text-red-400 font-bold">{t.settings_data}</div>
-                  <div className="text-xs text-slate-500">{t.settings_data_desc}</div>
+                  <div className="text-red-400 font-medium text-sm">{t.settings_data}</div>
                </div>
                <button 
                  onClick={onClearData}
-                 className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded-lg text-sm border border-red-800"
+                 className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 rounded-lg text-xs tracking-wider uppercase transition-colors"
                >
                  {t.settings_reset}
                </button>
@@ -140,7 +139,7 @@ const SettingsModal = ({
           </div>
         </div>
 
-        <button onClick={onClose} className="w-full mt-8 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold">
+        <button onClick={onClose} className="w-full mt-8 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-medium transition-colors">
           {t.settings_close}
         </button>
       </div>
@@ -149,36 +148,29 @@ const SettingsModal = ({
 };
 
 const AchievementsModal = ({ stats, language, onClose, t }: { stats: UserStats, language: string, onClose: () => void, t: any }) => (
-  <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-slate-800 border border-slate-600 rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in duration-200">
+  <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="glass-panel rounded-2xl max-w-2xl w-full flex flex-col max-h-[80vh] animate-fade-in border border-white/10">
       <div className="p-6 border-b border-white/10 flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2">
-          <Icons.Trophy className="w-6 h-6" /> {t.ach_title}
+        <h2 className="text-xl font-bold text-yellow-400/90 flex items-center gap-2 uppercase tracking-widest">
+          <Icons.Trophy className="w-5 h-5" /> {t.ach_title}
         </h2>
-        <button onClick={onClose} className="text-2xl text-slate-400 hover:text-white">✕</button>
+        <button onClick={onClose} className="text-2xl text-white/50 hover:text-white transition-colors">✕</button>
       </div>
       
-      <div className="overflow-y-auto p-6 space-y-4">
+      <div className="overflow-y-auto p-6 space-y-3 custom-scrollbar">
         {ACHIEVEMENTS_LIST.map(ach => {
           const unlocked = stats.unlockedAchievements.includes(ach.id);
           const title = language === 'zh' ? ach.titleZh : ach.titleEn;
           const desc = language === 'zh' ? ach.descZh : ach.descEn;
 
           return (
-            <div key={ach.id} className={`p-4 rounded-xl border ${unlocked ? 'bg-slate-700/50 border-yellow-500/50' : 'bg-slate-900/50 border-slate-700'} flex items-center gap-4`}>
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl ${unlocked ? 'bg-yellow-500/20' : 'bg-black/40 grayscale'}`}>
+            <div key={ach.id} className={`p-4 rounded-xl border transition-all ${unlocked ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-white/5 border-transparent opacity-50'} flex items-center gap-4`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${unlocked ? 'bg-yellow-500/20 text-yellow-400' : 'bg-black/20 text-white/20'}`}>
                 {ach.icon}
               </div>
               <div className="flex-1">
-                <h3 className={`font-bold text-lg ${unlocked ? 'text-white' : 'text-slate-500'}`}>{title}</h3>
-                <p className="text-sm text-slate-400">{desc}</p>
-              </div>
-              <div className="text-right">
-                {unlocked ? (
-                  <span className="text-yellow-400 font-bold text-xs uppercase bg-yellow-400/10 px-2 py-1 rounded">Unlocked</span>
-                ) : (
-                  <span className="text-slate-600 text-xs uppercase">{t.ach_locked}</span>
-                )}
+                <h3 className={`font-bold text-base ${unlocked ? 'text-white' : 'text-white/50'}`}>{title}</h3>
+                <p className="text-xs text-white/40 mt-1">{desc}</p>
               </div>
             </div>
           );
@@ -199,49 +191,56 @@ const MainMenu = ({
   onShowAchievements,
   t
 }: any) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900 text-white p-4">
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
     {/* Top Right Controls */}
-    <div className="absolute top-4 right-4 flex gap-2">
+    <div className="absolute top-6 right-6 flex gap-3">
       <button 
         onClick={onShowAchievements}
-        className="w-10 h-10 rounded-full bg-slate-800 border border-slate-600 hover:bg-slate-700 flex items-center justify-center text-yellow-400"
+        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-yellow-400 transition-all"
       >
-        <Icons.Trophy className="w-5 h-5" />
+        <Icons.Trophy className="w-4 h-4" />
       </button>
       <button 
         onClick={onShowSettings}
-        className="w-10 h-10 rounded-full bg-slate-800 border border-slate-600 hover:bg-slate-700 flex items-center justify-center text-gray-300"
+        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"
       >
-        <Icons.Settings className="w-5 h-5" />
+        <Icons.Settings className="w-4 h-4" />
       </button>
       <button 
         onClick={onShowRules}
-        className="w-10 h-10 rounded-full bg-slate-800 border border-slate-600 hover:bg-slate-700 flex items-center justify-center text-xl font-bold"
+        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/80 hover:text-white font-bold transition-all"
       >
         ?
       </button>
     </div>
 
-    <h1 className="text-5xl md:text-7xl font-black mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-red-400 text-center animate-pulse-fast">
-      GRID RUSH
-    </h1>
-    <p className="text-slate-400 mb-12 font-mono text-lg text-center tracking-widest">{t.menu_subtitle}</p>
+    <div className="mb-16 text-center relative">
+      <div className="absolute -inset-10 bg-blue-500/20 blur-[100px] rounded-full pointer-events-none" />
+      <h1 className="text-6xl md:text-8xl font-black mb-4 text-white tracking-tighter drop-shadow-2xl relative z-10">
+        GRID<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">RUSH</span>
+      </h1>
+      <p className="text-white/40 font-mono text-sm md:text-base tracking-[0.3em] uppercase">{t.menu_subtitle}</p>
+    </div>
 
-    <div className="flex flex-col gap-4 w-full max-w-sm">
-      <button onClick={onOnline} className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-2xl font-black text-xl shadow-lg shadow-blue-900/40 transition-all active:scale-95 flex items-center justify-center gap-3">
-        <Icons.Sword className="w-6 h-6" /> {t.menu_online}
+    <div className="flex flex-col gap-4 w-full max-w-sm relative z-10">
+      <button onClick={onOnline} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-blue-500/50 hover:bg-blue-500/10 transition-all">
+        <Icons.Sword className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" /> 
+        <span className="font-bold tracking-widest text-lg">{t.menu_online}</span>
       </button>
 
-      <button onClick={onChallenge} className="w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-        <Icons.Clock className="w-6 h-6 text-yellow-400" /> {t.menu_solo}
+      <button onClick={onChallenge} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-yellow-500/50 hover:bg-yellow-500/10 transition-all">
+        <Icons.Clock className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" /> 
+        <span className="font-bold tracking-widest text-lg">{t.menu_solo}</span>
       </button>
 
-      <button onClick={onPractice} className="w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-        <Icons.Dumbbell className="w-6 h-6 text-green-400" /> {t.menu_practice}
+      <button onClick={onPractice} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all">
+        <Icons.Dumbbell className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" /> 
+        <span className="font-bold tracking-widest text-lg">{t.menu_practice}</span>
       </button>
 
-      <button onClick={onShowAchievements} className="md:hidden w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-        <Icons.Trophy className="w-6 h-6 text-yellow-400" /> {t.menu_achievements}
+      <button onClick={onShowAchievements} className="md:hidden w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white">
+        <Icons.Trophy className="w-5 h-5 text-yellow-400" /> 
+        <span className="font-bold tracking-widest text-lg">{t.menu_achievements}</span>
       </button>
     </div>
   </div>
@@ -252,47 +251,50 @@ const MainMenu = ({
 const PracticeMode = ({ onBack, t, language }: { onBack: () => void, t: any, language: any }) => {
   const [activeGame, setActiveGame] = useState<string | null>(null);
 
-  // Auto-close handler
   const handleComplete = (success: boolean) => {
     if (success) {
-       // Wait 800ms to show the green check/success feedback inside the game component
-       // then close the modal
        setTimeout(() => {
           setActiveGame(null);
        }, 800);
-    } else {
-       // Optional: Shake screen or feedback for fail, but let user retry immediately
     }
   };
 
   return (
-    <div className="absolute inset-0 z-30 bg-slate-950 flex flex-col overflow-auto">
-      <div className="p-6 flex items-center gap-4 bg-slate-900 sticky top-0 z-10 border-b border-white/10">
-        <button onClick={onBack} className="text-slate-400 hover:text-white">← Back</button>
-        <h2 className="text-2xl font-bold text-green-400">{t.menu_practice}</h2>
+    <div className="absolute inset-0 z-30 flex flex-col overflow-hidden bg-black">
+       {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-black pointer-events-none" />
+
+      <div className="p-6 flex items-center gap-4 z-10">
+        <button onClick={onBack} className="text-white/50 hover:text-white transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-widest">
+           ← Back
+        </button>
       </div>
 
-      <div className="p-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 p-6 max-w-5xl mx-auto w-full overflow-y-auto custom-scrollbar z-10">
+        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 mb-8 uppercase tracking-tighter">
+           {t.menu_practice}
+        </h2>
+
         {activeGame ? (
-           <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4">
-             <div className="flex justify-between w-full max-w-md mb-8">
-               <h3 className="text-xl font-bold text-white">{MINI_GAMES.find(g => g.id === activeGame)?.name}</h3>
-               <button onClick={() => setActiveGame(null)} className="text-sm bg-slate-800 px-3 py-1 rounded">Close</button>
+           <div className="flex flex-col items-center animate-fade-in h-[600px]">
+             <div className="flex justify-between w-full max-w-md mb-6 items-center">
+               <h3 className="text-xl font-bold text-white uppercase tracking-widest">{MINI_GAMES.find(g => g.id === activeGame)?.name}</h3>
+               <button onClick={() => setActiveGame(null)} className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wider">Close</button>
              </div>
-             <div className="glass-panel p-8 rounded-3xl w-full max-w-md">
+             <div className="glass-panel p-8 rounded-3xl w-full max-w-md h-full shadow-2xl border border-white/10">
                 <MiniGameRenderer type={activeGame} playerId="P1" onComplete={handleComplete} language={language} />
              </div>
            </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-12">
             {MINI_GAMES.map(game => (
               <button 
                 key={game.id}
                 onClick={() => setActiveGame(game.id)}
-                className="bg-slate-800/50 border border-slate-700 hover:bg-slate-800 hover:border-green-500/50 p-6 rounded-2xl flex flex-col items-center gap-3 transition-all"
+                className="premium-btn p-8 rounded-2xl flex flex-col items-center gap-4 group"
               >
-                <div className="text-4xl">{game.icon}</div>
-                <div className="font-bold">{game.name}</div>
+                <div className="text-4xl group-hover:scale-110 transition-transform duration-300 drop-shadow-lg">{game.icon}</div>
+                <div className="font-bold text-white group-hover:text-emerald-300 transition-colors uppercase tracking-wide text-sm">{game.name}</div>
               </button>
             ))}
           </div>
@@ -308,65 +310,81 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
   const [joinId, setJoinId] = useState('');
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900 text-white p-4">
-      <button onClick={onBack} className="absolute top-6 left-6 text-slate-500 hover:text-white">← Back</button>
-      <h2 className="text-4xl font-black mb-8 text-blue-400">{t.menu_online}</h2>
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
+      <button onClick={onBack} className="absolute top-6 left-6 text-white/40 hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
+      
+      <h2 className="text-4xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 uppercase tracking-tighter">{t.menu_online}</h2>
+      
       {isConnecting ? (
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-blue-300 animate-pulse">{t.online_connecting}</p>
+        <div className="flex flex-col items-center animate-fade-in">
+          <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin mb-6"></div>
+          <p className="text-white/60 font-mono text-sm tracking-widest animate-pulse">{t.online_connecting}</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6 w-full max-w-xl items-center">
-          <div className="flex flex-col md:flex-row gap-6 w-full">
-            <div className="flex-1 bg-slate-800/50 p-6 rounded-2xl border border-white/10 flex flex-col items-center hover:border-blue-500/50 transition-colors">
-              <h3 className="text-xl font-bold mb-4 text-blue-400">{t.online_host}</h3>
-              <p className="text-sm text-gray-400 text-center mb-6">{t.online_host_desc}</p>
-              <button onClick={onCreate} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg">{t.online_create}</button>
+        <div className="flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1 glass-panel p-8 rounded-2xl flex flex-col items-center hover:border-blue-500/50 transition-colors group">
+              <h3 className="text-lg font-bold mb-2 text-blue-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">{t.online_host}</h3>
+              <p className="text-xs text-white/40 text-center mb-8 h-8">{t.online_host_desc}</p>
+              <button onClick={onCreate} className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-900/50 transition-all active:scale-95">{t.online_create}</button>
             </div>
-            <div className="flex-1 bg-slate-800/50 p-6 rounded-2xl border border-white/10 flex flex-col items-center hover:border-red-500/50 transition-colors">
-              <h3 className="text-xl font-bold mb-4 text-red-400">{t.online_join}</h3>
-              <p className="text-sm text-gray-400 text-center mb-6">{t.online_join_desc}</p>
+            
+            <div className="flex-1 glass-panel p-8 rounded-2xl flex flex-col items-center hover:border-red-500/50 transition-colors group">
+              <h3 className="text-lg font-bold mb-2 text-red-400 uppercase tracking-widest group-hover:text-red-300 transition-colors">{t.online_join}</h3>
+              <p className="text-xs text-white/40 text-center mb-8 h-8">{t.online_join_desc}</p>
               <div className="flex w-full gap-2">
-                <input value={joinId} onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} placeholder="CODE" className="flex-1 bg-black/40 border border-slate-600 rounded-xl px-2 text-center font-mono text-xl focus:outline-none uppercase" />
-                <button onClick={() => onJoin(joinId)} disabled={joinId.length !== 4} className="px-4 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-xl font-bold">{t.online_join_btn}</button>
+                <input 
+                  value={joinId} 
+                  onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} 
+                  placeholder="CODE" 
+                  className="flex-1 bg-black/40 border border-white/10 focus:border-white/30 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-white placeholder-white/20 transition-colors" 
+                />
+                <button onClick={() => onJoin(joinId)} disabled={joinId.length !== 4} className="px-6 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-900/50 transition-all active:scale-95">{t.online_join_btn}</button>
               </div>
             </div>
           </div>
-          <p className="text-xs text-slate-600 mt-4 text-center max-w-sm">{t.online_instruction}</p>
+          <p className="text-[10px] text-white/20 mt-8 text-center max-w-md mx-auto">{t.online_instruction}</p>
         </div>
       )}
-      {error && <div className="mt-8 bg-red-500/10 border border-red-500/50 text-red-200 px-6 py-3 rounded-lg">{error}</div>}
+      {error && <div className="mt-8 bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-3 rounded-lg text-sm">{error}</div>}
     </div>
   );
 };
 
 const WaitingRoom = ({ roomId, onCancel, t }: { roomId: string, onCancel: () => void, t: any }) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900 text-white p-4">
-    <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col items-center max-w-md w-full animate-in zoom-in duration-300">
-      <h2 className="text-gray-400 mb-2">Room Code</h2>
-      <div className="text-7xl font-mono font-black tracking-widest text-white mb-8 select-all cursor-pointer bg-black/20 px-8 py-4 rounded-xl">{roomId}</div>
-      <div className="flex items-center gap-3 mb-8">
-        <span className="text-blue-300 animate-pulse">{t.online_waiting}</span>
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
+    <div className="glass-panel p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in">
+      <h2 className="text-white/40 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
+      <div className="text-6xl font-mono font-bold tracking-widest text-white mb-10 select-all cursor-pointer bg-black/30 px-8 py-6 rounded-2xl border border-white/5 hover:border-white/20 transition-colors">{roomId}</div>
+      <div className="flex items-center gap-3 mb-10">
+        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+        <span className="text-blue-300 text-sm font-medium tracking-wide">{t.online_waiting}</span>
       </div>
-      <button onClick={onCancel} className="text-slate-500 hover:text-white underline">Cancel</button>
+      <button onClick={onCancel} className="text-white/30 hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
     </div>
   </div>
 );
 
 const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe: boolean, opponent?: boolean, t: any }) => {
-  const color = player.id === 'P1' ? 'text-blue-400' : 'text-red-400';
-  const borderColor = player.id === 'P1' ? 'border-blue-500' : 'border-red-500';
+  const colorClass = player.id === 'P1' ? 'text-blue-400' : 'text-red-400';
+  const borderClass = player.id === 'P1' ? 'border-blue-500/50 bg-blue-500/10' : 'border-red-500/50 bg-red-500/10';
   
   return (
-    <div className={`flex items-center gap-3 ${opponent ? 'flex-row-reverse text-right' : ''}`}>
-      <div className={`w-12 h-12 rounded-xl bg-slate-800 border-2 ${borderColor} flex items-center justify-center text-xl font-bold shadow-lg`}>
+    <div className={`flex items-center gap-4 ${opponent ? 'flex-row-reverse text-right' : ''}`}>
+      <div className={`w-14 h-14 rounded-2xl border ${borderClass} flex items-center justify-center text-xl font-bold shadow-lg backdrop-blur-sm`}>
         {player.id === 'P1' ? 'P1' : 'P2'}
       </div>
       <div>
-        <div className={`font-bold ${color} text-lg`}>{isMe ? t.game_you : player.name}</div>
-        <div className="text-xs text-gray-400 flex items-center gap-1">
-          {player.stealsRemaining > 0 ? <span className="text-yellow-400">★ {t.game_ready}</span> : <span className="opacity-50">{t.game_no_steal}</span>}
+        <div className={`font-bold ${colorClass} text-lg tracking-wide`}>{isMe ? t.game_you : player.name}</div>
+        <div className="text-xs text-white/40 flex items-center gap-1.5 mt-1">
+          {player.stealsRemaining > 0 ? (
+             <>
+               <span className="text-yellow-400">★</span> 
+               <span className="opacity-70">{t.game_ready}</span>
+             </>
+          ) : (
+             <span className="opacity-30">{t.game_no_steal}</span>
+          )}
         </div>
       </div>
     </div>
@@ -826,14 +844,14 @@ export default function App() {
   const miniGameId = isPlayingMiniGame && myActiveCellIdx !== null ? gameState.cells[myActiveCellIdx].gameId : null;
 
   return (
-    <div className="h-screen w-screen bg-slate-950 flex flex-col relative overflow-hidden">
+    <div className="h-screen w-screen flex flex-col relative overflow-hidden">
       
       {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
 
       {/* Achievement Toast */}
       {newAchievement && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 fade-in duration-300">
-           <div className="bg-yellow-500/90 text-black px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2">
+           <div className="bg-yellow-500 text-black px-6 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(234,179,8,0.5)] flex items-center gap-2 border border-yellow-400">
              <Icons.Trophy className="w-5 h-5" />
              <span>Unlocked: {newAchievement}</span>
            </div>
@@ -848,31 +866,31 @@ export default function App() {
               {isSolo ? t.msg_challenge_complete : (gameState.winner === 'DRAW' ? t.msg_draw : (gameState.winner === myId ? t.msg_win : t.msg_lose))}
             </h2>
             {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">TIME: {challengeTime}</div>}
-            <button onClick={resetGame} className="mt-8 px-8 py-3 border border-white/20 rounded-full hover:bg-white/10 transition-colors">Back to Menu</button>
+            <button onClick={resetGame} className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-colors text-white font-bold uppercase tracking-widest">Back to Menu</button>
           </div>
         </div>
       )}
 
       {/* Steal Notification (Only Online) */}
       {gameState.stealNotification && !isSolo && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg pointer-events-none">
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg pointer-events-none">
           {(() => {
             const { defenderId, expiresAt, cellId } = gameState.stealNotification!;
             const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
             const isDefender = myId === defenderId;
-            const bgClass = isDefender ? 'bg-red-600' : 'bg-blue-600';
+            const bgClass = isDefender ? 'bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)]' : 'bg-blue-600 shadow-[0_0_30px_rgba(37,99,235,0.5)]';
             const showDefendBtn = isDefender && me.activeCell !== cellId;
 
             return (
-              <div className={`mx-4 p-4 rounded-xl shadow-2xl border border-white/20 ${bgClass} text-white flex justify-between items-center animate-pulse-fast pointer-events-auto`}>
+              <div className={`mx-4 p-5 rounded-2xl border border-white/20 ${bgClass} text-white flex justify-between items-center animate-pulse-fast pointer-events-auto`}>
                 <div>
-                   <h3 className="font-bold uppercase text-lg">{isDefender ? t.msg_steal_attack : t.msg_steal_doing}</h3>
+                   <h3 className="font-bold uppercase text-lg tracking-wider">{isDefender ? t.msg_steal_attack : t.msg_steal_doing}</h3>
                    <div className="text-sm opacity-90">{isDefender ? `Opponent is stealing Cell ${cellId + 1}!` : `Stealing Cell ${cellId + 1} from opponent!`}</div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-3xl font-mono font-black">{remaining}s</span>
+                  <span className="text-4xl font-mono font-black">{remaining}s</span>
                   {showDefendBtn && (
-                    <button onClick={() => sendAction({ type: 'DEFEND' })} className="px-4 py-2 bg-white text-black font-bold rounded hover:scale-105 active:scale-95 transition-transform">{t.msg_defend}</button>
+                    <button onClick={() => sendAction({ type: 'DEFEND' })} className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:scale-105 active:scale-95 transition-transform shadow-lg">{t.msg_defend}</button>
                   )}
                 </div>
               </div>
@@ -882,25 +900,25 @@ export default function App() {
       )}
 
       {/* HUD */}
-      <div className="h-20 md:h-24 bg-slate-900/80 backdrop-blur border-b border-white/10 flex justify-between items-center px-4 md:px-12 z-10 shrink-0">
+      <div className="h-20 md:h-24 glass-panel border-b border-white/10 flex justify-between items-center px-4 md:px-12 z-10 shrink-0 relative">
          <PlayerBadge player={me} isMe={true} t={t} />
          <div className="flex flex-col items-center">
             {isSolo ? (
                 <div className="flex flex-col items-center gap-1">
-                    <div className="text-2xl font-mono font-bold text-yellow-400">{challengeTime}</div>
-                    <div className="text-xs text-slate-400 font-mono tracking-widest uppercase">{t.level_progress} {myActiveCellIdx !== null ? myActiveCellIdx + 1 : '-'}/{gameState.cells.length}</div>
+                    <div className="text-3xl font-mono font-bold text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]">{challengeTime}</div>
+                    <div className="text-[10px] text-white/50 font-mono tracking-[0.3em] uppercase">{t.level_progress} {myActiveCellIdx !== null ? myActiveCellIdx + 1 : '-'}/{gameState.cells.length}</div>
                 </div>
             ) : (
                 <>
-                    <div className="text-3xl font-black italic text-white/10 tracking-widest">VS</div>
-                    <div className="text-xs text-slate-500 font-mono mt-1">ROOM: {roomId}</div>
+                    <div className="text-3xl font-black italic text-white/5 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
+                    <div className="text-[10px] text-white/30 font-mono mt-8 bg-black/20 px-2 py-1 rounded">ROOM: {roomId}</div>
                 </>
             )}
          </div>
          {isSolo ? (
              <button 
                 onClick={resetGame}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-900/50 text-red-300 border border-red-800 hover:bg-red-900 text-sm font-bold"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 text-xs font-bold uppercase tracking-wider transition-colors"
              >
                 <Icons.Exit className="w-4 h-4" /> {t.exit_game}
              </button>
@@ -910,53 +928,66 @@ export default function App() {
       </div>
 
       {/* Game Grid or Solo View */}
-      <div className="flex-1 flex items-center justify-center p-4 relative">
-         <button onClick={() => setShowRules(true)} className="absolute bottom-6 right-6 w-10 h-10 rounded-full bg-slate-800/50 border border-slate-600 hover:bg-slate-700 flex items-center justify-center text-white font-bold">?</button>
+      <div className="flex-1 flex items-center justify-center p-4 relative bg-radial-gradient">
+         <button onClick={() => setShowRules(true)} className="absolute bottom-6 right-6 w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/70 font-bold transition-all z-20">?</button>
 
          {isPlayingMiniGame && miniGameId ? (
-            <div className="w-full max-w-lg aspect-square md:aspect-auto md:h-[600px] flex flex-col">
-               <div className="glass-panel p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center flex-1 animate-in zoom-in duration-300">
-                  <div className="absolute top-4 left-4 text-xs font-mono text-slate-400">
+            <div className="w-full max-w-lg aspect-square md:aspect-auto md:h-[600px] flex flex-col z-10">
+               <div className="glass-panel p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center flex-1 animate-in zoom-in duration-300 border border-white/10">
+                  <div className="absolute top-6 left-6 text-xs font-mono text-white/30 tracking-widest uppercase">
                       {isSolo ? `${t.level_progress} ${myActiveCellIdx! + 1}` : `${t.game_playing} ${myActiveCellIdx! + 1}`}
                   </div>
-                  <h3 className="text-center text-2xl font-bold mb-8 text-white uppercase tracking-widest">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
-                  <MiniGameRenderer type={miniGameId} playerId={myId!} onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} language={settings.language} />
+                  <h3 className="text-center text-3xl font-black mb-10 text-white uppercase tracking-widest drop-shadow-md">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
+                  <div className="w-full flex-1">
+                     <MiniGameRenderer type={miniGameId} playerId={myId!} onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} language={settings.language} />
+                  </div>
                </div>
             </div>
          ) : (
             // This grid view only renders for ONLINE mode when no minigame is active
             !isSolo && (
-            <div className="grid grid-cols-3 gap-4 w-full max-w-md aspect-square">
+            <div className="grid grid-cols-3 gap-4 w-full max-w-md aspect-square z-10">
                {gameState.cells.map((cell) => {
                   const isOwnedByMe = cell.owner === myId;
                   const isOwnedByOpp = cell.owner && cell.owner !== myId;
                   const isOppActive = cell.activePlayers.includes(opponent.id);
-                  let baseClass = "glass-panel rounded-xl flex items-center justify-center relative transition-all duration-200 shadow-xl group";
-                  if (isOwnedByMe) baseClass += myId === 'P1' ? " bg-blue-500/20 border-blue-500/50" : " bg-red-500/20 border-red-500/50";
-                  else if (isOwnedByOpp) baseClass += " bg-gray-800/80 border-gray-700 opacity-80 grayscale-[0.3]";
-                  else baseClass += " hover:bg-white/10 cursor-pointer active:scale-95 hover:border-white/30";
+                  
+                  let baseClass = "glass-panel rounded-2xl flex items-center justify-center relative transition-all duration-300 shadow-xl group border-2";
+                  
+                  if (isOwnedByMe) {
+                      baseClass += myId === 'P1' 
+                        ? " bg-blue-500/20 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.2)]" 
+                        : " bg-red-500/20 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.2)]";
+                  } else if (isOwnedByOpp) {
+                      baseClass += " bg-gray-900/80 border-gray-800 opacity-60 grayscale-[0.5]";
+                  } else {
+                      baseClass += " border-white/5 hover:border-white/20 hover:bg-white/5 cursor-pointer active:scale-95";
+                  }
 
                   const canSteal = isOwnedByOpp && me.stealsRemaining > 0;
-                  if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-[0_0_20px_rgba(250,204,21,0.2)] cursor-crosshair";
+                  if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-[0_0_30px_rgba(250,204,21,0.3)] cursor-crosshair hover:scale-105 z-10";
 
                   return (
                      <div key={cell.id} onClick={() => sendAction({ type: 'CLICK_CELL', cellIndex: cell.id })} className={baseClass}>
-                        {cell.owner === 'P1' && <Icons.Flag className="w-10 h-10 text-blue-500 drop-shadow-lg" />}
-                        {cell.owner === 'P2' && <Icons.Flag className="w-10 h-10 text-red-500 drop-shadow-lg" />}
-                        {!cell.owner && <Icons.Question className="w-8 h-8 text-white/20 group-hover:text-white/40 transition-colors" />}
+                        {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-fade-in" />}
+                        {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-fade-in" />}
+                        {!cell.owner && <Icons.Question className="w-8 h-8 text-white/10 group-hover:text-white/40 transition-colors" />}
+                        
                         {isOppActive && (
-                           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 px-2 py-1 rounded-full backdrop-blur-sm border border-white/10">
-                              <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                              <span className="text-[10px] font-bold text-yellow-100 uppercase">{t.game_enemy}</span>
+                           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 px-2 py-1 rounded-full backdrop-blur-md border border-red-500/30 shadow-lg">
+                              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                              <span className="text-[10px] font-bold text-red-200 uppercase tracking-wide">{t.game_enemy}</span>
                            </div>
                         )}
+                        
                         {canSteal && (
-                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl backdrop-blur-[2px]">
-                              <Icons.Sword className="w-8 h-8 text-yellow-400 mb-1" />
+                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl backdrop-blur-sm">
+                              <Icons.Sword className="w-10 h-10 text-yellow-400 mb-2 animate-bounce" />
                               <span className="text-xs font-bold text-yellow-400 uppercase tracking-widest">{t.game_steal}</span>
                            </div>
                         )}
-                        <div className="absolute bottom-2 left-3 text-[10px] text-white/10 font-mono">{cell.id + 1}</div>
+                        
+                        <div className="absolute bottom-3 left-4 text-[10px] text-white/20 font-mono font-bold">{cell.id + 1}</div>
                      </div>
                   );
                })}
