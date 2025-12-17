@@ -1,0 +1,5 @@
+{
+  "name": "GridRush: 9-Cell Battle",
+  "description": "A high-stakes, 1v1 split-screen racing game where players compete to conquer a tic-tac-toe grid by completing random mini-games.",
+  "requestFramePermissions": []
+}
