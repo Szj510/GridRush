@@ -43,9 +43,11 @@ export interface GameState {
 // --- New Types for System ---
 
 export type Language = 'en' | 'zh';
+export type Theme = 'light' | 'dark';
 
 export interface AppSettings {
   language: Language;
+  theme: Theme;
   soundEnabled: boolean;
   musicEnabled: boolean;
 }

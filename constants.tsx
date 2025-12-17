@@ -153,6 +153,7 @@ export const TRANSLATIONS = {
     
     settings_title: "SETTINGS",
     settings_lang: "Language / 语言",
+    settings_theme: "Theme",
     settings_sound: "Sound Effects",
     settings_music: "Music",
     settings_data: "Clear Data",
@@ -206,6 +207,7 @@ export const TRANSLATIONS = {
 
     settings_title: "游戏设置",
     settings_lang: "语言 / Language",
+    settings_theme: "外观 / Theme",
     settings_sound: "音效",
     settings_music: "背景音乐",
     settings_data: "清除数据",

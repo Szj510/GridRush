@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Language } from '../types';
 import { MINI_GAME_TRANSLATIONS, Icons } from '../constants';
+import { audio } from '../services/audio';
 
 interface Props {
   type: string;
@@ -11,9 +12,15 @@ interface Props {
 
 const Button = ({ onClick, children, className, style, disabled }: any) => (
   <button 
-    onClick={(e) => { e.stopPropagation(); if (!disabled) onClick && onClick(); }}
+    onClick={(e) => { 
+      e.stopPropagation(); 
+      if (!disabled) { 
+        audio.playClick();
+        onClick && onClick(); 
+      }
+    }}
     disabled={disabled}
-    className={`px-6 py-3 rounded-xl font-bold text-lg active:scale-95 transition-transform select-none shadow-lg ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+    className={`px-6 py-3 rounded-xl font-bold text-lg active:scale-95 transition-transform select-none shadow-sm ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     style={style}
   >
     {children}
@@ -26,15 +33,17 @@ const useFeedback = () => {
   
   const trigger = (isCorrect: boolean) => {
     setFeedback(isCorrect ? 'CORRECT' : 'WRONG');
+    if (isCorrect) audio.playSuccess();
+    else audio.playFailure();
     setTimeout(() => setFeedback('NONE'), 300);
   };
   
-  const bgClass = feedback === 'CORRECT' ? 'bg-green-500/20' : feedback === 'WRONG' ? 'bg-red-500/20 animate-shake' : '';
+  const bgClass = feedback === 'CORRECT' ? 'bg-green-100 dark:bg-green-900/30 ring-2 ring-green-500' : feedback === 'WRONG' ? 'bg-red-100 dark:bg-red-900/30 ring-2 ring-red-500 animate-shake' : '';
   
   return { trigger, bgClass, feedback };
 };
 
-// 1. Math Rush (Score 3 to win)
+// 1. Math Rush
 const MathGame = ({ onComplete, language }: Props) => {
   const [problem, setProblem] = useState({ q: '', a: 0, options: [] as number[] });
   const [score, setScore] = useState(0);
@@ -79,20 +88,18 @@ const MathGame = ({ onComplete, language }: Props) => {
       } else {
         generateProblem();
       }
-    } else {
-       // Wrong answer penalty - slight delay or visual shake
     }
   };
 
   return (
     <div className={`flex flex-col items-center gap-6 w-full h-full justify-center rounded-3xl transition-colors duration-200 ${bgClass}`}>
-      <div className="flex justify-between w-full max-w-xs text-sm text-slate-400 font-mono">
+      <div className="flex justify-between w-full max-w-xs text-sm text-slate-500 dark:text-slate-400 font-mono">
          <span>{t.score}: {score}/{TARGET_SCORE}</span>
       </div>
-      <div className="text-5xl font-black mb-4 tracking-wider text-white drop-shadow-lg">{problem.q}</div>
+      <div className="text-5xl font-black mb-4 tracking-wider text-slate-800 dark:text-white drop-shadow-sm">{problem.q}</div>
       <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
         {problem.options.map((opt, i) => (
-          <Button key={i} onClick={() => handleAnswer(opt)} className="bg-slate-700 hover:bg-slate-600 text-white py-6 text-2xl border border-white/10">
+          <Button key={i} onClick={() => handleAnswer(opt)} className="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-6 text-2xl border border-slate-200 dark:border-slate-600">
             {opt}
           </Button>
         ))}
@@ -101,14 +108,14 @@ const MathGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 2. Power Mash (Unchanged, good mechanics)
+// 2. Power Mash
 const MashGame = ({ onComplete, language }: Props) => {
   const [progress, setProgress] = useState(30);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
   const mash = () => {
-    trigger(true);
+    audio.playPop(); // Special sound for mash
     setProgress(p => Math.min(100, p + 8));
   };
 
@@ -117,6 +124,7 @@ const MashGame = ({ onComplete, language }: Props) => {
       setProgress(p => {
         if (p >= 100) {
            clearInterval(timer);
+           audio.playSuccess();
            onComplete(true);
            return 100;
         }
@@ -129,8 +137,8 @@ const MashGame = ({ onComplete, language }: Props) => {
 
   return (
     <div className={`flex flex-col items-center w-full gap-6 h-full justify-center rounded-3xl ${bgClass}`}>
-      <div className="text-xl font-bold animate-pulse text-yellow-400">{t.mash_instr}</div>
-      <div className="w-full max-w-xs h-8 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+      <div className="text-xl font-bold animate-pulse text-yellow-500">{t.mash_instr}</div>
+      <div className="w-full max-w-xs h-8 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600">
         <div 
            className="h-full transition-all duration-75 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"
            style={{ width: `${progress}%` }}
@@ -138,7 +146,7 @@ const MashGame = ({ onComplete, language }: Props) => {
       </div>
       <Button 
         onClick={mash} 
-        className="w-40 h-40 rounded-full bg-red-600 border-b-8 border-red-800 active:border-b-0 active:translate-y-2 text-2xl shadow-red-900/50 flex items-center justify-center"
+        className="w-40 h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-2xl flex items-center justify-center hover:bg-red-400"
       >
         MASH!
       </Button>
@@ -146,7 +154,7 @@ const MashGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 3. Stroop Test (Score 5)
+// 3. Stroop Test
 const StroopGame = ({ onComplete, language }: Props) => {
   const colors = [
     { name: language === 'zh' ? '红' : 'RED', hex: '#ef4444', id: 'red' },
@@ -180,7 +188,6 @@ const StroopGame = ({ onComplete, language }: Props) => {
        if (nextScore >= TARGET) setTimeout(() => onComplete(true), 200);
        else nextRound();
     } else {
-       // Reset or penalty? Let's just reset streak for punishment
        setScore(0);
     }
   };
@@ -188,11 +195,11 @@ const StroopGame = ({ onComplete, language }: Props) => {
   return (
     <div className={`flex flex-col items-center gap-8 w-full h-full justify-center rounded-3xl transition-colors ${bgClass}`}>
       <div className="flex flex-col items-center">
-        <div className="text-xl text-slate-400 mb-2">{t.stroop_instr}</div>
-        <div className="text-sm font-mono text-slate-500">{t.score}: {score}/{TARGET}</div>
+        <div className="text-xl text-slate-500 dark:text-slate-400 mb-2">{t.stroop_instr}</div>
+        <div className="text-sm font-mono text-slate-400">{t.score}: {score}/{TARGET}</div>
       </div>
       <div 
-        className="text-7xl font-black tracking-widest drop-shadow-2xl h-24"
+        className="text-7xl font-black tracking-widest drop-shadow-sm h-24"
         style={{ color: current.color.hex }}
       >
         {current.text.name}
@@ -202,7 +209,7 @@ const StroopGame = ({ onComplete, language }: Props) => {
            <Button 
              key={c.id} 
              onClick={() => handleAnswer(c.id)}
-             className="h-20 border-2 border-transparent hover:border-white/20"
+             className="h-20 border-2 border-transparent hover:border-slate-300 dark:hover:border-white/20 shadow-none"
              style={{ backgroundColor: c.hex }}
            />
          ))}
@@ -211,7 +218,7 @@ const StroopGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 4. Reaction (Milliseconds check)
+// 4. Reaction
 const ReactionGame = ({ onComplete, language }: Props) => {
   const [status, setStatus] = useState<'WAIT' | 'GO' | 'EARLY' | 'SLOW' | 'RESULT'>('WAIT');
   const [resultMs, setResultMs] = useState(0);
@@ -225,6 +232,7 @@ const ReactionGame = ({ onComplete, language }: Props) => {
     const delay = 1500 + Math.random() * 2500; 
     timeoutRef.current = window.setTimeout(() => {
       setStatus('GO');
+      audio.playTone(600, 'square', 0.1); // Beep on GO
       startTimeRef.current = Date.now();
     }, delay);
   };
@@ -237,15 +245,18 @@ const ReactionGame = ({ onComplete, language }: Props) => {
   const handleClick = () => {
     if (status === 'WAIT') {
       setStatus('EARLY');
+      audio.playFailure();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     } else if (status === 'GO') {
       const diff = Date.now() - startTimeRef.current;
       setResultMs(diff);
       if (diff <= THRESHOLD) {
-         setStatus('RESULT'); // Success handled by render
+         setStatus('RESULT');
+         audio.playSuccess();
          setTimeout(() => onComplete(true), 800);
       } else {
          setStatus('SLOW');
+         audio.playFailure();
       }
     }
   };
@@ -254,11 +265,11 @@ const ReactionGame = ({ onComplete, language }: Props) => {
     <div className="flex flex-col items-center gap-4 w-full">
         <div 
         onMouseDown={handleClick} 
-        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-2xl
-            ${status === 'WAIT' ? 'bg-rose-900 border-4 border-rose-800' : 
-            status === 'GO' ? 'bg-emerald-500 border-4 border-emerald-400 scale-[1.02]' : 
-            status === 'RESULT' ? 'bg-blue-600' :
-            'bg-orange-600'}
+        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl
+            ${status === 'WAIT' ? 'bg-red-500' : 
+            status === 'GO' ? 'bg-green-500 scale-[1.02]' : 
+            status === 'RESULT' ? 'bg-blue-500' :
+            'bg-orange-500'}
         `}
         >
         <span className="text-4xl font-bold tracking-widest text-white drop-shadow-md text-center px-4">
@@ -276,7 +287,7 @@ const ReactionGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 5. Memory Matrix (Instant feedback)
+// 5. Memory Matrix
 const MatrixGame = ({ onComplete, language }: Props) => {
   const [pattern, setPattern] = useState<number[]>([]);
   const [input, setInput] = useState<number[]>([]);
@@ -294,6 +305,7 @@ const MatrixGame = ({ onComplete, language }: Props) => {
     
     setTimeout(() => {
        setPhase('INPUT');
+       audio.playTone(400, 'sine', 0.1);
     }, 1500);
   };
 
@@ -301,31 +313,34 @@ const MatrixGame = ({ onComplete, language }: Props) => {
 
   const handleClick = (i: number) => {
     if (phase === 'WATCH') return;
-    if (input.includes(i)) return; // Already clicked
+    if (input.includes(i)) return; 
 
+    audio.playClick();
     if (pattern.includes(i)) {
        const next = [...input, i];
        setInput(next);
        if (next.length === pattern.length) {
+          audio.playSuccess();
           setTimeout(() => onComplete(true), 300);
        }
     } else {
        setWrongIdx(i);
-       setTimeout(() => start(), 800); // Restart on fail
+       audio.playFailure();
+       setTimeout(() => start(), 800); 
     }
   };
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="text-xl font-bold text-blue-300">{phase === 'WATCH' ? t.repeat : t.repeat_go}</div>
+      <div className="text-xl font-bold text-blue-500 dark:text-blue-400">{phase === 'WATCH' ? t.repeat : t.repeat_go}</div>
       <div className="grid grid-cols-3 gap-3">
         {Array(9).fill(0).map((_, i) => {
            const isTarget = pattern.includes(i);
            const isSelected = input.includes(i);
            const isWrong = wrongIdx === i;
            
-           let bg = 'bg-slate-800 border-slate-700';
-           if (phase === 'WATCH' && isTarget) bg = 'bg-white shadow-[0_0_15px_white]';
+           let bg = 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700';
+           if (phase === 'WATCH' && isTarget) bg = 'bg-white dark:bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)]';
            if (phase === 'INPUT' && isSelected) bg = 'bg-green-500 shadow-[0_0_10px_#22c55e]';
            if (isWrong) bg = 'bg-red-500 animate-shake';
 
@@ -333,7 +348,7 @@ const MatrixGame = ({ onComplete, language }: Props) => {
              <button
                key={i}
                onClick={(e) => { e.stopPropagation(); handleClick(i); }}
-               className={`w-20 h-20 rounded-xl transition-all duration-150 border ${bg}`}
+               className={`w-20 h-20 rounded-xl transition-all duration-150 border-2 ${bg}`}
              />
            );
         })}
@@ -342,22 +357,20 @@ const MatrixGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 6. Lock Pick (Significantly Easier)
+// 6. Lock Pick
 const LockPickGame = ({ onComplete, language }: Props) => {
   const [level, setLevel] = useState(0);
   const [angle, setAngle] = useState(0);
   const [targetAngle, setTargetAngle] = useState(0);
-  // Decreased initial speed from 3/2 to 1.5 for better playability
   const [speed, setSpeed] = useState(1.5); 
   const reqRef = useRef(0);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
-  const TARGET_WIDTH = 40; // Widened target zone (was 30, then 34)
+  const TARGET_WIDTH = 40; 
 
   const startLevel = () => {
     setAngle(0);
-    // Random target between 60 and 300 degrees
     setTargetAngle(Math.random() * 240 + 60);
   };
 
@@ -379,25 +392,20 @@ const LockPickGame = ({ onComplete, language }: Props) => {
   }, [speed]);
 
   const click = () => {
-    // Check collision
-    // targetAngle is center of zone
     const diff = Math.abs(angle - targetAngle);
     if (diff <= TARGET_WIDTH / 2) {
-       // Hit!
        trigger(true);
        if (level >= 2) {
           setTimeout(() => onComplete(true), 300);
        } else {
           setLevel(l => l + 1);
-          setSpeed(s => s + 0.5); // Reduced acceleration (was +1.5/2)
+          setSpeed(s => s + 0.5); 
           startLevel();
        }
     } else {
-       // Miss
        trigger(false);
-       // Reset level
        setLevel(0);
-       setSpeed(1.5); // Reset to slower speed
+       setSpeed(1.5); 
        startLevel();
     }
   };
@@ -408,32 +416,19 @@ const LockPickGame = ({ onComplete, language }: Props) => {
       onMouseDown={click}
     >
       <div className="flex flex-col items-center">
-         <div className="text-xl font-bold mb-2">{t.lock_instr}</div>
+         <div className="text-xl font-bold mb-2 text-slate-700 dark:text-slate-200">{t.lock_instr}</div>
          <div className="flex gap-2">
             {[0, 1, 2].map(i => (
-               <div key={i} className={`w-3 h-3 rounded-full ${i < level ? 'bg-green-500' : 'bg-slate-700'}`} />
+               <div key={i} className={`w-3 h-3 rounded-full ${i < level ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`} />
             ))}
          </div>
       </div>
 
       <div className="relative w-64 h-64 cursor-pointer">
          {/* Track */}
-         <div className="absolute inset-0 rounded-full border-8 border-slate-700" />
+         <div className="absolute inset-0 rounded-full border-8 border-slate-200 dark:border-slate-800" />
          
          {/* Target Zone */}
-         <div 
-            className="absolute inset-0 rounded-full border-8 border-transparent border-t-green-500"
-            style={{ 
-               transform: `rotate(${targetAngle - 90}deg) rotate(-${TARGET_WIDTH/2}deg)`,
-               // Using clip path is cleaner for arcs but rotation works for visual hack
-            }}
-         />
-         {/* Better Target Visual using SVG */}
-         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100">
-             <circle cx="50" cy="50" r="46" fill="none" stroke="#334155" strokeWidth="8" />
-         </svg>
-         
-         {/* Re-implementing target zone using conic gradient for perfect arc */}
          <div 
             className="absolute inset-0 rounded-full"
             style={{
@@ -445,7 +440,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
 
          {/* Center */}
          <div className="absolute inset-0 flex items-center justify-center">
-             <Icons.Lock className="w-16 h-16 text-slate-500" />
+             <Icons.Lock className="w-16 h-16 text-slate-400 dark:text-slate-600" />
          </div>
 
          {/* Needle */}
@@ -454,7 +449,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
             style={{ transform: `rotate(${angle}deg)` }}
          >
              <div className="w-2 h-1/2 bg-transparent relative">
-                <div className="absolute top-0 w-4 h-4 -ml-1 bg-white rounded-full shadow-[0_0_10px_white]" />
+                <div className="absolute top-0 w-4 h-4 -ml-1 bg-slate-800 dark:bg-white rounded-full shadow-sm" />
              </div>
          </div>
       </div>
@@ -462,7 +457,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 7. Scramble Password (Added 0)
+// 7. Scramble Password
 const PasswordGame = ({ onComplete, language }: Props) => {
   const [code, setCode] = useState('');
   const [input, setInput] = useState('');
@@ -479,6 +474,7 @@ const PasswordGame = ({ onComplete, language }: Props) => {
   };
 
   const press = (n: number) => {
+    audio.playClick();
     const next = input + n;
     setInput(next);
     if (next === code) {
@@ -496,13 +492,13 @@ const PasswordGame = ({ onComplete, language }: Props) => {
 
   return (
      <div className={`flex flex-col items-center gap-4 w-full h-full justify-center rounded-3xl ${bgClass}`}>
-       <div className="text-sm text-slate-400">{t.type_code} <span className="text-white font-mono text-xl ml-2 tracking-widest bg-slate-800 px-2 rounded">{code}</span></div>
-       <div className="text-4xl font-mono tracking-[0.5em] text-blue-400 h-12 border-b-2 border-blue-500/30 mb-4">
+       <div className="text-sm text-slate-500">{t.type_code} <span className="text-slate-800 dark:text-white font-mono text-xl ml-2 tracking-widest bg-slate-200 dark:bg-slate-700 px-2 rounded">{code}</span></div>
+       <div className="text-4xl font-mono tracking-[0.5em] text-blue-500 dark:text-blue-400 h-12 border-b-2 border-blue-500/30 mb-4">
          {input.padEnd(4, '•')}
        </div>
        <div className="flex flex-wrap justify-center gap-2 max-w-xs">
          {layout.map(n => (
-           <Button key={n} onClick={() => press(n)} className="bg-slate-700 hover:bg-slate-600 w-16 h-16 text-2xl font-mono">
+           <Button key={n} onClick={() => press(n)} className="bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white w-16 h-16 text-2xl font-mono border border-slate-200 dark:border-slate-600">
              {n}
            </Button>
          ))}
@@ -511,7 +507,7 @@ const PasswordGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 8. Aim Lab (Dynamic Targets)
+// 8. Aim Lab (Burst) - FIXED LOGIC
 const BurstGame = ({ onComplete, language }: Props) => {
   const [target, setTarget] = useState<{id: number, x: number, y: number, size: number} | null>(null);
   const [score, setScore] = useState(0);
@@ -525,7 +521,7 @@ const BurstGame = ({ onComplete, language }: Props) => {
         id: Math.random(),
         x: Math.random() * 80 + 10,
         y: Math.random() * 80 + 10,
-        size: 100 // Percent
+        size: 100 
      });
   };
 
@@ -536,10 +532,12 @@ const BurstGame = ({ onComplete, language }: Props) => {
         if (failedRef.current) return;
         setTarget(curr => {
            if (!curr) return null;
-           const nextSize = curr.size - 0.8; // Shrink speed
+           const nextSize = curr.size - 0.8; 
            if (nextSize <= 0) {
-              failedRef.current = true;
-              onComplete(false); // Timeout fail
+              // CHANGE: Don't fail the whole game, just spawn new one (maybe sound failure)
+              // This fixes the "no ball spawns after miss" issue
+              audio.playFailure();
+              spawn(); 
               return null;
            }
            return { ...curr, size: nextSize };
@@ -548,14 +546,16 @@ const BurstGame = ({ onComplete, language }: Props) => {
      };
      reqRef.current = requestAnimationFrame(loop);
      return () => cancelAnimationFrame(reqRef.current);
-  }, [onComplete]);
+  }, []); // Logic contained inside state setter
 
   const hit = () => {
-     if (failedRef.current) return;
+     audio.playPop();
      const next = score + 1;
      setScore(next);
      if (next >= TARGET_COUNT) {
+        failedRef.current = true; // Stop loop
         setTarget(null);
+        audio.playSuccess();
         onComplete(true);
      } else {
         spawn();
@@ -563,15 +563,15 @@ const BurstGame = ({ onComplete, language }: Props) => {
   };
 
   return (
-    <div className="w-full h-full relative min-h-[300px] bg-slate-900/50 rounded-2xl border border-white/5 overflow-hidden cursor-crosshair">
-       <div className="absolute top-2 left-4 text-xs font-mono text-slate-400 pointer-events-none select-none z-10">
+    <div className="w-full h-full relative min-h-[300px] bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden cursor-crosshair">
+       <div className="absolute top-2 left-4 text-xs font-mono text-slate-500 pointer-events-none select-none z-10">
           {t.burst_instr} {score}/{TARGET_COUNT}
        </div>
        {target && (
          <button
            key={target.id}
            onMouseDown={(e) => { e.stopPropagation(); hit(); }}
-           className="absolute rounded-full bg-red-500 border-2 border-white shadow-[0_0_15px_rgba(239,68,68,1)] active:scale-110 transition-transform"
+           className="absolute rounded-full bg-red-500 border-2 border-white shadow-lg active:scale-110 transition-transform"
            style={{ 
                top: `${target.y}%`, 
                left: `${target.x}%`, 
@@ -590,7 +590,7 @@ const BurstGame = ({ onComplete, language }: Props) => {
   );
 };
 
-// 9. Sequence (Unchanged)
+// 9. Sequence
 const SequenceGame = ({ onComplete, language }: Props) => {
   const [next, setNext] = useState(1);
   const [buttons, setButtons] = useState<number[]>([]);
@@ -602,6 +602,7 @@ const SequenceGame = ({ onComplete, language }: Props) => {
   }, []);
 
   const click = (n: number) => {
+    audio.playClick();
     if (n === next) {
       if (n === 5) {
         trigger(true);
@@ -617,13 +618,13 @@ const SequenceGame = ({ onComplete, language }: Props) => {
 
   return (
     <div className={`flex flex-col items-center gap-6 w-full h-full justify-center rounded-3xl transition-colors ${bgClass}`}>
-      <div className="text-xl">{t.sequence_instr} <span className="font-bold text-yellow-400">1 → 5</span></div>
+      <div className="text-xl text-slate-800 dark:text-white">{t.sequence_instr} <span className="font-bold text-blue-500">1 → 5</span></div>
       <div className="flex flex-wrap gap-4 justify-center max-w-[320px]">
         {buttons.map(n => (
           <Button 
             key={n} 
             onClick={() => click(n)} 
-            className={`${n < next ? 'bg-emerald-600 opacity-20 scale-90' : 'bg-slate-700'} w-20 h-20 text-3xl transition-all duration-200`}
+            className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-20 h-20 text-3xl transition-all duration-200`}
           >
             {n}
           </Button>

@@ -3,6 +3,7 @@ import { GameState, PlayerId, PlayerState, CellData, StealNotification, NetworkM
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { MiniGameRenderer } from './components/MiniGames';
+import { audio } from './services/audio';
 
 declare global {
   interface Window {
@@ -29,6 +30,7 @@ const DEFAULT_GAME_STATE: GameState = {
 
 const DEFAULT_SETTINGS: AppSettings = {
   language: 'en',
+  theme: 'light',
   soundEnabled: true,
   musicEnabled: true,
 };
@@ -45,24 +47,24 @@ const DEFAULT_STATS: UserStats = {
 // --- Modals ---
 
 const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => (
-  <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-    <div className="glass-panel rounded-2xl p-8 max-w-lg w-full relative animate-fade-in border border-white/10">
-      <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">✕</button>
-      <h2 className="text-2xl font-bold mb-6 text-center text-white tracking-widest uppercase">
+  <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-lg w-full relative animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
+      <button onClick={() => { audio.playClick(); onClose(); }} className="absolute top-6 right-6 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
+      <h2 className="text-2xl font-bold mb-6 text-center text-slate-900 dark:text-white tracking-widest uppercase">
         {t.rules_title}
       </h2>
-      <div className="space-y-6 text-white/80 text-sm md:text-base leading-relaxed font-light">
-        <p><strong className="text-white font-semibold">Goal:</strong> {t.rules_goal}</p>
-        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-          <strong className="block text-blue-400 mb-2 font-semibold">🏁 Racing</strong>
+      <div className="space-y-6 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
+        <p><strong className="text-slate-900 dark:text-white font-semibold">Goal:</strong> {t.rules_goal}</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+          <strong className="block text-blue-600 dark:text-blue-400 mb-2 font-semibold">🏁 Racing</strong>
           {t.rules_race}
         </div>
-        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-          <strong className="block text-red-400 mb-2 font-semibold">⚔️ Stealing</strong>
+        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
+          <strong className="block text-red-600 dark:text-red-400 mb-2 font-semibold">⚔️ Stealing</strong>
           {t.rules_steal}
         </div>
       </div>
-      <button onClick={onClose} className="w-full mt-8 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-xl transition-all">
+      <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-8 bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 font-bold py-3 rounded-xl transition-all shadow-lg">
         OK
       </button>
     </div>
@@ -83,55 +85,69 @@ const SettingsModal = ({
   t: any 
 }) => {
   return (
-    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="glass-panel rounded-2xl p-8 max-w-md w-full animate-fade-in">
-        <h2 className="text-xl font-bold mb-8 text-white flex items-center gap-3 tracking-widest uppercase">
+    <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
+        <h2 className="text-xl font-bold mb-8 text-slate-900 dark:text-white flex items-center gap-3 tracking-widest uppercase">
           <Icons.Settings className="w-5 h-5" /> {t.settings_title}
         </h2>
 
-        <div className="space-y-8">
+        <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <span className="text-white/60 font-light">{t.settings_lang}</span>
-            <div className="flex bg-black/20 rounded-lg p-1">
+            <span className="text-slate-600 dark:text-slate-300">{t.settings_lang}</span>
+            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
               <button 
-                onClick={() => onUpdate({ ...settings, language: 'en' })}
-                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'en' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'}`}
+                onClick={() => { audio.playClick(); onUpdate({ ...settings, language: 'en' }); }}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'en' ? 'bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >EN</button>
               <button 
-                onClick={() => onUpdate({ ...settings, language: 'zh' })}
-                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'zh' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/60'}`}
+                onClick={() => { audio.playClick(); onUpdate({ ...settings, language: 'zh' }); }}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.language === 'zh' ? 'bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >中文</button>
             </div>
           </div>
 
           <div className="flex justify-between items-center">
-             <span className="text-white/60 font-light">{t.settings_sound}</span>
+            <span className="text-slate-600 dark:text-slate-300">{t.settings_theme}</span>
+            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+              <button 
+                onClick={() => { audio.playClick(); onUpdate({ ...settings, theme: 'light' }); }}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.theme === 'light' ? 'bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+              >Light</button>
+              <button 
+                onClick={() => { audio.playClick(); onUpdate({ ...settings, theme: 'dark' }); }}
+                className={`px-4 py-1.5 rounded text-sm transition-all ${settings.theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow text-slate-900 dark:text-white' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+              >Dark</button>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+             <span className="text-slate-600 dark:text-slate-300">{t.settings_sound}</span>
              <button 
-               onClick={() => onUpdate({ ...settings, soundEnabled: !settings.soundEnabled })}
-               className={`w-12 h-6 rounded-full transition-colors relative ${settings.soundEnabled ? 'bg-emerald-500/80' : 'bg-white/10'}`}
+               onClick={() => { audio.playClick(); onUpdate({ ...settings, soundEnabled: !settings.soundEnabled }); }}
+               className={`w-12 h-6 rounded-full transition-colors relative ${settings.soundEnabled ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}
              >
                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.soundEnabled ? 'left-7' : 'left-1'}`} />
              </button>
           </div>
 
            <div className="flex justify-between items-center">
-             <span className="text-white/60 font-light">{t.settings_music}</span>
+             <span className="text-slate-600 dark:text-slate-300">{t.settings_music}</span>
              <button 
-               onClick={() => onUpdate({ ...settings, musicEnabled: !settings.musicEnabled })}
-               className={`w-12 h-6 rounded-full transition-colors relative ${settings.musicEnabled ? 'bg-emerald-500/80' : 'bg-white/10'}`}
+               onClick={() => { audio.playClick(); onUpdate({ ...settings, musicEnabled: !settings.musicEnabled }); }}
+               className={`w-12 h-6 rounded-full transition-colors relative ${settings.musicEnabled ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}
              >
                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.musicEnabled ? 'left-7' : 'left-1'}`} />
              </button>
           </div>
 
-          <div className="pt-6 border-t border-white/5">
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
              <div className="flex justify-between items-center">
                <div>
-                  <div className="text-red-400 font-medium text-sm">{t.settings_data}</div>
+                  <div className="text-red-500 font-medium text-sm">{t.settings_data}</div>
                </div>
                <button 
-                 onClick={onClearData}
-                 className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 rounded-lg text-xs tracking-wider uppercase transition-colors"
+                 onClick={() => { audio.playClick(); onClearData(); }}
+                 className="px-4 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 rounded-lg text-xs tracking-wider uppercase transition-colors"
                >
                  {t.settings_reset}
                </button>
@@ -139,7 +155,7 @@ const SettingsModal = ({
           </div>
         </div>
 
-        <button onClick={onClose} className="w-full mt-8 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-medium transition-colors">
+        <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-medium transition-colors hover:opacity-90 shadow-lg">
           {t.settings_close}
         </button>
       </div>
@@ -148,13 +164,13 @@ const SettingsModal = ({
 };
 
 const AchievementsModal = ({ stats, language, onClose, t }: { stats: UserStats, language: string, onClose: () => void, t: any }) => (
-  <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-    <div className="glass-panel rounded-2xl max-w-2xl w-full flex flex-col max-h-[80vh] animate-fade-in border border-white/10">
-      <div className="p-6 border-b border-white/10 flex justify-between items-center">
-        <h2 className="text-xl font-bold text-yellow-400/90 flex items-center gap-2 uppercase tracking-widest">
+  <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full flex flex-col max-h-[80vh] animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-yellow-500 flex items-center gap-2 uppercase tracking-widest">
           <Icons.Trophy className="w-5 h-5" /> {t.ach_title}
         </h2>
-        <button onClick={onClose} className="text-2xl text-white/50 hover:text-white transition-colors">✕</button>
+        <button onClick={() => { audio.playClick(); onClose(); }} className="text-2xl text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
       </div>
       
       <div className="overflow-y-auto p-6 space-y-3 custom-scrollbar">
@@ -164,13 +180,13 @@ const AchievementsModal = ({ stats, language, onClose, t }: { stats: UserStats, 
           const desc = language === 'zh' ? ach.descZh : ach.descEn;
 
           return (
-            <div key={ach.id} className={`p-4 rounded-xl border transition-all ${unlocked ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-white/5 border-transparent opacity-50'} flex items-center gap-4`}>
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${unlocked ? 'bg-yellow-500/20 text-yellow-400' : 'bg-black/20 text-white/20'}`}>
+            <div key={ach.id} className={`p-4 rounded-xl border transition-all ${unlocked ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-700' : 'bg-slate-50 dark:bg-slate-800/50 border-transparent opacity-60'} flex items-center gap-4`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${unlocked ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-500' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
                 {ach.icon}
               </div>
               <div className="flex-1">
-                <h3 className={`font-bold text-base ${unlocked ? 'text-white' : 'text-white/50'}`}>{title}</h3>
-                <p className="text-xs text-white/40 mt-1">{desc}</p>
+                <h3 className={`font-bold text-base ${unlocked ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{title}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{desc}</p>
               </div>
             </div>
           );
@@ -195,51 +211,50 @@ const MainMenu = ({
     {/* Top Right Controls */}
     <div className="absolute top-6 right-6 flex gap-3">
       <button 
-        onClick={onShowAchievements}
-        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-yellow-400 transition-all"
+        onClick={() => { audio.playClick(); onShowAchievements(); }}
+        className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-yellow-500 transition-all"
       >
-        <Icons.Trophy className="w-4 h-4" />
+        <Icons.Trophy className="w-5 h-5" />
       </button>
       <button 
-        onClick={onShowSettings}
-        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"
+        onClick={() => { audio.playClick(); onShowSettings(); }}
+        className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all"
       >
-        <Icons.Settings className="w-4 h-4" />
+        <Icons.Settings className="w-5 h-5" />
       </button>
       <button 
-        onClick={onShowRules}
-        className="w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/80 hover:text-white font-bold transition-all"
+        onClick={() => { audio.playClick(); onShowRules(); }}
+        className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-bold transition-all"
       >
         ?
       </button>
     </div>
 
-    <div className="mb-16 text-center relative">
-      <div className="absolute -inset-10 bg-blue-500/20 blur-[100px] rounded-full pointer-events-none" />
-      <h1 className="text-6xl md:text-8xl font-black mb-4 text-white tracking-tighter drop-shadow-2xl relative z-10">
-        GRID<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">RUSH</span>
+    <div className="mb-16 text-center">
+      <h1 className="text-6xl md:text-8xl font-black mb-4 text-slate-900 dark:text-white tracking-tighter drop-shadow-sm">
+        GRID<span className="text-blue-500">RUSH</span>
       </h1>
-      <p className="text-white/40 font-mono text-sm md:text-base tracking-[0.3em] uppercase">{t.menu_subtitle}</p>
+      <p className="text-slate-400 font-mono text-sm md:text-base tracking-[0.3em] uppercase">{t.menu_subtitle}</p>
     </div>
 
-    <div className="flex flex-col gap-4 w-full max-w-sm relative z-10">
-      <button onClick={onOnline} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-blue-500/50 hover:bg-blue-500/10 transition-all">
-        <Icons.Sword className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" /> 
+    <div className="flex flex-col gap-4 w-full max-w-sm">
+      <button onClick={() => { audio.playClick(); onOnline(); }} className="group w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all border border-slate-100 dark:border-slate-700">
+        <Icons.Sword className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" /> 
         <span className="font-bold tracking-widest text-lg">{t.menu_online}</span>
       </button>
 
-      <button onClick={onChallenge} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-yellow-500/50 hover:bg-yellow-500/10 transition-all">
-        <Icons.Clock className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" /> 
+      <button onClick={() => { audio.playClick(); onChallenge(); }} className="group w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all border border-slate-100 dark:border-slate-700">
+        <Icons.Clock className="w-5 h-5 text-yellow-500 group-hover:scale-110 transition-transform" /> 
         <span className="font-bold tracking-widest text-lg">{t.menu_solo}</span>
       </button>
 
-      <button onClick={onPractice} className="group w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all">
-        <Icons.Dumbbell className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" /> 
+      <button onClick={() => { audio.playClick(); onPractice(); }} className="group w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all border border-slate-100 dark:border-slate-700">
+        <Icons.Dumbbell className="w-5 h-5 text-green-500 group-hover:scale-110 transition-transform" /> 
         <span className="font-bold tracking-widest text-lg">{t.menu_practice}</span>
       </button>
 
-      <button onClick={onShowAchievements} className="md:hidden w-full py-5 premium-btn rounded-2xl flex items-center justify-center gap-4 text-white">
-        <Icons.Trophy className="w-5 h-5 text-yellow-400" /> 
+      <button onClick={() => { audio.playClick(); onShowAchievements(); }} className="md:hidden w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl border border-slate-100 dark:border-slate-700">
+        <Icons.Trophy className="w-5 h-5 text-yellow-500" /> 
         <span className="font-bold tracking-widest text-lg">{t.menu_achievements}</span>
       </button>
     </div>
@@ -260,28 +275,25 @@ const PracticeMode = ({ onBack, t, language }: { onBack: () => void, t: any, lan
   };
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col overflow-hidden bg-black">
-       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/20 to-black pointer-events-none" />
-
+    <div className="absolute inset-0 z-30 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
       <div className="p-6 flex items-center gap-4 z-10">
-        <button onClick={onBack} className="text-white/50 hover:text-white transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-widest">
+        <button onClick={() => { audio.playClick(); onBack(); }} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-widest">
            ← Back
         </button>
       </div>
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full overflow-y-auto custom-scrollbar z-10">
-        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400 mb-8 uppercase tracking-tighter">
+        <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-8 uppercase tracking-tighter">
            {t.menu_practice}
         </h2>
 
         {activeGame ? (
            <div className="flex flex-col items-center animate-fade-in h-[600px]">
              <div className="flex justify-between w-full max-w-md mb-6 items-center">
-               <h3 className="text-xl font-bold text-white uppercase tracking-widest">{MINI_GAMES.find(g => g.id === activeGame)?.name}</h3>
-               <button onClick={() => setActiveGame(null)} className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wider">Close</button>
+               <h3 className="text-xl font-bold text-slate-800 dark:text-white uppercase tracking-widest">{MINI_GAMES.find(g => g.id === activeGame)?.name}</h3>
+               <button onClick={() => { audio.playClick(); setActiveGame(null); }} className="text-xs bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wider">Close</button>
              </div>
-             <div className="glass-panel p-8 rounded-3xl w-full max-w-md h-full shadow-2xl border border-white/10">
+             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-md h-full shadow-2xl border border-slate-200 dark:border-slate-800">
                 <MiniGameRenderer type={activeGame} playerId="P1" onComplete={handleComplete} language={language} />
              </div>
            </div>
@@ -290,11 +302,11 @@ const PracticeMode = ({ onBack, t, language }: { onBack: () => void, t: any, lan
             {MINI_GAMES.map(game => (
               <button 
                 key={game.id}
-                onClick={() => setActiveGame(game.id)}
-                className="premium-btn p-8 rounded-2xl flex flex-col items-center gap-4 group"
+                onClick={() => { audio.playClick(); setActiveGame(game.id); }}
+                className="bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 group shadow-md hover:shadow-xl transition-all border border-slate-100 dark:border-slate-700"
               >
-                <div className="text-4xl group-hover:scale-110 transition-transform duration-300 drop-shadow-lg">{game.icon}</div>
-                <div className="font-bold text-white group-hover:text-emerald-300 transition-colors uppercase tracking-wide text-sm">{game.name}</div>
+                <div className="text-4xl group-hover:scale-110 transition-transform duration-300 drop-shadow-md">{game.icon}</div>
+                <div className="font-bold text-slate-800 dark:text-white group-hover:text-blue-500 transition-colors uppercase tracking-wide text-sm">{game.name}</div>
               </button>
             ))}
           </div>
@@ -311,75 +323,77 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
-      <button onClick={onBack} className="absolute top-6 left-6 text-white/40 hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
+      <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
       
-      <h2 className="text-4xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 uppercase tracking-tighter">{t.menu_online}</h2>
+      <h2 className="text-4xl font-black mb-12 text-slate-900 dark:text-white uppercase tracking-tighter">{t.menu_online}</h2>
       
       {isConnecting ? (
         <div className="flex flex-col items-center animate-fade-in">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin mb-6"></div>
-          <p className="text-white/60 font-mono text-sm tracking-widest animate-pulse">{t.online_connecting}</p>
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+          <p className="text-slate-500 dark:text-slate-400 font-mono text-sm tracking-widest animate-pulse">{t.online_connecting}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in">
           <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1 glass-panel p-8 rounded-2xl flex flex-col items-center hover:border-blue-500/50 transition-colors group">
-              <h3 className="text-lg font-bold mb-2 text-blue-400 uppercase tracking-widest group-hover:text-blue-300 transition-colors">{t.online_host}</h3>
-              <p className="text-xs text-white/40 text-center mb-8 h-8">{t.online_host_desc}</p>
-              <button onClick={onCreate} className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-900/50 transition-all active:scale-95">{t.online_create}</button>
+            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors group">
+              <h3 className="text-lg font-bold mb-2 text-blue-500 uppercase tracking-widest">{t.online_host}</h3>
+              <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_host_desc}</p>
+              <button onClick={() => { audio.playClick(); onCreate(); }} className="w-full py-4 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-500/30 text-white transition-all active:scale-95">{t.online_create}</button>
             </div>
             
-            <div className="flex-1 glass-panel p-8 rounded-2xl flex flex-col items-center hover:border-red-500/50 transition-colors group">
-              <h3 className="text-lg font-bold mb-2 text-red-400 uppercase tracking-widest group-hover:text-red-300 transition-colors">{t.online_join}</h3>
-              <p className="text-xs text-white/40 text-center mb-8 h-8">{t.online_join_desc}</p>
+            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-red-500 transition-colors group">
+              <h3 className="text-lg font-bold mb-2 text-red-500 uppercase tracking-widest">{t.online_join}</h3>
+              <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_join_desc}</p>
               <div className="flex w-full gap-2">
                 <input 
                   value={joinId} 
                   onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} 
                   placeholder="CODE" 
-                  className="flex-1 bg-black/40 border border-white/10 focus:border-white/30 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-white placeholder-white/20 transition-colors" 
+                  className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-red-500 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-slate-900 dark:text-white placeholder-slate-400 transition-colors" 
                 />
-                <button onClick={() => onJoin(joinId)} disabled={joinId.length !== 4} className="px-6 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-900/50 transition-all active:scale-95">{t.online_join_btn}</button>
+                <button onClick={() => { audio.playClick(); onJoin(joinId); }} disabled={joinId.length !== 4} className="px-6 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-500/30 transition-all active:scale-95">{t.online_join_btn}</button>
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-white/20 mt-8 text-center max-w-md mx-auto">{t.online_instruction}</p>
+          <p className="text-[10px] text-slate-400 mt-8 text-center max-w-md mx-auto">{t.online_instruction}</p>
         </div>
       )}
-      {error && <div className="mt-8 bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-3 rounded-lg text-sm">{error}</div>}
+      {error && <div className="mt-8 bg-red-50 text-red-500 px-6 py-3 rounded-lg text-sm border border-red-200">{error}</div>}
     </div>
   );
 };
 
 const WaitingRoom = ({ roomId, onCancel, t }: { roomId: string, onCancel: () => void, t: any }) => (
   <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
-    <div className="glass-panel p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in">
-      <h2 className="text-white/40 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
-      <div className="text-6xl font-mono font-bold tracking-widest text-white mb-10 select-all cursor-pointer bg-black/30 px-8 py-6 rounded-2xl border border-white/5 hover:border-white/20 transition-colors">{roomId}</div>
+    <div className="bg-white dark:bg-slate-800 p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
+      <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
+      <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-10 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
       <div className="flex items-center gap-3 mb-10">
         <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-        <span className="text-blue-300 text-sm font-medium tracking-wide">{t.online_waiting}</span>
+        <span className="text-blue-500 text-sm font-medium tracking-wide">{t.online_waiting}</span>
       </div>
-      <button onClick={onCancel} className="text-white/30 hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
+      <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
     </div>
   </div>
 );
 
 const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe: boolean, opponent?: boolean, t: any }) => {
-  const colorClass = player.id === 'P1' ? 'text-blue-400' : 'text-red-400';
-  const borderClass = player.id === 'P1' ? 'border-blue-500/50 bg-blue-500/10' : 'border-red-500/50 bg-red-500/10';
+  const colorClass = player.id === 'P1' ? 'text-blue-500' : 'text-red-500';
+  const borderClass = player.id === 'P1' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
   
   return (
     <div className={`flex items-center gap-4 ${opponent ? 'flex-row-reverse text-right' : ''}`}>
-      <div className={`w-14 h-14 rounded-2xl border ${borderClass} flex items-center justify-center text-xl font-bold shadow-lg backdrop-blur-sm`}>
-        {player.id === 'P1' ? 'P1' : 'P2'}
+      <div className={`w-14 h-14 rounded-2xl border-2 ${borderClass} flex items-center justify-center text-xl font-bold shadow-sm`}>
+        <span className={player.id === 'P1' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
+            {player.id === 'P1' ? 'P1' : 'P2'}
+        </span>
       </div>
       <div>
         <div className={`font-bold ${colorClass} text-lg tracking-wide`}>{isMe ? t.game_you : player.name}</div>
-        <div className="text-xs text-white/40 flex items-center gap-1.5 mt-1">
+        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
           {player.stealsRemaining > 0 ? (
              <>
-               <span className="text-yellow-400">★</span> 
+               <span className="text-yellow-500">★</span> 
                <span className="opacity-70">{t.game_ready}</span>
              </>
           ) : (
@@ -437,6 +451,33 @@ export default function App() {
     } catch (e) { console.error('Load failed', e); }
   }, []);
 
+  // --- Audio & Theme Effects ---
+  useEffect(() => {
+    audio.setSettings(settings.soundEnabled, settings.musicEnabled);
+    if (settings.musicEnabled && appMode !== 'MENU') {
+        audio.startMusic();
+    } else {
+        audio.stopMusic();
+    }
+  }, [settings, appMode]);
+
+  useEffect(() => {
+      // Initialize Audio Context on first interaction
+      const initAudio = () => audio.init();
+      window.addEventListener('click', initAudio, { once: true });
+      return () => window.removeEventListener('click', initAudio);
+  }, []);
+
+  useEffect(() => {
+      // Apply theme
+      const root = document.documentElement;
+      if (settings.theme === 'dark') {
+          root.classList.add('dark');
+      } else {
+          root.classList.remove('dark');
+      }
+  }, [settings.theme]);
+
   const saveStats = (newStats: UserStats) => {
     setStats(newStats);
     localStorage.setItem('gridrush_stats', JSON.stringify(newStats));
@@ -465,6 +506,7 @@ export default function App() {
       if (!unlocked.includes(ach.id) && ach.condition(currentStats)) {
         unlocked.push(ach.id);
         setNewAchievement(ach.titleEn); // Show toast
+        audio.playWin(); // Achievement sound
         changed = true;
         setTimeout(() => setNewAchievement(null), 4000);
       }
@@ -522,6 +564,7 @@ export default function App() {
   // --- Game Logic ---
 
   const startNewGame = (mode: 'ONLINE' | 'SOLO') => {
+    audio.playClick();
     let gameIds: string[];
     let numCells = 9;
 
@@ -668,6 +711,7 @@ export default function App() {
            const timeTaken = Date.now() - challengeStartTime;
            const newFastest = (stats.fastestSoloRun === 0 || timeTaken < stats.fastestSoloRun) ? timeTaken : stats.fastestSoloRun;
            saveStats({ ...stats, fastestSoloRun: newFastest });
+           audio.playWin();
            
            return {
              ...prev,
@@ -709,6 +753,8 @@ export default function App() {
       if (roleRef.current === 'HOST' && winner) {
           if (winner === 'P1') saveStats({ ...stats, onlineWins: stats.onlineWins + 1 });
       }
+
+      if (winner) audio.playWin();
 
       return {
         ...prev,
@@ -798,13 +844,14 @@ export default function App() {
     roleRef.current = 'NONE';
     setError(null);
     setAppMode('MENU');
+    audio.playClick();
   };
 
   // --- Render ---
 
   if (appMode === 'MENU') {
     return (
-      <>
+      <div className="w-full h-full text-slate-900 dark:text-white transition-colors duration-300">
         {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
@@ -817,7 +864,7 @@ export default function App() {
           onShowAchievements={() => setShowAchievements(true)}
           t={t}
         />
-      </>
+      </div>
     );
   }
 
@@ -844,14 +891,14 @@ export default function App() {
   const miniGameId = isPlayingMiniGame && myActiveCellIdx !== null ? gameState.cells[myActiveCellIdx].gameId : null;
 
   return (
-    <div className="h-screen w-screen flex flex-col relative overflow-hidden">
+    <div className="h-screen w-screen flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
       {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
 
       {/* Achievement Toast */}
       {newAchievement && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 fade-in duration-300">
-           <div className="bg-yellow-500 text-black px-6 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(234,179,8,0.5)] flex items-center gap-2 border border-yellow-400">
+           <div className="bg-yellow-500 text-white px-6 py-3 rounded-full font-bold shadow-xl flex items-center gap-2 border border-yellow-400">
              <Icons.Trophy className="w-5 h-5" />
              <span>Unlocked: {newAchievement}</span>
            </div>
@@ -860,13 +907,13 @@ export default function App() {
 
       {/* Winner Overlay */}
       {gameState.winner && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="text-center animate-bounce">
             <h2 className="text-5xl md:text-7xl font-black mb-4 text-white">
               {isSolo ? t.msg_challenge_complete : (gameState.winner === 'DRAW' ? t.msg_draw : (gameState.winner === myId ? t.msg_win : t.msg_lose))}
             </h2>
             {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">TIME: {challengeTime}</div>}
-            <button onClick={resetGame} className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-colors text-white font-bold uppercase tracking-widest">Back to Menu</button>
+            <button onClick={resetGame} className="mt-8 px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">Back to Menu</button>
           </div>
         </div>
       )}
@@ -878,11 +925,11 @@ export default function App() {
             const { defenderId, expiresAt, cellId } = gameState.stealNotification!;
             const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
             const isDefender = myId === defenderId;
-            const bgClass = isDefender ? 'bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)]' : 'bg-blue-600 shadow-[0_0_30px_rgba(37,99,235,0.5)]';
+            const bgClass = isDefender ? 'bg-red-500 shadow-red-500/50' : 'bg-blue-500 shadow-blue-500/50';
             const showDefendBtn = isDefender && me.activeCell !== cellId;
 
             return (
-              <div className={`mx-4 p-5 rounded-2xl border border-white/20 ${bgClass} text-white flex justify-between items-center animate-pulse-fast pointer-events-auto`}>
+              <div className={`mx-4 p-5 rounded-2xl ${bgClass} shadow-xl text-white flex justify-between items-center animate-pulse-fast pointer-events-auto`}>
                 <div>
                    <h3 className="font-bold uppercase text-lg tracking-wider">{isDefender ? t.msg_steal_attack : t.msg_steal_doing}</h3>
                    <div className="text-sm opacity-90">{isDefender ? `Opponent is stealing Cell ${cellId + 1}!` : `Stealing Cell ${cellId + 1} from opponent!`}</div>
@@ -890,7 +937,7 @@ export default function App() {
                 <div className="flex items-center gap-4">
                   <span className="text-4xl font-mono font-black">{remaining}s</span>
                   {showDefendBtn && (
-                    <button onClick={() => sendAction({ type: 'DEFEND' })} className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:scale-105 active:scale-95 transition-transform shadow-lg">{t.msg_defend}</button>
+                    <button onClick={() => { audio.playClick(); sendAction({ type: 'DEFEND' }); }} className="px-6 py-2 bg-white text-black font-bold rounded-lg hover:scale-105 active:scale-95 transition-transform shadow-lg">{t.msg_defend}</button>
                   )}
                 </div>
               </div>
@@ -900,25 +947,25 @@ export default function App() {
       )}
 
       {/* HUD */}
-      <div className="h-20 md:h-24 glass-panel border-b border-white/10 flex justify-between items-center px-4 md:px-12 z-10 shrink-0 relative">
+      <div className="h-20 md:h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center px-4 md:px-12 z-10 shrink-0 relative shadow-sm">
          <PlayerBadge player={me} isMe={true} t={t} />
          <div className="flex flex-col items-center">
             {isSolo ? (
                 <div className="flex flex-col items-center gap-1">
-                    <div className="text-3xl font-mono font-bold text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]">{challengeTime}</div>
-                    <div className="text-[10px] text-white/50 font-mono tracking-[0.3em] uppercase">{t.level_progress} {myActiveCellIdx !== null ? myActiveCellIdx + 1 : '-'}/{gameState.cells.length}</div>
+                    <div className="text-3xl font-mono font-bold text-slate-800 dark:text-yellow-500">{challengeTime}</div>
+                    <div className="text-[10px] text-slate-400 font-mono tracking-[0.3em] uppercase">{t.level_progress} {myActiveCellIdx !== null ? myActiveCellIdx + 1 : '-'}/{gameState.cells.length}</div>
                 </div>
             ) : (
                 <>
-                    <div className="text-3xl font-black italic text-white/5 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
-                    <div className="text-[10px] text-white/30 font-mono mt-8 bg-black/20 px-2 py-1 rounded">ROOM: {roomId}</div>
+                    <div className="text-3xl font-black italic text-slate-100 dark:text-slate-800 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-8 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">ROOM: {roomId}</div>
                 </>
             )}
          </div>
          {isSolo ? (
              <button 
                 onClick={resetGame}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 text-xs font-bold uppercase tracking-wider transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 border border-red-200 dark:border-red-800 text-xs font-bold uppercase tracking-wider transition-colors"
              >
                 <Icons.Exit className="w-4 h-4" /> {t.exit_game}
              </button>
@@ -928,16 +975,16 @@ export default function App() {
       </div>
 
       {/* Game Grid or Solo View */}
-      <div className="flex-1 flex items-center justify-center p-4 relative bg-radial-gradient">
-         <button onClick={() => setShowRules(true)} className="absolute bottom-6 right-6 w-10 h-10 rounded-full glass-panel hover:bg-white/10 flex items-center justify-center text-white/70 font-bold transition-all z-20">?</button>
+      <div className="flex-1 flex items-center justify-center p-4 relative">
+         <button onClick={() => { audio.playClick(); setShowRules(true); }} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white font-bold transition-all z-20">?</button>
 
          {isPlayingMiniGame && miniGameId ? (
             <div className="w-full max-w-lg aspect-square md:aspect-auto md:h-[600px] flex flex-col z-10">
-               <div className="glass-panel p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center flex-1 animate-in zoom-in duration-300 border border-white/10">
-                  <div className="absolute top-6 left-6 text-xs font-mono text-white/30 tracking-widest uppercase">
+               <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center flex-1 animate-in zoom-in duration-300 border border-slate-200 dark:border-slate-800">
+                  <div className="absolute top-6 left-6 text-xs font-mono text-slate-400 tracking-widest uppercase">
                       {isSolo ? `${t.level_progress} ${myActiveCellIdx! + 1}` : `${t.game_playing} ${myActiveCellIdx! + 1}`}
                   </div>
-                  <h3 className="text-center text-3xl font-black mb-10 text-white uppercase tracking-widest drop-shadow-md">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
+                  <h3 className="text-center text-3xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
                   <div className="w-full flex-1">
                      <MiniGameRenderer type={miniGameId} playerId={myId!} onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} language={settings.language} />
                   </div>
@@ -952,42 +999,42 @@ export default function App() {
                   const isOwnedByOpp = cell.owner && cell.owner !== myId;
                   const isOppActive = cell.activePlayers.includes(opponent.id);
                   
-                  let baseClass = "glass-panel rounded-2xl flex items-center justify-center relative transition-all duration-300 shadow-xl group border-2";
+                  let baseClass = "rounded-2xl flex items-center justify-center relative transition-all duration-300 shadow-lg group border-4";
                   
                   if (isOwnedByMe) {
                       baseClass += myId === 'P1' 
-                        ? " bg-blue-500/20 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.2)]" 
-                        : " bg-red-500/20 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.2)]";
+                        ? " bg-blue-100 border-blue-500 dark:bg-blue-900/40 dark:border-blue-500" 
+                        : " bg-red-100 border-red-500 dark:bg-red-900/40 dark:border-red-500";
                   } else if (isOwnedByOpp) {
-                      baseClass += " bg-gray-900/80 border-gray-800 opacity-60 grayscale-[0.5]";
+                      baseClass += " bg-slate-200 border-slate-300 dark:bg-slate-800 dark:border-slate-700 opacity-60 grayscale-[0.5]";
                   } else {
-                      baseClass += " border-white/5 hover:border-white/20 hover:bg-white/5 cursor-pointer active:scale-95";
+                      baseClass += " bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 cursor-pointer active:scale-95";
                   }
 
                   const canSteal = isOwnedByOpp && me.stealsRemaining > 0;
-                  if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-[0_0_30px_rgba(250,204,21,0.3)] cursor-crosshair hover:scale-105 z-10";
+                  if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-yellow-400/50 cursor-crosshair hover:scale-105 z-10";
 
                   return (
-                     <div key={cell.id} onClick={() => sendAction({ type: 'CLICK_CELL', cellIndex: cell.id })} className={baseClass}>
-                        {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)] animate-fade-in" />}
-                        {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-fade-in" />}
-                        {!cell.owner && <Icons.Question className="w-8 h-8 text-white/10 group-hover:text-white/40 transition-colors" />}
+                     <div key={cell.id} onClick={() => { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); }} className={baseClass}>
+                        {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-sm animate-fade-in" />}
+                        {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-sm animate-fade-in" />}
+                        {!cell.owner && <Icons.Question className="w-8 h-8 text-slate-200 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors" />}
                         
                         {isOppActive && (
-                           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 px-2 py-1 rounded-full backdrop-blur-md border border-red-500/30 shadow-lg">
-                              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                              <span className="text-[10px] font-bold text-red-200 uppercase tracking-wide">{t.game_enemy}</span>
+                           <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-600 px-2 py-1 rounded-full shadow-md z-20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                              <span className="text-[10px] font-bold text-white uppercase tracking-wide">{t.game_enemy}</span>
                            </div>
                         )}
                         
                         {canSteal && (
-                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl backdrop-blur-sm">
+                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl backdrop-blur-sm z-30">
                               <Icons.Sword className="w-10 h-10 text-yellow-400 mb-2 animate-bounce" />
                               <span className="text-xs font-bold text-yellow-400 uppercase tracking-widest">{t.game_steal}</span>
                            </div>
                         )}
                         
-                        <div className="absolute bottom-3 left-4 text-[10px] text-white/20 font-mono font-bold">{cell.id + 1}</div>
+                        <div className="absolute bottom-3 left-4 text-[10px] text-slate-300 dark:text-slate-600 font-mono font-bold">{cell.id + 1}</div>
                      </div>
                   );
                })}
