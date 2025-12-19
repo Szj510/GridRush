@@ -15,6 +15,7 @@ const INITIAL_PLAYER_STATE = (id: PlayerId, name: string): PlayerState => ({
   id,
   name,
   activeCell: null,
+  challengeStartTime: 0,
   stealsRemaining: 1,
   isDefending: false,
 });
@@ -750,6 +751,9 @@ export default function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Time Sync
+  const timeOffsetRef = useRef<number>(0);
+  
   // Modals
   const [showRules, setShowRules] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -860,12 +864,14 @@ export default function App() {
 
   // --- Game Loop ---
   useEffect(() => {
-    if ((roleRef.current !== 'HOST' && roleRef.current !== 'SOLO') || gameState.status !== 'PLAYING') return;
+    // FIXED: Ensure loop runs for GUESTS too, so setTick triggers re-renders for the timer
+    if (gameState.status !== 'PLAYING') return;
 
     const interval = setInterval(() => {
+      // Always tick to force re-render for UI timers
       setTick(t => t + 1);
 
-      // Solo Challenge Timer
+      // Solo Challenge Timer (Only for Solo Player)
       if (roleRef.current === 'SOLO') {
         const diff = Date.now() - challengeStartTime;
         const mins = Math.floor(diff / 60000).toString().padStart(2, '0');
@@ -873,7 +879,7 @@ export default function App() {
         setChallengeTime(`${mins}:${secs}`);
       }
 
-      // Check Steal Expiry (Online Only)
+      // Check Steal Expiry (Only Host manages game rules)
       if (roleRef.current === 'HOST' && gameState.stealNotification) {
         if (Date.now() > gameState.stealNotification.expiresAt) {
           setGameState(prev => ({ ...prev, stealNotification: null }));
@@ -888,14 +894,14 @@ export default function App() {
   const syncState = (newState?: GameState) => {
     if (roleRef.current === 'HOST' && connRef.current) {
       const stateToSend = newState || gameState; 
-      connRef.current.send({ type: 'STATE_UPDATE', state: stateToSend });
+      connRef.current.send({ type: 'STATE_UPDATE', state: stateToSend, serverTime: Date.now() });
     }
   };
 
   useEffect(() => {
     if (roleRef.current === 'HOST' && gameState.status !== 'IDLE') {
       if (connRef.current && connRef.current.open) {
-        connRef.current.send({ type: 'STATE_UPDATE', state: gameState });
+        connRef.current.send({ type: 'STATE_UPDATE', state: gameState, serverTime: Date.now() });
       }
     }
   }, [gameState]);
@@ -936,7 +942,7 @@ export default function App() {
     if (mode === 'ONLINE') {
        setGameState(newGame);
        if (roleRef.current === 'HOST' && connRef.current) {
-          connRef.current.send({ type: 'STATE_UPDATE', state: newGame });
+          connRef.current.send({ type: 'STATE_UPDATE', state: newGame, serverTime: Date.now() });
        }
        saveStats({ ...stats, gamesPlayed: stats.gamesPlayed + 1 });
     } else {
@@ -948,6 +954,8 @@ export default function App() {
        roleRef.current = 'SOLO';
        setMyId('P1');
        setChallengeStartTime(Date.now());
+       // Reset offset for solo
+       timeOffsetRef.current = 0;
        setAppMode('GAME');
        saveStats({ ...stats, gamesPlayed: stats.gamesPlayed + 1 });
     }
@@ -977,7 +985,7 @@ export default function App() {
         const pStateKey = pid === 'P1' ? 'p1' : 'p2';
         return {
           ...prev,
-          [pStateKey]: { ...prev[pStateKey], activeCell: cellIndex, stealsRemaining: 0 },
+          [pStateKey]: { ...prev[pStateKey], activeCell: cellIndex, stealsRemaining: 0, challengeStartTime: Date.now() },
           cells: prev.cells.map((c, i) => i === cellIndex ? { ...c, activePlayers: [...c.activePlayers, pid] } : c),
           stealNotification: {
             challengerId: pid,
@@ -1001,9 +1009,39 @@ export default function App() {
       return {
         ...prev,
         cells: newCells,
-        [pKey]: { ...prev[pKey], activeCell: cellIndex }
+        [pKey]: { ...prev[pKey], activeCell: cellIndex, challengeStartTime: Date.now() }
       };
     });
+  };
+
+  // Logic to handle voluntarily abandoning a cell
+  const processAbandon = (pid: PlayerId) => {
+     if (roleRef.current === 'SOLO') return; // Cannot abandon in solo
+     
+     setGameState(prev => {
+        const pKey = pid === 'P1' ? 'p1' : 'p2';
+        const currentCellIdx = prev[pKey].activeCell;
+        
+        if (currentCellIdx === null) return prev;
+
+        // Clean up active players list
+        const newCells = prev.cells.map((c, i) => {
+            if (i === currentCellIdx) {
+                return { ...c, activePlayers: c.activePlayers.filter(id => id !== pid) };
+            }
+            return c;
+        });
+
+        // If this was a steal attempt, clear the notification
+        const stealNote = (prev.stealNotification?.challengerId === pid) ? null : prev.stealNotification;
+
+        return {
+            ...prev,
+            cells: newCells,
+            [pKey]: { ...prev[pKey], activeCell: null, isDefending: false, challengeStartTime: 0 },
+            stealNotification: stealNote
+        };
+     });
   };
 
   const processDefend = (pid: PlayerId) => {
@@ -1028,7 +1066,7 @@ export default function App() {
       return {
         ...prev,
         cells: newCells,
-        [pKey]: { ...prev[pKey], activeCell: targetCell, isDefending: true },
+        [pKey]: { ...prev[pKey], activeCell: targetCell, isDefending: true, challengeStartTime: Date.now() },
         stealNotification: null
       };
     });
@@ -1111,6 +1149,7 @@ export default function App() {
     if (roleRef.current === 'HOST' || roleRef.current === 'SOLO') {
       if (action.type === 'CLICK_CELL') processCellClick('P1', action.cellIndex);
       if (action.type === 'DEFEND') processDefend('P1');
+      if (action.type === 'ABANDON_CHALLENGE') processAbandon('P1');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P1', action.success);
     } else {
       if (connRef.current) connRef.current.send({ type: 'ACTION', action });
@@ -1122,6 +1161,7 @@ export default function App() {
       const { action } = msg;
       if (action.type === 'CLICK_CELL') processCellClick('P2', action.cellIndex);
       if (action.type === 'DEFEND') processDefend('P2');
+      if (action.type === 'ABANDON_CHALLENGE') processAbandon('P2');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P2', action.success);
     }
   };
@@ -1138,6 +1178,7 @@ export default function App() {
       setRoomId(code);
       setMyId('P1');
       roleRef.current = 'HOST';
+      timeOffsetRef.current = 0; // Host has 0 offset
       setIsConnecting(false);
       setAppMode('GAME');
     });
@@ -1168,7 +1209,18 @@ export default function App() {
         setAppMode('GAME');
       });
       conn.on('data', (data: NetworkMessage) => {
-        if (data.type === 'STATE_UPDATE') setGameState(data.state);
+        if (data.type === 'STATE_UPDATE') {
+            setGameState(data.state);
+            // Calculate time offset: Local - Server
+            // So if Server says 1000 and Local is 800, offset is -200.
+            // When reading server time (1000), we add offset (-200) to get 800 (Local equivalent).
+            // Actually, we usually want: EstimatedServerTime = LocalTime - Offset
+            // So Offset = LocalTime - ServerTime.
+            if (data.serverTime) {
+                const now = Date.now();
+                timeOffsetRef.current = now - data.serverTime;
+            }
+        }
       });
       peer.on('error', () => { setError("Err"); setIsConnecting(false); });
     });
@@ -1262,7 +1314,10 @@ export default function App() {
         <div className="absolute top-28 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg pointer-events-none">
           {(() => {
             const { defenderId, expiresAt, cellId } = gameState.stealNotification!;
-            const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+            // Corrected timer sync for steal notification
+            const estimatedServerTime = Date.now() - timeOffsetRef.current;
+            const remaining = Math.max(0, Math.ceil((expiresAt - estimatedServerTime) / 1000));
+            
             const isDefender = myId === defenderId;
             const bgClass = isDefender ? 'bg-red-500 shadow-red-500/50' : 'bg-blue-500 shadow-blue-500/50';
             const showDefendBtn = isDefender && me.activeCell !== cellId;
@@ -1323,6 +1378,17 @@ export default function App() {
                   <div className="absolute top-6 left-6 text-xs font-mono text-slate-400 tracking-widest uppercase">
                       {isSolo ? `${t.level_progress} ${myActiveCellIdx! + 1}` : `${t.game_playing} ${myActiveCellIdx! + 1}`}
                   </div>
+                  
+                  {/* Abandon Button for Online Mode */}
+                  {!isSolo && (
+                      <button 
+                        onClick={() => { audio.playClick(); sendAction({ type: 'ABANDON_CHALLENGE' }); }}
+                        className="absolute top-6 right-6 text-xs font-bold text-red-500 hover:text-red-600 hover:underline uppercase tracking-widest transition-colors"
+                      >
+                         Give Up
+                      </button>
+                  )}
+
                   <h3 className="text-center text-3xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
                   <div className="w-full flex-1">
                      <MiniGameRenderer 
@@ -1342,7 +1408,10 @@ export default function App() {
                {gameState.cells.map((cell) => {
                   const isOwnedByMe = cell.owner === myId;
                   const isOwnedByOpp = cell.owner && cell.owner !== myId;
-                  const isOppActive = cell.activePlayers.includes(opponent.id);
+                  
+                  // Active Player Checks
+                  const isP1Active = gameState.p1.activeCell === cell.id;
+                  const isP2Active = gameState.p2.activeCell === cell.id;
                   
                   let baseClass = "rounded-2xl flex items-center justify-center relative transition-all duration-300 shadow-lg group border-4";
                   
@@ -1359,18 +1428,41 @@ export default function App() {
                   const canSteal = isOwnedByOpp && me.stealsRemaining > 0;
                   if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-yellow-400/50 cursor-crosshair hover:scale-105 z-10";
 
+                  // Corrected Timer Calculation using Time Offset
+                  // Estimated Server Time = Local Time - Offset
+                  // Duration = Estimated Server Time - Start Time (which is Server Time)
+                  const getTimer = (start: number | undefined) => {
+                      if (!start) return 0;
+                      const estimatedServerTime = Date.now() - timeOffsetRef.current;
+                      return Math.max(0, Math.floor((estimatedServerTime - start) / 1000));
+                  };
+                  
+                  const p1Time = isP1Active ? getTimer(gameState.p1.challengeStartTime) : 0;
+                  const p2Time = isP2Active ? getTimer(gameState.p2.challengeStartTime) : 0;
+
                   return (
                      <div key={cell.id} onClick={() => { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); }} className={baseClass}>
                         {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-sm animate-fade-in" />}
                         {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-sm animate-fade-in" />}
                         {!cell.owner && <Icons.Question className="w-8 h-8 text-slate-200 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors" />}
                         
-                        {isOppActive && (
-                           <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-600 px-2 py-1 rounded-full shadow-md z-20">
-                              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                              <span className="text-[10px] font-bold text-white uppercase tracking-wide">{t.game_enemy}</span>
-                           </div>
-                        )}
+                        {/* Status Badges (Top Right) */}
+                        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-20 pointer-events-none">
+                            {(isP1Active || isP2Active) && (
+                                <div className="flex flex-col gap-1">
+                                    {isP1Active && (
+                                        <div className="bg-blue-600 px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-md">
+                                            P1: {p1Time}s
+                                        </div>
+                                    )}
+                                    {isP2Active && (
+                                        <div className="bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-md">
+                                            P2: {p2Time}s
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         
                         {canSteal && (
                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl backdrop-blur-sm z-30">

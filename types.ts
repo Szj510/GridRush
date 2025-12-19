@@ -42,6 +42,7 @@ export interface PlayerState {
   id: PlayerId;
   name: string;
   activeCell: number | null; 
+  challengeStartTime?: number; // New: Tracks when the current challenge started
   stealsRemaining: number;
   isDefending: boolean;
 }
@@ -94,11 +95,12 @@ export interface UserStats {
 }
 
 export type NetworkMessage = 
-  | { type: 'STATE_UPDATE'; state: GameState }
+  | { type: 'STATE_UPDATE'; state: GameState; serverTime?: number }
   | { type: 'ACTION'; action: GameAction }
   | { type: 'RESTART' };
 
 export type GameAction = 
   | { type: 'CLICK_CELL'; cellIndex: number }
+  | { type: 'ABANDON_CHALLENGE' } // New: Allow player to give up current cell
   | { type: 'DEFEND' }
   | { type: 'COMPLETE_GAME'; success: boolean };
