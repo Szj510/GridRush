@@ -18,6 +18,11 @@ const INITIAL_PLAYER_STATE = (id: PlayerId, name: string): PlayerState => ({
   challengeStartTime: 0,
   stealsRemaining: 1,
   isDefending: false,
+  lastHeartbeat: Date.now(),
+  lastInputTime: Date.now(),
+  cellFailures: {},
+  cellCooldowns: {},
+  stealCooldown: 0
 });
 
 const DEFAULT_GAME_STATE: GameState = {
@@ -557,51 +562,26 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
   }
 
   if (step === 'PLAYING' && selectedGameId) {
-     return (
-        <div className="absolute inset-0 z-30 flex flex-col bg-slate-900">
-           {/* Header */}
-           <div className="h-16 flex items-center justify-between px-6 bg-slate-800/50 backdrop-blur-md z-20">
-              <span className="font-bold text-white/50 text-sm tracking-widest">{MINI_GAMES.find(g => g.id === selectedGameId)?.name}</span>
-              <button onClick={() => setPaused(true)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-full transition-colors">
-                 <Icons.Pause className="w-6 h-6" />
-              </button>
-           </div>
-
-           {/* Game Area */}
-           <div className="flex-1 relative flex flex-col">
-              <div className="flex-1 p-4 md:p-8 flex items-center justify-center">
-                 <div className="w-full max-w-lg aspect-square bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-slate-700">
-                    <MiniGameRenderer 
-                       type={selectedGameId} 
-                       playerId="P1" 
-                       onComplete={handleGameComplete} 
-                       language={language}
-                       difficulty={config.difficulty}
-                       tutorialEnabled={config.tutorialEnabled}
-                    />
-                 </div>
-              </div>
-           </div>
-
-           {/* Pause Menu Overlay */}
-           {paused && (
-              <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 animate-fade-in">
-                 <h2 className="text-4xl font-black text-white uppercase tracking-widest mb-12">{t.prac_paused}</h2>
-                 <div className="flex flex-col gap-4 w-full max-w-xs">
-                    <button onClick={() => setPaused(false)} className="bg-white text-slate-900 py-4 rounded-xl font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center justify-center gap-3">
-                       <Icons.Play className="w-5 h-5" /> {t.prac_resume}
-                    </button>
-                    <button onClick={() => { setPaused(false); setStep('DETAIL'); startPractice(); }} className="bg-slate-700 text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-600 transition-colors flex items-center justify-center gap-3">
-                       <Icons.Restart className="w-5 h-5" /> {t.prac_restart}
-                    </button>
-                    <button onClick={() => setStep('DETAIL')} className="bg-red-500/20 text-red-500 border border-red-500/50 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-red-500/30 transition-colors flex items-center justify-center gap-3">
-                       <Icons.Exit className="w-5 h-5" /> {t.prac_quit}
-                    </button>
-                 </div>
-              </div>
-           )}
-        </div>
-     );
+    const game = MINI_GAMES.find(g => g.id === selectedGameId)!;
+    return (
+       <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950">
+          <div className="absolute top-6 left-6 z-40">
+              <button onClick={() => setStep('DETAIL')} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-bold uppercase tracking-widest text-xs">← Quit</button>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center w-full max-w-lg aspect-square border border-slate-200 dark:border-slate-800">
+                <MiniGameRenderer 
+                    type={game.id} 
+                    playerId="P1" // Dummy
+                    language={language}
+                    difficulty={config.difficulty}
+                    tutorialEnabled={config.tutorialEnabled}
+                    onComplete={(success, score) => handleGameComplete(success, score)}
+                />
+             </div>
+          </div>
+       </div>
+    );
   }
 
   if (step === 'RESULT' && result && selectedGameId) {
@@ -711,9 +691,18 @@ const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe:
   const colorClass = player.id === 'P1' ? 'text-blue-500' : 'text-red-500';
   const borderClass = player.id === 'P1' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
   
+  // Cooldown status
+  const cooldownEnd = player.stealCooldown > Date.now() ? player.stealCooldown : 0;
+  const isCooldown = cooldownEnd > 0;
+  
   return (
     <div className={`flex items-center gap-4 ${opponent ? 'flex-row-reverse text-right' : ''}`}>
-      <div className={`w-14 h-14 rounded-2xl border-2 ${borderClass} flex items-center justify-center text-xl font-bold shadow-sm`}>
+      <div className={`w-14 h-14 rounded-2xl border-2 ${borderClass} flex items-center justify-center text-xl font-bold shadow-sm relative overflow-hidden`}>
+         {isCooldown && (
+             <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-[10px] font-bold text-white z-10 backdrop-blur-sm">
+                 {Math.ceil((cooldownEnd - Date.now())/1000)}s
+             </div>
+         )}
         <span className={player.id === 'P1' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
             {player.id === 'P1' ? 'P1' : 'P2'}
         </span>
@@ -750,6 +739,7 @@ export default function App() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('CONNECTED');
   
   // Time Sync
   const timeOffsetRef = useRef<number>(0);
@@ -768,6 +758,7 @@ export default function App() {
   const peerRef = useRef<any>(null);
   const connRef = useRef<any>(null);
   const roleRef = useRef<'HOST' | 'GUEST' | 'SOLO' | 'NONE'>('NONE');
+  const lastPacketTime = useRef<number>(Date.now()); // Track last data from other peer
   const [, setTick] = useState(0);
 
   // Helpers
@@ -862,34 +853,109 @@ export default function App() {
     }
   };
 
-  // --- Game Loop ---
+  // --- Heartbeat System ---
+  useEffect(() => {
+     if (gameState.status !== 'PLAYING' || !myId) return;
+     
+     const hbInterval = setInterval(() => {
+         if (connRef.current && connRef.current.open) {
+             connRef.current.send({ type: 'HEARTBEAT', id: myId, timestamp: Date.now() });
+         }
+         // Self update for Host
+         if (roleRef.current === 'HOST') {
+             setGameState(prev => ({
+                 ...prev,
+                 p1: { ...prev.p1, lastHeartbeat: Date.now() }
+             }));
+         }
+     }, 2000);
+     
+     return () => clearInterval(hbInterval);
+  }, [gameState.status, myId]);
+
+
+  // --- Game Loop (Host Logic + Guest Detection + UI Ticks) ---
   useEffect(() => {
     // FIXED: Ensure loop runs for GUESTS too, so setTick triggers re-renders for the timer
     if (gameState.status !== 'PLAYING') return;
 
     const interval = setInterval(() => {
+      const now = Date.now();
       // Always tick to force re-render for UI timers
       setTick(t => t + 1);
 
       // Solo Challenge Timer (Only for Solo Player)
       if (roleRef.current === 'SOLO') {
-        const diff = Date.now() - challengeStartTime;
+        const diff = now - challengeStartTime;
         const mins = Math.floor(diff / 60000).toString().padStart(2, '0');
         const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
         setChallengeTime(`${mins}:${secs}`);
       }
+      
+      // --- HOST LOGIC: ANOMALY DETECTION ---
+      if (roleRef.current === 'HOST') {
+          let stateChanged = false;
+          const nextState = { ...gameState };
 
-      // Check Steal Expiry (Only Host manages game rules)
-      if (roleRef.current === 'HOST' && gameState.stealNotification) {
-        if (Date.now() > gameState.stealNotification.expiresAt) {
-          setGameState(prev => ({ ...prev, stealNotification: null }));
-          syncState();
-        }
+          const checkPlayerAnomaly = (pid: PlayerId) => {
+              const pKey = pid === 'P1' ? 'p1' : 'p2';
+              const player = nextState[pKey];
+              
+              if (player.activeCell !== null) {
+                  // 1. HARD LIMIT CHECK (180s)
+                  if (now - player.challengeStartTime > 180000) {
+                      // Force Exit Cell
+                      const cellId = player.activeCell;
+                      nextState.cells[cellId].activePlayers = nextState.cells[cellId].activePlayers.filter(id => id !== pid);
+                      nextState[pKey] = { ...player, activeCell: null, isDefending: false };
+                      stateChanged = true;
+                  }
+                  // 2. AFK CHECK (Input idle > 35s)
+                  else if (now - player.lastInputTime > 35000) {
+                      const cellId = player.activeCell;
+                      nextState.cells[cellId].activePlayers = nextState.cells[cellId].activePlayers.filter(id => id !== pid);
+                      nextState[pKey] = { ...player, activeCell: null, isDefending: false };
+                      stateChanged = true;
+                  }
+                  // 3. DISCONNECT CHECK (Heartbeat > 10s)
+                  else if (now - player.lastHeartbeat > 10000) {
+                      const cellId = player.activeCell;
+                      nextState.cells[cellId].activePlayers = nextState.cells[cellId].activePlayers.filter(id => id !== pid);
+                      nextState[pKey] = { ...player, activeCell: null, isDefending: false };
+                      stateChanged = true;
+                  }
+              }
+          };
+
+          checkPlayerAnomaly('P1');
+          checkPlayerAnomaly('P2');
+
+          // Check Steal Expiry (Host manages game rules)
+          if (nextState.stealNotification) {
+            if (now > nextState.stealNotification.expiresAt) {
+              nextState.stealNotification = null;
+              stateChanged = true;
+            }
+          }
+
+          if (stateChanged) {
+              setGameState(nextState);
+              syncState(nextState);
+          }
+      } 
+      // --- GUEST LOGIC: DETECT HOST DISCONNECT ---
+      else if (roleRef.current === 'GUEST') {
+          // If no packet from Host for > 10s, consider disconnected
+          if (now - lastPacketTime.current > 10000) {
+              setConnectionStatus('DISCONNECTED');
+          } else {
+              setConnectionStatus('CONNECTED');
+          }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState.status, gameState.stealNotification, challengeStartTime]);
+  }, [gameState.status, gameState.stealNotification, challengeStartTime, gameState]);
 
   const syncState = (newState?: GameState) => {
     if (roleRef.current === 'HOST' && connRef.current) {
@@ -941,6 +1007,8 @@ export default function App() {
     
     if (mode === 'ONLINE') {
        setGameState(newGame);
+       setConnectionStatus('CONNECTED');
+       lastPacketTime.current = Date.now(); // Reset timestamp
        if (roleRef.current === 'HOST' && connRef.current) {
           connRef.current.send({ type: 'STATE_UPDATE', state: newGame, serverTime: Date.now() });
        }
@@ -969,11 +1037,23 @@ export default function App() {
       const cell = prev.cells[cellIndex];
       const player = pid === 'P1' ? prev.p1 : prev.p2;
       const opponent = pid === 'P1' ? prev.p2 : prev.p1;
+      const now = Date.now();
 
       if (prev.winner) return prev;
       if (player.activeCell === cellIndex) return prev; 
       if (cell.owner === pid) return prev;
 
+      // 1. Check Cell Cooldown (3 Failures Rule)
+      if (player.cellCooldowns[cellIndex] && now < player.cellCooldowns[cellIndex]) {
+          return prev; // Block entry
+      }
+
+      // 2. Check Steal Cooldown (Abandoned steal rule)
+      if (cell.owner && cell.owner !== pid) {
+          if (now < player.stealCooldown) return prev; // Block entry if steal cooldown active
+      }
+
+      // Logic for entering a cell
       if (cell.owner && cell.owner !== pid) {
         if (player.stealsRemaining <= 0) return prev;
         
@@ -985,14 +1065,20 @@ export default function App() {
         const pStateKey = pid === 'P1' ? 'p1' : 'p2';
         return {
           ...prev,
-          [pStateKey]: { ...prev[pStateKey], activeCell: cellIndex, stealsRemaining: 0, challengeStartTime: Date.now() },
+          [pStateKey]: { 
+              ...prev[pStateKey], 
+              activeCell: cellIndex, 
+              stealsRemaining: 0, 
+              challengeStartTime: now,
+              lastInputTime: now // Reset AFK timer on entry
+          },
           cells: prev.cells.map((c, i) => i === cellIndex ? { ...c, activePlayers: [...c.activePlayers, pid] } : c),
           stealNotification: {
             challengerId: pid,
             defenderId: opponent.id,
             cellId: cellIndex,
-            timestamp: Date.now(),
-            expiresAt: Date.now() + 5000
+            timestamp: now,
+            expiresAt: now + 5000
           }
         };
       }
@@ -1009,7 +1095,12 @@ export default function App() {
       return {
         ...prev,
         cells: newCells,
-        [pKey]: { ...prev[pKey], activeCell: cellIndex, challengeStartTime: Date.now() }
+        [pKey]: { 
+            ...prev[pKey], 
+            activeCell: cellIndex, 
+            challengeStartTime: now,
+            lastInputTime: now 
+        }
       };
     });
   };
@@ -1032,13 +1123,25 @@ export default function App() {
             return c;
         });
 
-        // If this was a steal attempt, clear the notification
-        const stealNote = (prev.stealNotification?.challengerId === pid) ? null : prev.stealNotification;
+        // If this was a steal attempt, clear the notification AND apply steal cooldown
+        let stealNote = prev.stealNotification;
+        let newStealCooldown = prev[pKey].stealCooldown;
+        
+        if (prev.stealNotification?.challengerId === pid) {
+            stealNote = null;
+            newStealCooldown = Date.now() + 20000; // 20s Cooldown on steal cancel
+        }
 
         return {
             ...prev,
             cells: newCells,
-            [pKey]: { ...prev[pKey], activeCell: null, isDefending: false, challengeStartTime: 0 },
+            [pKey]: { 
+                ...prev[pKey], 
+                activeCell: null, 
+                isDefending: false, 
+                challengeStartTime: 0,
+                stealCooldown: newStealCooldown 
+            },
             stealNotification: stealNote
         };
      });
@@ -1066,18 +1169,38 @@ export default function App() {
       return {
         ...prev,
         cells: newCells,
-        [pKey]: { ...prev[pKey], activeCell: targetCell, isDefending: true, challengeStartTime: Date.now() },
+        [pKey]: { 
+            ...prev[pKey], 
+            activeCell: targetCell, 
+            isDefending: true, 
+            challengeStartTime: Date.now(),
+            lastInputTime: Date.now()
+        },
         stealNotification: null
       };
     });
   };
 
-  const processGameComplete = (pid: PlayerId, success: boolean) => {
-    if (!success) return; 
+  const processInteraction = (pid: PlayerId) => {
+     setGameState(prev => {
+         const pKey = pid === 'P1' ? 'p1' : 'p2';
+         return {
+             ...prev,
+             [pKey]: { ...prev[pKey], lastInputTime: Date.now() }
+         };
+     });
+  };
 
+  const processGameComplete = (pid: PlayerId, success: boolean) => {
     setGameState(prev => {
+      const pKey = pid === 'P1' ? 'p1' : 'p2';
+      const cellIdx = prev[pKey].activeCell;
+      
       // Solo Mode Logic
       if (roleRef.current === 'SOLO') {
+        // ... (Solo Logic unchanged mostly, just needs to handle success=false if needed, though solo usually just waits)
+        if (!success) return prev; // Solo usually loops until win
+        
         const currentLevel = prev.p1.activeCell;
         if (currentLevel === null) return prev;
         
@@ -1097,7 +1220,6 @@ export default function App() {
              p1: { ...prev.p1, activeCell: null }
            };
         } else {
-           // Move to next level
            return {
              ...prev,
              p1: { ...prev.p1, activeCell: nextLevel }
@@ -1106,13 +1228,45 @@ export default function App() {
       }
 
       // Online Mode Logic
-      const pState = pid === 'P1' ? prev.p1 : prev.p2;
-      const cellIdx = pState.activeCell;
       if (cellIdx === null) return prev;
 
-      const pKey = pid === 'P1' ? 'p1' : 'p2';
-      const oppKey = pid === 'P1' ? 'p2' : 'p1';
+      // FAILURE HANDLING
+      if (!success) {
+          const newFailures = (prev[pKey].cellFailures[cellIdx] || 0) + 1;
+          const newCooldowns = { ...prev[pKey].cellCooldowns };
+          
+          let updatedPlayer = { 
+              ...prev[pKey], 
+              cellFailures: { ...prev[pKey].cellFailures, [cellIdx]: newFailures } 
+          };
 
+          // 3 Failures -> 10s Cooldown
+          if (newFailures >= 3) {
+              newCooldowns[cellIdx] = Date.now() + 10000;
+              updatedPlayer.cellCooldowns = newCooldowns;
+              updatedPlayer.activeCell = null; // Kick out
+              updatedPlayer.isDefending = false;
+              // Reset failures after penalty
+              updatedPlayer.cellFailures[cellIdx] = 0;
+              
+              // Remove from cell active players
+              const newCells = prev.cells.map((c, i) => {
+                  if (i === cellIdx) return { ...c, activePlayers: c.activePlayers.filter(id => id !== pid) };
+                  return c;
+              });
+              
+              return { ...prev, cells: newCells, [pKey]: updatedPlayer };
+          }
+
+          return { ...prev, [pKey]: updatedPlayer };
+      }
+
+      // SUCCESS HANDLING
+      // Prevent race condition: If already owned by someone else (unlikely with this logic but good safety)
+      // Actually, check if cell has owner.
+      const currentOwner = prev.cells[cellIdx].owner;
+      
+      // If Stealing or Neutral
       const newCells = prev.cells.map((c, i) => {
         if (i === cellIdx) {
           return { ...c, owner: pid, activePlayers: [], lastInteraction: Date.now() };
@@ -1120,11 +1274,15 @@ export default function App() {
         return c;
       });
 
+      const oppKey = pid === 'P1' ? 'p2' : 'p1';
       let newOppState = { ...prev[oppKey] };
+      
+      // If opponent was in this cell (defending or racing), kick them out
       if (prev[oppKey].activeCell === cellIdx) {
         newOppState.activeCell = null;
         newOppState.isDefending = false; 
       }
+      
       const winner = checkWinner(newCells);
       
       if (roleRef.current === 'HOST' && winner) {
@@ -1138,7 +1296,12 @@ export default function App() {
         cells: newCells,
         status: winner ? 'FINISHED' : prev.status,
         winner,
-        [pKey]: { ...prev[pKey], activeCell: null, isDefending: false },
+        [pKey]: { 
+            ...prev[pKey], 
+            activeCell: null, 
+            isDefending: false,
+            cellFailures: { ...prev[pKey].cellFailures, [cellIdx]: 0 } // Reset failures on success
+        },
         [oppKey]: newOppState,
         stealNotification: prev.stealNotification?.cellId === cellIdx ? null : prev.stealNotification
       };
@@ -1150,6 +1313,7 @@ export default function App() {
       if (action.type === 'CLICK_CELL') processCellClick('P1', action.cellIndex);
       if (action.type === 'DEFEND') processDefend('P1');
       if (action.type === 'ABANDON_CHALLENGE') processAbandon('P1');
+      if (action.type === 'INTERACTION') processInteraction('P1');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P1', action.success);
     } else {
       if (connRef.current) connRef.current.send({ type: 'ACTION', action });
@@ -1157,11 +1321,21 @@ export default function App() {
   };
 
   const handleGuestMessage = (msg: NetworkMessage) => {
-    if (msg.type === 'ACTION') {
+    // HOST RECEIVES MESSAGE
+    lastPacketTime.current = Date.now(); // Mark activity
+
+    if (msg.type === 'HEARTBEAT') {
+        setGameState(prev => ({
+            ...prev,
+            p2: { ...prev.p2, lastHeartbeat: Date.now() }
+        }));
+    }
+    else if (msg.type === 'ACTION') {
       const { action } = msg;
       if (action.type === 'CLICK_CELL') processCellClick('P2', action.cellIndex);
       if (action.type === 'DEFEND') processDefend('P2');
       if (action.type === 'ABANDON_CHALLENGE') processAbandon('P2');
+      if (action.type === 'INTERACTION') processInteraction('P2');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P2', action.success);
     }
   };
@@ -1179,6 +1353,7 @@ export default function App() {
       setMyId('P1');
       roleRef.current = 'HOST';
       timeOffsetRef.current = 0; // Host has 0 offset
+      lastPacketTime.current = Date.now();
       setIsConnecting(false);
       setAppMode('GAME');
     });
@@ -1187,9 +1362,15 @@ export default function App() {
       connRef.current = conn;
       conn.on('data', (data: NetworkMessage) => handleGuestMessage(data));
       conn.on('open', () => startNewGame('ONLINE'));
+      conn.on('close', () => {
+          // Explicit PeerJS close event
+          // For Host, we just mark P2 as disconnected via logic loop, but here we can force it too
+          setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: 0 } })); // Force timeout logic
+      });
     });
 
     peer.on('error', () => { setError("Conn Error"); setIsConnecting(false); });
+    peer.on('disconnected', () => { setConnectionStatus('DISCONNECTED'); });
   };
 
   const joinGame = (code: string) => {
@@ -1203,12 +1384,18 @@ export default function App() {
       connRef.current = conn;
       roleRef.current = 'GUEST';
       setMyId('P2');
+      lastPacketTime.current = Date.now(); // Init
+
       conn.on('open', () => {
         setRoomId(code);
         setIsConnecting(false);
         setAppMode('GAME');
+        setConnectionStatus('CONNECTED');
       });
       conn.on('data', (data: NetworkMessage) => {
+        // GUEST RECEIVES MESSAGE
+        lastPacketTime.current = Date.now(); // Mark activity
+
         if (data.type === 'STATE_UPDATE') {
             setGameState(data.state);
             // Calculate time offset: Local - Server
@@ -1222,7 +1409,9 @@ export default function App() {
             }
         }
       });
+      conn.on('close', () => { setConnectionStatus('DISCONNECTED'); });
       peer.on('error', () => { setError("Err"); setIsConnecting(false); });
+      peer.on('disconnected', () => { setConnectionStatus('DISCONNECTED'); });
     });
   };
 
@@ -1232,6 +1421,7 @@ export default function App() {
     setMyId(null);
     setRoomId(null);
     setIsConnecting(false);
+    setConnectionStatus('CONNECTED');
     roleRef.current = 'NONE';
     setError(null);
     setAppMode('MENU');
@@ -1285,6 +1475,22 @@ export default function App() {
     <div className="h-screen w-screen flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
       {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
+
+      {/* Disconnection / Exit Modal */}
+      {connectionStatus === 'DISCONNECTED' && (
+          <div className="absolute inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-sm">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icons.Exit className="w-8 h-8 text-red-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">CONNECTION LOST</h2>
+                  <p className="text-slate-500 mb-6">The connection to the other player was interrupted.</p>
+                  <button onClick={resetGame} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-red-600 transition-colors">
+                      EXIT TO MENU
+                  </button>
+              </div>
+          </div>
+      )}
 
       {/* Achievement Toast */}
       {newAchievement && (
@@ -1352,20 +1558,31 @@ export default function App() {
             ) : (
                 <>
                     <div className="text-3xl font-black italic text-slate-100 dark:text-slate-800 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-8 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">ROOM: {roomId}</div>
+                    <div className="flex items-center gap-2 mt-8 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        <div className="text-[10px] text-slate-400 font-mono">ROOM: {roomId}</div>
+                    </div>
                 </>
             )}
          </div>
-         {isSolo ? (
-             <button 
-                onClick={resetGame}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 border border-red-200 dark:border-red-800 text-xs font-bold uppercase tracking-wider transition-colors"
-             >
-                <Icons.Exit className="w-4 h-4" /> {t.exit_game}
-             </button>
-         ) : (
+         
+         {/* Exit Button - Always visible now */}
+         <button 
+            onClick={resetGame}
+            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-500 border border-red-200 dark:border-red-800 text-xs font-bold uppercase tracking-wider transition-colors ml-4"
+         >
+            <Icons.Exit className="w-4 h-4" /> {t.exit_game}
+         </button>
+         
+         {/* Mobile Exit (replaces badge or sits near it) */}
+         <div className="md:hidden flex flex-col items-end gap-1">
              <PlayerBadge player={opponent} isMe={false} opponent t={t} />
-         )}
+             <button onClick={resetGame} className="text-[10px] text-red-500 underline uppercase tracking-widest font-bold">EXIT</button>
+         </div>
+         
+         <div className="hidden md:block">
+            {isSolo ? null : <PlayerBadge player={opponent} isMe={false} opponent t={t} />}
+         </div>
       </div>
 
       {/* Game Grid or Solo View */}
@@ -1395,6 +1612,7 @@ export default function App() {
                        type={miniGameId} 
                        playerId={myId!} 
                        onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} 
+                       onInteraction={() => sendAction({ type: 'INTERACTION' })}
                        language={settings.language} 
                        difficulty="HARD" 
                      />
@@ -1413,6 +1631,10 @@ export default function App() {
                   const isP1Active = gameState.p1.activeCell === cell.id;
                   const isP2Active = gameState.p2.activeCell === cell.id;
                   
+                  // Cooldown check for styling
+                  const myCooldown = me.cellCooldowns[cell.id] || 0;
+                  const isCellCooldown = myCooldown > Date.now();
+
                   let baseClass = "rounded-2xl flex items-center justify-center relative transition-all duration-300 shadow-lg group border-4";
                   
                   if (isOwnedByMe) {
@@ -1424,8 +1646,13 @@ export default function App() {
                   } else {
                       baseClass += " bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 cursor-pointer active:scale-95";
                   }
+                  
+                  // Disabled look for cooldown
+                  if (isCellCooldown) {
+                      baseClass += " opacity-50 cursor-not-allowed grayscale";
+                  }
 
-                  const canSteal = isOwnedByOpp && me.stealsRemaining > 0;
+                  const canSteal = isOwnedByOpp && me.stealsRemaining > 0 && !isCellCooldown && me.stealCooldown < Date.now();
                   if (canSteal) baseClass += " hover:border-yellow-400 hover:shadow-yellow-400/50 cursor-crosshair hover:scale-105 z-10";
 
                   // Corrected Timer Calculation using Time Offset
@@ -1441,7 +1668,7 @@ export default function App() {
                   const p2Time = isP2Active ? getTimer(gameState.p2.challengeStartTime) : 0;
 
                   return (
-                     <div key={cell.id} onClick={() => { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); }} className={baseClass}>
+                     <div key={cell.id} onClick={() => { if(!isCellCooldown) { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); } }} className={baseClass}>
                         {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-sm animate-fade-in" />}
                         {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-sm animate-fade-in" />}
                         {!cell.owner && <Icons.Question className="w-8 h-8 text-slate-200 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors" />}
@@ -1469,6 +1696,12 @@ export default function App() {
                               <Icons.Sword className="w-10 h-10 text-yellow-400 mb-2 animate-bounce" />
                               <span className="text-xs font-bold text-yellow-400 uppercase tracking-widest">{t.game_steal}</span>
                            </div>
+                        )}
+                        
+                        {isCellCooldown && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 rounded-2xl z-40 backdrop-grayscale">
+                                <span className="text-white font-bold text-2xl animate-pulse">{Math.ceil((myCooldown - Date.now())/1000)}s</span>
+                            </div>
                         )}
                         
                         <div className="absolute bottom-3 left-4 text-[10px] text-slate-300 dark:text-slate-600 font-mono font-bold">{cell.id + 1}</div>

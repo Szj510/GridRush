@@ -6,18 +6,20 @@ import { audio } from '../services/audio';
 interface Props {
   type: string;
   onComplete: (success: boolean, score?: number) => void;
+  onInteraction?: () => void; // New prop to signal activity
   playerId: 'P1' | 'P2';
   language: Language;
   difficulty?: Difficulty; 
   tutorialEnabled?: boolean; 
 }
 
-const Button = ({ onClick, children, className, style, disabled }: any) => (
+const Button = ({ onClick, children, className, style, disabled, onInteraction }: any) => (
   <button 
     onClick={(e) => { 
       e.stopPropagation(); 
       if (!disabled) { 
         audio.playClick();
+        onInteraction && onInteraction(); // Signal activity
         onClick && onClick(); 
       }
     }}
@@ -48,7 +50,7 @@ const useFeedback = () => {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // 1. Math Rush
-const MathGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const MathGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [problem, setProblem] = useState({ q: '...', a: 0, options: [] as number[] });
   const [score, setScore] = useState(0);
   const { trigger, bgClass } = useFeedback();
@@ -121,7 +123,8 @@ const MathGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled
         {problem.options.map((opt, i) => (
           <Button 
             key={i} 
-            onClick={() => handleAnswer(opt)} 
+            onClick={() => handleAnswer(opt)}
+            onInteraction={onInteraction}
             className={`bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-6 text-2xl border border-slate-200 dark:border-slate-600 ${tutorialEnabled && opt === problem.a ? 'ring-4 ring-green-400 ring-opacity-50 animate-pulse' : ''}`}
           >
             {opt}
@@ -134,7 +137,7 @@ const MathGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled
 };
 
 // 2. Power Mash
-const MashGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [progress, setProgress] = useState(30);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
@@ -181,7 +184,8 @@ const MashGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled
         )}
       </div>
       <Button 
-        onClick={mash} 
+        onClick={mash}
+        onInteraction={onInteraction}
         className="w-40 h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-2xl flex items-center justify-center hover:bg-red-400 relative overflow-hidden"
       >
         <span className="relative z-10">MASH!</span>
@@ -192,7 +196,7 @@ const MashGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled
 };
 
 // 3. Stroop Test
-const StroopGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const StroopGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const colors = [
     { name: language === 'zh' ? '红' : 'RED', hex: '#ef4444', id: 'red' },
     { name: language === 'zh' ? '蓝' : 'BLUE', hex: '#3b82f6', id: 'blue' },
@@ -259,6 +263,7 @@ const StroopGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabl
            <Button 
              key={c.id} 
              onClick={() => handleAnswer(c.id)}
+             onInteraction={onInteraction}
              className={`h-20 border-2 border-transparent hover:border-slate-300 dark:hover:border-white/20 shadow-none relative overflow-hidden`}
              style={{ backgroundColor: c.hex }}
            >
@@ -273,7 +278,7 @@ const StroopGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabl
 };
 
 // 4. Reaction
-const ReactionGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const ReactionGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [status, setStatus] = useState<'WAIT' | 'GO' | 'EARLY' | 'SLOW' | 'RESULT'>('WAIT');
   const [resultMs, setResultMs] = useState(0);
   const timeoutRef = useRef<number | null>(null);
@@ -303,6 +308,8 @@ const ReactionGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
   }, []);
 
   const handleClick = () => {
+    if (onInteraction) onInteraction();
+    
     if (status === 'WAIT') {
       setStatus('EARLY');
       audio.playFailure();
@@ -345,14 +352,14 @@ const ReactionGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
         )}
         </div>
         {(status === 'EARLY' || status === 'SLOW') && (
-            <Button onClick={start} className="bg-slate-700 text-white">{t.retry}</Button>
+            <Button onClick={start} onInteraction={onInteraction} className="bg-slate-700 text-white">{t.retry}</Button>
         )}
     </div>
   );
 };
 
 // 5. Memory Matrix
-const MatrixGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const MatrixGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [pattern, setPattern] = useState<number[]>([]);
   const [input, setInput] = useState<number[]>([]);
   const [phase, setPhase] = useState<'WATCH' | 'INPUT'>('WATCH');
@@ -421,6 +428,8 @@ const MatrixGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabl
   const handleClick = (i: number) => {
     if (phase === 'WATCH') return;
     if (input.includes(i)) return; 
+    
+    if (onInteraction) onInteraction();
 
     audio.playClick();
     if (pattern.includes(i)) {
@@ -477,7 +486,7 @@ const MatrixGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabl
 };
 
 // 6. Lock Pick
-const LockPickGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const LockPickGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [level, setLevel] = useState(0);
   const [angle, setAngle] = useState(0);
   const [targetAngle, setTargetAngle] = useState(0);
@@ -549,6 +558,8 @@ const LockPickGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
   }, []); // Empty dependency to run once on mount
 
   const click = () => {
+    if (onInteraction) onInteraction();
+    
     const diff = Math.abs(angleRef.current - targetAngle);
     const width = diffConfig.width;
     
@@ -623,7 +634,7 @@ const LockPickGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
 };
 
 // 7. Scramble Password
-const PasswordGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const PasswordGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [code, setCode] = useState('');
   const [input, setInput] = useState('');
   const [layout, setLayout] = useState([1,2,3,4,5,6,7,8,9,0]);
@@ -652,6 +663,7 @@ const PasswordGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
   };
 
   const press = (n: number) => {
+    if (onInteraction) onInteraction();
     audio.playClick();
     const next = input + n;
     setInput(next);
@@ -684,6 +696,7 @@ const PasswordGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
                 <Button 
                     key={n} 
                     onClick={() => press(n)} 
+                    onInteraction={onInteraction}
                     className={`bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white w-16 h-16 text-2xl font-mono border border-slate-200 dark:border-slate-600 ${isNext ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/30' : ''}`}
                 >
                     {n}
@@ -696,7 +709,7 @@ const PasswordGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
 };
 
 // 8. Aim Lab (Burst)
-const BurstGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [target, setTarget] = useState<{id: number, x: number, y: number, size: number} | null>(null);
   const [score, setScore] = useState(0);
   const t = MINI_GAME_TRANSLATIONS[language];
@@ -744,6 +757,7 @@ const BurstGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnable
   }, [config.shrink]); 
 
   const hit = () => {
+     if (onInteraction) onInteraction();
      audio.playPop();
      const next = score + 1;
      setScore(next);
@@ -789,7 +803,7 @@ const BurstGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnable
 };
 
 // 9. Sequence
-const SequenceGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+const SequenceGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [next, setNext] = useState(1);
   const [buttons, setButtons] = useState<number[]>([]);
   const t = MINI_GAME_TRANSLATIONS[language];
@@ -809,6 +823,7 @@ const SequenceGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
   }, [difficulty]); // Changed from [maxNum] to [difficulty]
 
   const click = (n: number) => {
+    if (onInteraction) onInteraction();
     audio.playClick();
     if (n === next) {
       if (n === maxNum.count) {
@@ -833,6 +848,7 @@ const SequenceGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEna
             <Button 
                 key={n} 
                 onClick={() => click(n)} 
+                onInteraction={onInteraction}
                 className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-20 h-20 text-3xl transition-all duration-200 ${isNext ? 'ring-4 ring-blue-400 animate-pulse' : ''}`}
             >
                 {n}

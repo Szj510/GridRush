@@ -42,9 +42,18 @@ export interface PlayerState {
   id: PlayerId;
   name: string;
   activeCell: number | null; 
-  challengeStartTime?: number; // New: Tracks when the current challenge started
+  challengeStartTime: number; // New: Tracks when the current challenge started
   stealsRemaining: number;
   isDefending: boolean;
+  
+  // --- New Logic State ---
+  lastHeartbeat: number; // To detect disconnect/background
+  lastInputTime: number; // To detect AFK inside a minigame
+  
+  // Map key is cellId (0-8)
+  cellFailures: Record<number, number>; // Count consecutive failures per cell
+  cellCooldowns: Record<number, number>; // Timestamp when cooldown expires for a cell
+  stealCooldown: number; // Timestamp when steal ability unlocks again (if cancelled)
 }
 
 export interface StealNotification {
@@ -97,10 +106,12 @@ export interface UserStats {
 export type NetworkMessage = 
   | { type: 'STATE_UPDATE'; state: GameState; serverTime?: number }
   | { type: 'ACTION'; action: GameAction }
+  | { type: 'HEARTBEAT'; id: PlayerId; timestamp: number } // Keep-alive
   | { type: 'RESTART' };
 
 export type GameAction = 
   | { type: 'CLICK_CELL'; cellIndex: number }
   | { type: 'ABANDON_CHALLENGE' } // New: Allow player to give up current cell
   | { type: 'DEFEND' }
+  | { type: 'INTERACTION' } // Sent when player clicks inside a minigame to prevent AFK
   | { type: 'COMPLETE_GAME'; success: boolean };
