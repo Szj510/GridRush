@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Language } from '../types';
+import { Language, Difficulty } from '../types';
 import { MINI_GAME_TRANSLATIONS, Icons } from '../constants';
 import { audio } from '../services/audio';
 
 interface Props {
   type: string;
-  onComplete: (success: boolean) => void;
+  onComplete: (success: boolean, score?: number) => void;
   playerId: 'P1' | 'P2';
   language: Language;
+  difficulty?: Difficulty; 
+  tutorialEnabled?: boolean; 
 }
 
 const Button = ({ onClick, children, className, style, disabled }: any) => (
@@ -43,33 +45,48 @@ const useFeedback = () => {
   return { trigger, bgClass, feedback };
 };
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // 1. Math Rush
-const MathGame = ({ onComplete, language }: Props) => {
-  const [problem, setProblem] = useState({ q: '', a: 0, options: [] as number[] });
+const MathGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+  const [problem, setProblem] = useState({ q: '...', a: 0, options: [] as number[] });
   const [score, setScore] = useState(0);
-  const TARGET_SCORE = 3;
   const { trigger, bgClass } = useFeedback();
   const t = MINI_GAME_TRANSLATIONS[language];
+
+  // Config based on difficulty
+  const config = {
+    EASY: { target: 2, maxNum: 10, ops: ['+'] },
+    NORMAL: { target: 3, maxNum: 50, ops: ['+', '-'] },
+    HARD: { target: 5, maxNum: 99, ops: ['+', '-'] },
+    EXPERT: { target: 7, maxNum: 150, ops: ['+', '-', '*'] }
+  }[difficulty];
   
   const generateProblem = () => {
-    const op = Math.random() > 0.5 ? '+' : '-';
+    const op = config.ops[Math.floor(Math.random() * config.ops.length)];
     let a, b, ans;
-    if (op === '+') {
-       a = Math.floor(Math.random() * 40) + 10;
-       b = Math.floor(Math.random() * 40) + 10;
+    
+    if (op === '*') {
+       a = Math.floor(Math.random() * 10) + 2;
+       b = Math.floor(Math.random() * 10) + 2;
+       ans = a * b;
+    } else if (op === '+') {
+       a = Math.floor(Math.random() * config.maxNum) + 5;
+       b = Math.floor(Math.random() * config.maxNum) + 5;
        ans = a + b;
     } else {
-       a = Math.floor(Math.random() * 50) + 20;
-       b = Math.floor(Math.random() * 20) + 1;
+       a = Math.floor(Math.random() * config.maxNum) + 10;
+       b = Math.floor(Math.random() * 10) + 1;
        ans = a - b;
     }
     
     const opts = new Set<number>();
     opts.add(ans);
     while(opts.size < 4) {
-       const diff = Math.floor(Math.random() * 5) + 1;
+       const diff = Math.floor(Math.random() * 10) + 1;
        const dir = Math.random() > 0.5 ? 1 : -1;
-       opts.add(ans + (diff * dir));
+       const val = ans + (diff * dir);
+       if (val >= 0) opts.add(val);
     }
     setProblem({ q: `${a} ${op} ${b} = ?`, a: ans, options: Array.from(opts).sort(() => Math.random() - 0.5) });
   };
@@ -83,7 +100,7 @@ const MathGame = ({ onComplete, language }: Props) => {
     if (isCorrect) {
       const newScore = score + 1;
       setScore(newScore);
-      if (newScore >= TARGET_SCORE) {
+      if (newScore >= config.target) {
         setTimeout(() => onComplete(true), 200);
       } else {
         generateProblem();
@@ -94,29 +111,45 @@ const MathGame = ({ onComplete, language }: Props) => {
   return (
     <div className={`flex flex-col items-center gap-6 w-full h-full justify-center rounded-3xl transition-colors duration-200 ${bgClass}`}>
       <div className="flex justify-between w-full max-w-xs text-sm text-slate-500 dark:text-slate-400 font-mono">
-         <span>{t.score}: {score}/{TARGET_SCORE}</span>
+         <span>{t.score}: {score}/{config.target}</span>
+         <span className="text-[10px] uppercase bg-slate-200 dark:bg-slate-700 px-2 rounded">{difficulty}</span>
       </div>
-      <div className="text-5xl font-black mb-4 tracking-wider text-slate-800 dark:text-white drop-shadow-sm">{problem.q}</div>
+      <div className="text-5xl font-black mb-4 tracking-wider text-slate-900 dark:text-white drop-shadow-sm min-h-[3.5rem] flex items-center justify-center">
+          {problem.q}
+      </div>
       <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
         {problem.options.map((opt, i) => (
-          <Button key={i} onClick={() => handleAnswer(opt)} className="bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-6 text-2xl border border-slate-200 dark:border-slate-600">
+          <Button 
+            key={i} 
+            onClick={() => handleAnswer(opt)} 
+            className={`bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-6 text-2xl border border-slate-200 dark:border-slate-600 ${tutorialEnabled && opt === problem.a ? 'ring-4 ring-green-400 ring-opacity-50 animate-pulse' : ''}`}
+          >
             {opt}
           </Button>
         ))}
       </div>
+      {tutorialEnabled && <div className="text-xs text-green-600 dark:text-green-400 font-bold animate-bounce">HINT: Correct answer highlighted</div>}
     </div>
   );
 };
 
 // 2. Power Mash
-const MashGame = ({ onComplete, language }: Props) => {
+const MashGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [progress, setProgress] = useState(30);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
+  // Difficulty adjustments
+  const config = {
+    EASY: { decay: 0.8, gain: 10 },
+    NORMAL: { decay: 1.2, gain: 8 },
+    HARD: { decay: 1.5, gain: 7 },
+    EXPERT: { decay: 2.0, gain: 7 } 
+  }[difficulty];
+
   const mash = () => {
-    audio.playPop(); // Special sound for mash
-    setProgress(p => Math.min(100, p + 8));
+    audio.playPop(); 
+    setProgress(p => Math.min(100, p + config.gain));
   };
 
   useEffect(() => {
@@ -129,33 +162,37 @@ const MashGame = ({ onComplete, language }: Props) => {
            return 100;
         }
         if (p <= 0) return 0;
-        return Math.max(0, p - 1.5);
+        return Math.max(0, p - config.decay);
       });
     }, 50);
     return () => clearInterval(timer);
-  }, [onComplete]);
+  }, [onComplete, config.decay]);
 
   return (
     <div className={`flex flex-col items-center w-full gap-6 h-full justify-center rounded-3xl ${bgClass}`}>
       <div className="text-xl font-bold animate-pulse text-yellow-500">{t.mash_instr}</div>
-      <div className="w-full max-w-xs h-8 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600">
+      <div className="w-full max-w-xs h-8 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden border border-slate-300 dark:border-slate-600 relative">
         <div 
            className="h-full transition-all duration-75 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500"
            style={{ width: `${progress}%` }}
         />
+        {tutorialEnabled && (
+            <div className="absolute top-0 bottom-0 right-10 border-l-2 border-red-500 border-dashed opacity-50 text-[10px] pl-1 pt-1 text-red-500">GOAL</div>
+        )}
       </div>
       <Button 
         onClick={mash} 
-        className="w-40 h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-2xl flex items-center justify-center hover:bg-red-400"
+        className="w-40 h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-2xl flex items-center justify-center hover:bg-red-400 relative overflow-hidden"
       >
-        MASH!
+        <span className="relative z-10">MASH!</span>
+        {tutorialEnabled && <div className="absolute inset-0 bg-white opacity-20 animate-ping rounded-full" />}
       </Button>
     </div>
   );
 };
 
 // 3. Stroop Test
-const StroopGame = ({ onComplete, language }: Props) => {
+const StroopGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const colors = [
     { name: language === 'zh' ? '红' : 'RED', hex: '#ef4444', id: 'red' },
     { name: language === 'zh' ? '蓝' : 'BLUE', hex: '#3b82f6', id: 'blue' },
@@ -165,9 +202,15 @@ const StroopGame = ({ onComplete, language }: Props) => {
   
   const [current, setCurrent] = useState({ text: colors[0], color: colors[1] });
   const [score, setScore] = useState(0);
-  const TARGET = 5;
   const { trigger, bgClass } = useFeedback();
   const t = MINI_GAME_TRANSLATIONS[language];
+
+  const target = {
+    EASY: 3,
+    NORMAL: 5,
+    HARD: 8,
+    EXPERT: 12
+  }[difficulty];
 
   const nextRound = () => {
      const textIdx = Math.floor(Math.random() * colors.length);
@@ -185,10 +228,10 @@ const StroopGame = ({ onComplete, language }: Props) => {
     if (isCorrect) {
        const nextScore = score + 1;
        setScore(nextScore);
-       if (nextScore >= TARGET) setTimeout(() => onComplete(true), 200);
+       if (nextScore >= target) setTimeout(() => onComplete(true), 200);
        else nextRound();
     } else {
-       setScore(0);
+       if (difficulty !== 'EASY') setScore(0);
     }
   };
 
@@ -196,22 +239,33 @@ const StroopGame = ({ onComplete, language }: Props) => {
     <div className={`flex flex-col items-center gap-8 w-full h-full justify-center rounded-3xl transition-colors ${bgClass}`}>
       <div className="flex flex-col items-center">
         <div className="text-xl text-slate-500 dark:text-slate-400 mb-2">{t.stroop_instr}</div>
-        <div className="text-sm font-mono text-slate-400">{t.score}: {score}/{TARGET}</div>
+        <div className="text-sm font-mono text-slate-400">{t.score}: {score}/{target}</div>
       </div>
-      <div 
-        className="text-7xl font-black tracking-widest drop-shadow-sm h-24"
-        style={{ color: current.color.hex }}
-      >
-        {current.text.name}
+      <div className="relative flex flex-col items-center">
+          <div 
+            className="text-7xl font-black tracking-widest drop-shadow-sm h-24 relative z-10"
+            style={{ color: current.color.hex }}
+          >
+            {current.text.name}
+          </div>
+          {tutorialEnabled && (
+                <div className="mt-2 text-xs bg-slate-800 text-white px-3 py-1 rounded-full animate-bounce z-20">
+                    Match this color!
+                </div>
+          )}
       </div>
       <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
          {colors.map(c => (
            <Button 
              key={c.id} 
              onClick={() => handleAnswer(c.id)}
-             className="h-20 border-2 border-transparent hover:border-slate-300 dark:hover:border-white/20 shadow-none"
+             className={`h-20 border-2 border-transparent hover:border-slate-300 dark:hover:border-white/20 shadow-none relative overflow-hidden`}
              style={{ backgroundColor: c.hex }}
-           />
+           >
+              {tutorialEnabled && c.id === current.color.id && (
+                  <div className="absolute inset-0 bg-white/30 animate-pulse" />
+              )}
+           </Button>
          ))}
       </div>
     </div>
@@ -219,20 +273,26 @@ const StroopGame = ({ onComplete, language }: Props) => {
 };
 
 // 4. Reaction
-const ReactionGame = ({ onComplete, language }: Props) => {
+const ReactionGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [status, setStatus] = useState<'WAIT' | 'GO' | 'EARLY' | 'SLOW' | 'RESULT'>('WAIT');
   const [resultMs, setResultMs] = useState(0);
   const timeoutRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
   const t = MINI_GAME_TRANSLATIONS[language];
-  const THRESHOLD = 350; // ms
+  
+  const threshold = {
+    EASY: 500,
+    NORMAL: 350,
+    HARD: 280,
+    EXPERT: 220
+  }[difficulty];
 
   const start = () => {
     setStatus('WAIT');
     const delay = 1500 + Math.random() * 2500; 
     timeoutRef.current = window.setTimeout(() => {
       setStatus('GO');
-      audio.playTone(600, 'square', 0.1); // Beep on GO
+      audio.playTone(600, 'square', 0.1); 
       startTimeRef.current = Date.now();
     }, delay);
   };
@@ -250,10 +310,10 @@ const ReactionGame = ({ onComplete, language }: Props) => {
     } else if (status === 'GO') {
       const diff = Date.now() - startTimeRef.current;
       setResultMs(diff);
-      if (diff <= THRESHOLD) {
+      if (diff <= threshold) {
          setStatus('RESULT');
          audio.playSuccess();
-         setTimeout(() => onComplete(true), 800);
+         setTimeout(() => onComplete(true, diff), 800);
       } else {
          setStatus('SLOW');
          audio.playFailure();
@@ -263,9 +323,10 @@ const ReactionGame = ({ onComplete, language }: Props) => {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full">
+        <div className="text-xs text-slate-400 uppercase font-mono mb-2">Target: &lt;{threshold}ms</div>
         <div 
         onMouseDown={handleClick} 
-        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl
+        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl relative
             ${status === 'WAIT' ? 'bg-red-500' : 
             status === 'GO' ? 'bg-green-500 scale-[1.02]' : 
             status === 'RESULT' ? 'bg-blue-500' :
@@ -279,6 +340,9 @@ const ReactionGame = ({ onComplete, language }: Props) => {
             status === 'EARLY' ? t.too_early :
             `${t.too_slow}\n(${resultMs}ms)`}
         </span>
+        {tutorialEnabled && status === 'WAIT' && (
+            <div className="absolute bottom-4 text-white/70 text-sm animate-pulse">Wait for Green...</div>
+        )}
         </div>
         {(status === 'EARLY' || status === 'SLOW') && (
             <Button onClick={start} className="bg-slate-700 text-white">{t.retry}</Button>
@@ -288,28 +352,71 @@ const ReactionGame = ({ onComplete, language }: Props) => {
 };
 
 // 5. Memory Matrix
-const MatrixGame = ({ onComplete, language }: Props) => {
+const MatrixGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [pattern, setPattern] = useState<number[]>([]);
   const [input, setInput] = useState<number[]>([]);
   const [phase, setPhase] = useState<'WATCH' | 'INPUT'>('WATCH');
   const [wrongIdx, setWrongIdx] = useState<number | null>(null);
+  
+  // Track which cell is currently lit
+  const [currentLitCell, setCurrentLitCell] = useState<number | null>(null);
+  
+  // Use a ref to prevent double-initialization and ensure clean start
+  const hasStartedRef = useRef(false);
+  
   const t = MINI_GAME_TRANSLATIONS[language];
 
-  const start = () => {
+  // Adjusted durations: Longer flashes for better memory retention
+  const config = {
+    // flashTime: How long it stays yellow
+    // gapTime: Time between two flashes
+    EASY: { count: 3, flashTime: 1000, gapTime: 300 },
+    NORMAL: { count: 5, flashTime: 800, gapTime: 300 },
+    HARD: { count: 6, flashTime: 700, gapTime: 300 },
+    EXPERT: { count: 7, flashTime: 600, gapTime: 300 }
+  }[difficulty];
+
+  const startSequence = useCallback(async () => {
+    hasStartedRef.current = true;
+    
+    // Ensure everything is reset visually
+    setPhase('WATCH');
+    setCurrentLitCell(null);
     setInput([]);
     setWrongIdx(null);
-    setPhase('WATCH');
-    const p = new Set<number>();
-    while(p.size < 5) p.add(Math.floor(Math.random() * 9));
-    setPattern(Array.from(p));
     
-    setTimeout(() => {
-       setPhase('INPUT');
-       audio.playTone(400, 'sine', 0.1);
-    }, 1500);
-  };
+    // Generate unique pattern
+    const p = new Set<number>();
+    while(p.size < config.count) p.add(Math.floor(Math.random() * 9));
+    const newPattern = Array.from(p); 
+    setPattern(newPattern);
 
-  useEffect(() => { start(); }, []);
+    // Initial pause before starting light show
+    await sleep(800);
+
+    // Play Sequence
+    for (const cellId of newPattern) {
+        // Light up
+        setCurrentLitCell(cellId);
+        audio.playClick();
+        await sleep(config.flashTime);
+        
+        // Turn off
+        setCurrentLitCell(null);
+        await sleep(config.gapTime);
+    }
+
+    // Finished
+    setPhase('INPUT');
+    audio.playTone(400, 'sine', 0.1); 
+  }, [config]);
+
+  useEffect(() => { 
+      // Only start if we haven't already
+      if (!hasStartedRef.current) {
+          startSequence(); 
+      }
+  }, [startSequence]);
 
   const handleClick = (i: number) => {
     if (phase === 'WATCH') return;
@@ -326,7 +433,9 @@ const MatrixGame = ({ onComplete, language }: Props) => {
     } else {
        setWrongIdx(i);
        audio.playFailure();
-       setTimeout(() => start(), 800); 
+       // Restart after failure
+       hasStartedRef.current = false;
+       setTimeout(() => startSequence(), 800); 
     }
   };
 
@@ -339,10 +448,19 @@ const MatrixGame = ({ onComplete, language }: Props) => {
            const isSelected = input.includes(i);
            const isWrong = wrongIdx === i;
            
+           // Highlight logic: Only highlight if it's the CURRENTLY lit cell in sequence
+           const isLit = phase === 'WATCH' && currentLitCell === i;
+
+           // Tutorial: If input phase, highlight remaining correct options gently
+           const showHint = tutorialEnabled && phase === 'INPUT' && isTarget && !isSelected;
+
            let bg = 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700';
-           if (phase === 'WATCH' && isTarget) bg = 'bg-white dark:bg-white shadow-[0_0_15px_rgba(255,255,255,0.8)]';
+           
+           if (isLit) bg = 'bg-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.8)] border-yellow-500 scale-105 transition-none';
+           
            if (phase === 'INPUT' && isSelected) bg = 'bg-green-500 shadow-[0_0_10px_#22c55e]';
            if (isWrong) bg = 'bg-red-500 animate-shake';
+           if (showHint) bg += ' ring-2 ring-blue-400 animate-pulse';
 
            return (
              <button
@@ -353,60 +471,101 @@ const MatrixGame = ({ onComplete, language }: Props) => {
            );
         })}
       </div>
+      <div className="text-xs font-mono text-slate-400">Pattern Size: {config.count}</div>
     </div>
   );
 };
 
 // 6. Lock Pick
-const LockPickGame = ({ onComplete, language }: Props) => {
+const LockPickGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [level, setLevel] = useState(0);
   const [angle, setAngle] = useState(0);
   const [targetAngle, setTargetAngle] = useState(0);
-  const [speed, setSpeed] = useState(1.5); 
-  const reqRef = useRef(0);
+  
+  // Refs for animation loop state to avoid closure staleness and re-renders
+  const angleRef = useRef(0);
+  const speedRef = useRef(0);
+  const reqRef = useRef<number>(0);
+  
+  // Controls whether the loop is active
+  const isPlayingRef = useRef(true);
+  
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
-  const TARGET_WIDTH = 40; 
+  const diffConfig = {
+      EASY: { baseSpeed: 1, width: 60, levels: 2 },
+      NORMAL: { baseSpeed: 1.5, width: 40, levels: 3 },
+      HARD: { baseSpeed: 2.5, width: 30, levels: 3 },
+      EXPERT: { baseSpeed: 3.0, width: 25, levels: 4 }
+  }[difficulty];
 
-  const startLevel = () => {
+  // Update speed ref when difficulty changes
+  useEffect(() => {
+      speedRef.current = diffConfig.baseSpeed;
+  }, [diffConfig.baseSpeed]);
+
+  // Initialize Level Logic
+  const initLevel = () => {
+    angleRef.current = 0;
     setAngle(0);
     setTargetAngle(Math.random() * 240 + 60);
   };
 
+  // Main Loop - Rewritten to be time-based and robust
   useEffect(() => {
-    startLevel();
-  }, []);
+    // Ensure speed is set before loop starts
+    speedRef.current = diffConfig.baseSpeed;
+    
+    // State initialization
+    initLevel();
+    isPlayingRef.current = true;
+    
+    let lastTime: number | null = null;
+    
+    const loop = (time: number) => {
+        if (!isPlayingRef.current) return;
 
-  useEffect(() => {
-    const loop = () => {
-      setAngle(prev => {
-        let next = prev + speed;
-        if (next >= 360) next = 0;
-        return next;
-      });
-      reqRef.current = requestAnimationFrame(loop);
+        if (lastTime !== null) {
+            const delta = time - lastTime;
+            // 0.06 deg/ms roughly matches the original 1.5 deg/16ms feel 
+            // baseSpeed 1 = 60 deg/sec
+            const move = (0.06 * speedRef.current) * delta;
+            
+            angleRef.current = (angleRef.current + move) % 360;
+            setAngle(angleRef.current); // Force React Render
+        }
+        
+        lastTime = time;
+        reqRef.current = requestAnimationFrame(loop);
     };
+
     reqRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(reqRef.current);
-  }, [speed]);
+
+    return () => {
+        isPlayingRef.current = false;
+        cancelAnimationFrame(reqRef.current);
+    };
+  }, []); // Empty dependency to run once on mount
 
   const click = () => {
-    const diff = Math.abs(angle - targetAngle);
-    if (diff <= TARGET_WIDTH / 2) {
+    const diff = Math.abs(angleRef.current - targetAngle);
+    const width = diffConfig.width;
+    
+    if (diff <= width / 2) {
        trigger(true);
-       if (level >= 2) {
+       if (level >= diffConfig.levels - 1) {
+          isPlayingRef.current = false; // Stop loop
           setTimeout(() => onComplete(true), 300);
        } else {
           setLevel(l => l + 1);
-          setSpeed(s => s + 0.5); 
-          startLevel();
+          speedRef.current += 0.5; 
+          initLevel();
        }
     } else {
        trigger(false);
-       setLevel(0);
-       setSpeed(1.5); 
-       startLevel();
+       // Reset current level try only
+       initLevel();
     }
   };
 
@@ -418,7 +577,7 @@ const LockPickGame = ({ onComplete, language }: Props) => {
       <div className="flex flex-col items-center">
          <div className="text-xl font-bold mb-2 text-slate-700 dark:text-slate-200">{t.lock_instr}</div>
          <div className="flex gap-2">
-            {[0, 1, 2].map(i => (
+            {Array(diffConfig.levels).fill(0).map((_, i) => (
                <div key={i} className={`w-3 h-3 rounded-full ${i < level ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`} />
             ))}
          </div>
@@ -430,9 +589,9 @@ const LockPickGame = ({ onComplete, language }: Props) => {
          
          {/* Target Zone */}
          <div 
-            className="absolute inset-0 rounded-full"
+            className="absolute inset-0 rounded-full transition-all duration-300"
             style={{
-               background: `conic-gradient(transparent ${targetAngle - TARGET_WIDTH/2}deg, #22c55e ${targetAngle - TARGET_WIDTH/2}deg ${targetAngle + TARGET_WIDTH/2}deg, transparent ${targetAngle + TARGET_WIDTH/2}deg)`,
+               background: `conic-gradient(transparent ${targetAngle - diffConfig.width/2}deg, #22c55e ${targetAngle - diffConfig.width/2}deg ${targetAngle + diffConfig.width/2}deg, transparent ${targetAngle + diffConfig.width/2}deg)`,
                maskImage: 'radial-gradient(transparent 65%, black 66%)',
                WebkitMaskImage: 'radial-gradient(transparent 65%, black 66%)'
             }}
@@ -449,25 +608,44 @@ const LockPickGame = ({ onComplete, language }: Props) => {
             style={{ transform: `rotate(${angle}deg)` }}
          >
              <div className="w-2 h-1/2 bg-transparent relative">
-                <div className="absolute top-0 w-4 h-4 -ml-1 bg-slate-800 dark:bg-white rounded-full shadow-sm" />
+                <div className={`absolute top-0 w-4 h-4 -ml-1 bg-slate-800 dark:bg-white rounded-full shadow-sm ${tutorialEnabled ? 'ring-2 ring-blue-400' : ''}`} />
              </div>
          </div>
+         
+         {tutorialEnabled && (
+            <div className="absolute bottom-[-40px] left-0 right-0 text-center text-xs text-blue-500 animate-bounce">
+                Tap when needle hits green!
+            </div>
+         )}
       </div>
     </div>
   );
 };
 
 // 7. Scramble Password
-const PasswordGame = ({ onComplete, language }: Props) => {
+const PasswordGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [code, setCode] = useState('');
   const [input, setInput] = useState('');
   const [layout, setLayout] = useState([1,2,3,4,5,6,7,8,9,0]);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
 
+  // Config: Length of code
+  const codeLength = {
+      EASY: { count: 3 },
+      NORMAL: { count: 4 },
+      HARD: { count: 6 },
+      EXPERT: { count: 8 }
+  }[difficulty];
+
   useEffect(() => {
-    setCode(Math.floor(Math.random() * 9000 + 1000).toString());
-  }, []);
+    // Generate code based on length
+    let c = '';
+    for(let i=0; i<codeLength.count; i++) c += Math.floor(Math.random()*10);
+    setCode(c);
+    // IMPORTANT: Only re-run if DIFFICULTY string changes, not the object reference.
+    // The previous bug was depending on `codeLength` which is a new object on every render.
+  }, [difficulty]); // Changed from [codeLength] to [difficulty]
 
   const shuffle = () => {
     setLayout([...layout].sort(() => Math.random() - 0.5));
@@ -481,7 +659,7 @@ const PasswordGame = ({ onComplete, language }: Props) => {
        trigger(true);
        setTimeout(() => onComplete(true), 200);
     }
-    else if (next.length >= 4) {
+    else if (next.length >= codeLength.count) {
        trigger(false);
        setInput('');
        shuffle();
@@ -490,39 +668,58 @@ const PasswordGame = ({ onComplete, language }: Props) => {
     }
   };
 
+  // Tutorial Helper: find the next number to press
+  const nextRequired = code[input.length];
+
   return (
      <div className={`flex flex-col items-center gap-4 w-full h-full justify-center rounded-3xl ${bgClass}`}>
        <div className="text-sm text-slate-500">{t.type_code} <span className="text-slate-800 dark:text-white font-mono text-xl ml-2 tracking-widest bg-slate-200 dark:bg-slate-700 px-2 rounded">{code}</span></div>
-       <div className="text-4xl font-mono tracking-[0.5em] text-blue-500 dark:text-blue-400 h-12 border-b-2 border-blue-500/30 mb-4">
-         {input.padEnd(4, '•')}
+       <div className="text-4xl font-mono tracking-[0.5em] text-blue-500 dark:text-blue-400 h-12 border-b-2 border-blue-500/30 mb-4 text-center">
+         {input.padEnd(codeLength.count, '•')}
        </div>
        <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-         {layout.map(n => (
-           <Button key={n} onClick={() => press(n)} className="bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white w-16 h-16 text-2xl font-mono border border-slate-200 dark:border-slate-600">
-             {n}
-           </Button>
-         ))}
+         {layout.map(n => {
+            const isNext = tutorialEnabled && n.toString() === nextRequired;
+            return (
+                <Button 
+                    key={n} 
+                    onClick={() => press(n)} 
+                    className={`bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white w-16 h-16 text-2xl font-mono border border-slate-200 dark:border-slate-600 ${isNext ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                >
+                    {n}
+                </Button>
+            );
+         })}
        </div>
      </div>
   );
 };
 
-// 8. Aim Lab (Burst) - FIXED LOGIC
-const BurstGame = ({ onComplete, language }: Props) => {
+// 8. Aim Lab (Burst)
+const BurstGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [target, setTarget] = useState<{id: number, x: number, y: number, size: number} | null>(null);
   const [score, setScore] = useState(0);
-  const TARGET_COUNT = 5;
   const t = MINI_GAME_TRANSLATIONS[language];
   const reqRef = useRef(0);
   const failedRef = useRef(false);
 
+  // Config: Targets count and shrink speed
+  const config = {
+      EASY: { count: 3, shrink: 0.4 },
+      NORMAL: { count: 5, shrink: 0.8 },
+      HARD: { count: 8, shrink: 1.2 },
+      EXPERT: { count: 12, shrink: 1.8 }
+  }[difficulty];
+
+  const createTarget = () => ({
+    id: Math.random(),
+    x: Math.random() * 80 + 10,
+    y: Math.random() * 80 + 10,
+    size: 100 
+  });
+
   const spawn = () => {
-     setTarget({
-        id: Math.random(),
-        x: Math.random() * 80 + 10,
-        y: Math.random() * 80 + 10,
-        size: 100 
-     });
+     setTarget(createTarget());
   };
 
   useEffect(() => { spawn(); }, []);
@@ -532,13 +729,11 @@ const BurstGame = ({ onComplete, language }: Props) => {
         if (failedRef.current) return;
         setTarget(curr => {
            if (!curr) return null;
-           const nextSize = curr.size - 0.8; 
+           const nextSize = curr.size - config.shrink; 
            if (nextSize <= 0) {
-              // CHANGE: Don't fail the whole game, just spawn new one (maybe sound failure)
-              // This fixes the "no ball spawns after miss" issue
               audio.playFailure();
-              spawn(); 
-              return null;
+              // In easy mode, maybe don't reset score? For now, keep punishment consistent
+              return createTarget(); 
            }
            return { ...curr, size: nextSize };
         });
@@ -546,13 +741,13 @@ const BurstGame = ({ onComplete, language }: Props) => {
      };
      reqRef.current = requestAnimationFrame(loop);
      return () => cancelAnimationFrame(reqRef.current);
-  }, []); // Logic contained inside state setter
+  }, [config.shrink]); 
 
   const hit = () => {
      audio.playPop();
      const next = score + 1;
      setScore(next);
-     if (next >= TARGET_COUNT) {
+     if (next >= config.count) {
         failedRef.current = true; // Stop loop
         setTarget(null);
         audio.playSuccess();
@@ -565,7 +760,7 @@ const BurstGame = ({ onComplete, language }: Props) => {
   return (
     <div className="w-full h-full relative min-h-[300px] bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden cursor-crosshair">
        <div className="absolute top-2 left-4 text-xs font-mono text-slate-500 pointer-events-none select-none z-10">
-          {t.burst_instr} {score}/{TARGET_COUNT}
+          {t.burst_instr} {score}/{config.count}
        </div>
        {target && (
          <button
@@ -584,6 +779,9 @@ const BurstGame = ({ onComplete, language }: Props) => {
            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-1 h-1 bg-white rounded-full" />
            </div>
+           {tutorialEnabled && (
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-red-600 font-bold whitespace-nowrap">CLICK!</div>
+           )}
          </button>
        )}
     </div>
@@ -591,20 +789,29 @@ const BurstGame = ({ onComplete, language }: Props) => {
 };
 
 // 9. Sequence
-const SequenceGame = ({ onComplete, language }: Props) => {
+const SequenceGame = ({ onComplete, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [next, setNext] = useState(1);
   const [buttons, setButtons] = useState<number[]>([]);
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger, bgClass } = useFeedback();
   
+  // Config: Max number
+  const maxNum = {
+      EASY: { count: 3 },
+      NORMAL: { count: 5 },
+      HARD: { count: 7 },
+      EXPERT: { count: 9 }
+  }[difficulty];
+
   useEffect(() => {
-    setButtons([1, 2, 3, 4, 5].sort(() => Math.random() - 0.5));
-  }, []);
+    setButtons(Array.from({length: maxNum.count}, (_, i) => i + 1).sort(() => Math.random() - 0.5));
+    // IMPORTANT: Only re-run if DIFFICULTY string changes, not the object reference.
+  }, [difficulty]); // Changed from [maxNum] to [difficulty]
 
   const click = (n: number) => {
     audio.playClick();
     if (n === next) {
-      if (n === 5) {
+      if (n === maxNum.count) {
         trigger(true);
         setTimeout(() => onComplete(true), 200);
       }
@@ -612,23 +819,26 @@ const SequenceGame = ({ onComplete, language }: Props) => {
     } else {
       trigger(false);
       setNext(1);
-      setButtons([1, 2, 3, 4, 5].sort(() => Math.random() - 0.5));
+      setButtons(Array.from({length: maxNum.count}, (_, i) => i + 1).sort(() => Math.random() - 0.5));
     }
   };
 
   return (
     <div className={`flex flex-col items-center gap-6 w-full h-full justify-center rounded-3xl transition-colors ${bgClass}`}>
-      <div className="text-xl text-slate-800 dark:text-white">{t.sequence_instr} <span className="font-bold text-blue-500">1 → 5</span></div>
+      <div className="text-xl text-slate-800 dark:text-white">{t.sequence_instr} <span className="font-bold text-blue-500">1 → {maxNum.count}</span></div>
       <div className="flex flex-wrap gap-4 justify-center max-w-[320px]">
-        {buttons.map(n => (
-          <Button 
-            key={n} 
-            onClick={() => click(n)} 
-            className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-20 h-20 text-3xl transition-all duration-200`}
-          >
-            {n}
-          </Button>
-        ))}
+        {buttons.map(n => {
+          const isNext = tutorialEnabled && n === next;
+          return (
+            <Button 
+                key={n} 
+                onClick={() => click(n)} 
+                className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-20 h-20 text-3xl transition-all duration-200 ${isNext ? 'ring-4 ring-blue-400 animate-pulse' : ''}`}
+            >
+                {n}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

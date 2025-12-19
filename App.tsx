@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, StealNotification, NetworkMessage, GameAction, AppSettings, UserStats, Achievement } from './types';
+import { GameState, PlayerId, PlayerState, CellData, StealNotification, NetworkMessage, GameAction, AppSettings, UserStats, Achievement, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { MiniGameRenderer } from './components/MiniGames';
@@ -41,7 +41,14 @@ const DEFAULT_STATS: UserStats = {
   totalSteals: 0,
   totalDefends: 0,
   gamesPlayed: 0,
-  unlockedAchievements: []
+  unlockedAchievements: [],
+  practiceRecords: []
+};
+
+const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
+  difficulty: 'NORMAL',
+  isBattlePreset: true,
+  tutorialEnabled: false
 };
 
 // --- Modals ---
@@ -261,59 +268,381 @@ const MainMenu = ({
   </div>
 );
 
-// --- Practice Mode ---
+// --- Practice Mode V2 ---
 
-const PracticeMode = ({ onBack, t, language }: { onBack: () => void, t: any, language: any }) => {
-  const [activeGame, setActiveGame] = useState<string | null>(null);
+const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: () => void, t: any, language: any, stats: UserStats, onSaveRecord: (r: PracticeRecord) => void }) => {
+  const [step, setStep] = useState<'LIST' | 'DETAIL' | 'PLAYING' | 'RESULT' | 'HISTORY'>('LIST');
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [config, setConfig] = useState<PracticeConfig>(DEFAULT_PRACTICE_CONFIG);
+  const [result, setResult] = useState<{ success: boolean; value: number } | null>(null);
+  const [filterType, setFilterType] = useState<'ALL' | GameType>('ALL');
+  const [search, setSearch] = useState('');
+  const [startTime, setStartTime] = useState(0);
+  
+  // FIXED: Moved Hook to top level (outside of conditional block)
+  const [paused, setPaused] = useState(false);
 
-  const handleComplete = (success: boolean) => {
-    if (success) {
-       setTimeout(() => {
-          setActiveGame(null);
-       }, 800);
-    }
+  // Helper to get PB for current config
+  const getPB = (gid: string, cfg: PracticeConfig) => {
+    const relevant = stats.practiceRecords.filter(r => 
+      r.gameId === gid && 
+      r.config.difficulty === cfg.difficulty && 
+      r.config.isBattlePreset === cfg.isBattlePreset &&
+      r.config.tutorialEnabled === cfg.tutorialEnabled && // Strict check on tutorial
+      r.isWin
+    );
+    if (relevant.length === 0) return null;
+    
+    // Lower is better for everything since we only track duration mostly
+    return relevant.reduce((prev, curr) => prev.value < curr.value ? prev : curr);
   };
 
-  return (
-    <div className="absolute inset-0 z-30 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <div className="p-6 flex items-center gap-4 z-10">
-        <button onClick={() => { audio.playClick(); onBack(); }} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-widest">
-           ← Back
-        </button>
-      </div>
+  const startPractice = () => {
+    setStartTime(Date.now());
+    setPaused(false); // Reset paused state
+    setStep('PLAYING');
+  };
 
-      <div className="flex-1 p-6 max-w-5xl mx-auto w-full overflow-y-auto custom-scrollbar z-10">
-        <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-8 uppercase tracking-tighter">
-           {t.menu_practice}
-        </h2>
+  const handleGameComplete = (success: boolean, score?: number) => {
+     const endTime = Date.now();
+     
+     // Default value is time taken (duration), but if game returns a score (like Reaction ms), use that.
+     const duration = endTime - startTime;
+     const finalValue = score !== undefined ? score : duration;
+     
+     const record: PracticeRecord = {
+        gameId: selectedGameId!,
+        timestamp: Date.now(),
+        value: finalValue,
+        config: { ...config },
+        isWin: success
+     };
 
-        {activeGame ? (
-           <div className="flex flex-col items-center animate-fade-in h-[600px]">
-             <div className="flex justify-between w-full max-w-md mb-6 items-center">
-               <h3 className="text-xl font-bold text-slate-800 dark:text-white uppercase tracking-widest">{MINI_GAMES.find(g => g.id === activeGame)?.name}</h3>
-               <button onClick={() => { audio.playClick(); setActiveGame(null); }} className="text-xs bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wider">Close</button>
+     setResult({ success, value: finalValue });
+     if (success) {
+        onSaveRecord(record);
+     }
+     setStep('RESULT');
+  };
+
+  const toggleBattlePreset = () => {
+     if (!config.isBattlePreset) {
+         // Enable Preset: Force Normal Difficulty, Disable Tutorial
+         setConfig({ ...config, isBattlePreset: true, difficulty: 'NORMAL', tutorialEnabled: false });
+     } else {
+         // Disable Preset
+         setConfig({ ...config, isBattlePreset: false });
+     }
+  };
+
+  const updateDifficulty = (d: Difficulty) => {
+     setConfig({ ...config, difficulty: d, isBattlePreset: false });
+  };
+
+  const toggleTutorial = () => {
+      setConfig({ ...config, tutorialEnabled: !config.tutorialEnabled, isBattlePreset: false });
+  };
+
+  // --- Screens ---
+
+  // History Dashboard (New)
+  if (step === 'HISTORY') {
+      const allRecords = [...stats.practiceRecords].sort((a, b) => b.timestamp - a.timestamp);
+      
+      return (
+        <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950">
+             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <button onClick={() => setStep('LIST')} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
+                    ← Back
+                </button>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">MY PRACTICE</h2>
+                <div className="w-16" /> 
              </div>
-             <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl w-full max-w-md h-full shadow-2xl border border-slate-200 dark:border-slate-800">
-                <MiniGameRenderer type={activeGame} playerId="P1" onComplete={handleComplete} language={language} />
+             
+             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Total Wins</div>
+                        <div className="text-2xl font-black text-green-500">{stats.practiceRecords.filter(r => r.isWin).length}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Total Attempts</div>
+                        <div className="text-2xl font-black text-blue-500">{stats.practiceRecords.length}</div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {allRecords.length === 0 ? (
+                        <div className="text-center text-slate-400 py-10">No records yet. Go practice!</div>
+                    ) : (
+                        allRecords.map((r, i) => {
+                           const game = MINI_GAMES.find(g => g.id === r.gameId);
+                           return (
+                               <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                   <div className="flex items-center gap-3">
+                                       <div className="text-2xl">{game?.icon}</div>
+                                       <div>
+                                           <div className="font-bold text-sm text-slate-900 dark:text-white">{game?.name}</div>
+                                           <div className="text-[10px] text-slate-400 font-mono flex gap-2">
+                                               <span>{r.config.difficulty}</span>
+                                               {r.config.isBattlePreset && <span className="text-blue-500">BATTLE</span>}
+                                               {r.config.tutorialEnabled && <span className="text-yellow-500">TUTORIAL</span>}
+                                               <span>{new Date(r.timestamp).toLocaleDateString()}</span>
+                                           </div>
+                                       </div>
+                                   </div>
+                                   <div className={`font-mono font-bold ${r.isWin ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>
+                                       {r.isWin ? (r.gameId === 'reaction' ? `${r.value}ms` : `${(r.value/1000).toFixed(2)}s`) : 'FAIL'}
+                                   </div>
+                               </div>
+                           );
+                        })
+                    )}
+                </div>
              </div>
-           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pb-12">
-            {MINI_GAMES.map(game => (
-              <button 
-                key={game.id}
-                onClick={() => { audio.playClick(); setActiveGame(game.id); }}
-                className="bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center gap-4 group shadow-md hover:shadow-xl transition-all border border-slate-100 dark:border-slate-700"
-              >
-                <div className="text-4xl group-hover:scale-110 transition-transform duration-300 drop-shadow-md">{game.icon}</div>
-                <div className="font-bold text-slate-800 dark:text-white group-hover:text-blue-500 transition-colors uppercase tracking-wide text-sm">{game.name}</div>
-              </button>
-            ))}
+        </div>
+      );
+  }
+
+  if (step === 'LIST') {
+     const filtered = MINI_GAMES.filter(g => {
+        if (filterType !== 'ALL' && g.type !== filterType) return false;
+        if (search && !g.name.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+     });
+
+     return (
+       <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+             <button onClick={onBack} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
+                ← Back
+             </button>
+             <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">{t.menu_practice}</h2>
+             <button onClick={() => setStep('HISTORY')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-blue-500 transition-colors">
+                 <Icons.Trophy className="w-5 h-5" />
+             </button>
           </div>
-        )}
-      </div>
-    </div>
-  );
+
+          <div className="p-4 flex gap-2 overflow-x-auto no-scrollbar">
+             {['ALL', 'TIMED', 'SCORE', 'ACCURACY'].map(ft => (
+                <button 
+                  key={ft}
+                  onClick={() => setFilterType(ft as any)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors ${filterType === ft ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}
+                >
+                   {t[`prac_filter_${ft.toLowerCase()}`] || ft}
+                </button>
+             ))}
+          </div>
+          
+          <div className="px-4 mb-2">
+             <input 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t.prac_search}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+             />
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map(game => {
+                   const wins = stats.practiceRecords.filter(r => r.gameId === game.id && r.isWin).length;
+                   
+                   return (
+                     <button 
+                        key={game.id}
+                        onClick={() => { setSelectedGameId(game.id); setStep('DETAIL'); audio.playClick(); }}
+                        className="bg-white dark:bg-slate-900 p-6 rounded-2xl flex items-center gap-6 shadow-sm hover:shadow-lg border border-slate-100 dark:border-slate-800 transition-all text-left group"
+                     >
+                        <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                           {game.icon}
+                        </div>
+                        <div className="flex-1">
+                           <div className="flex justify-between items-start">
+                              <h3 className="font-bold text-slate-900 dark:text-white text-lg">{game.name}</h3>
+                              <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-1 rounded uppercase">{game.type}</span>
+                           </div>
+                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{game.description}</p>
+                           <div className="mt-3 flex items-center gap-4 text-xs font-mono text-slate-400">
+                              <span>Wins: {wins}</span>
+                           </div>
+                        </div>
+                     </button>
+                   );
+                })}
+             </div>
+          </div>
+       </div>
+     );
+  }
+
+  if (step === 'DETAIL' && selectedGameId) {
+     const game = MINI_GAMES.find(g => g.id === selectedGameId)!;
+     const currentPB = getPB(selectedGameId, config);
+
+     return (
+        <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950">
+           <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-lg mx-auto w-full animate-fade-in">
+              <div className="text-6xl mb-6 drop-shadow-lg">{game.icon}</div>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-wider mb-2">{game.name}</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-center mb-8">{game.description}</p>
+
+              {/* Config Section */}
+              <div className="w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 space-y-6">
+                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">{t.prac_config_title}</span>
+                    <span className="text-xs font-mono text-slate-400">ID: {game.id}</span>
+                 </div>
+
+                 {/* Settings */}
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                       <div className="flex flex-col">
+                            <span className="text-sm text-slate-500">{t.prac_preset_battle}</span>
+                            <span className="text-[10px] text-slate-400">{t.prac_preset_desc}</span>
+                       </div>
+                       <button 
+                          onClick={toggleBattlePreset}
+                          className={`w-12 h-6 rounded-full relative transition-colors ${config.isBattlePreset ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                       >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.isBattlePreset ? 'left-7' : 'left-1'}`} />
+                       </button>
+                    </div>
+
+                    <div className={`flex justify-between items-center transition-opacity ${config.isBattlePreset ? 'opacity-50' : ''}`}>
+                       <span className="text-sm text-slate-500">{t.prac_diff}</span>
+                       <select 
+                          value={config.difficulty}
+                          onChange={(e) => updateDifficulty(e.target.value as Difficulty)}
+                          className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-bold rounded-lg px-3 py-2 outline-none cursor-pointer"
+                       >
+                          {['EASY', 'NORMAL', 'HARD', 'EXPERT'].map(d => (
+                             <option key={d} value={d}>{t[`prac_diff_${d.toLowerCase()}`]}</option>
+                          ))}
+                       </select>
+                    </div>
+
+                    <div className={`flex justify-between items-center transition-opacity ${config.isBattlePreset ? 'opacity-50' : ''}`}>
+                       <span className="text-sm text-slate-500">{t.prac_tutorial}</span>
+                       <button 
+                          onClick={toggleTutorial}
+                          className={`w-12 h-6 rounded-full relative transition-colors ${config.tutorialEnabled ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                       >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.tutorialEnabled ? 'left-7' : 'left-1'}`} />
+                       </button>
+                    </div>
+                 </div>
+
+                 {/* PB Display */}
+                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 flex justify-between items-center">
+                    <span className="text-xs font-bold uppercase text-slate-400">{t.prac_pb}</span>
+                    <span className="font-mono font-bold text-lg text-slate-900 dark:text-white">
+                       {currentPB ? (selectedGameId === 'reaction' ? `${currentPB.value}ms` : `${(currentPB.value/1000).toFixed(2)}s`) : t.prac_no_pb}
+                    </span>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4 pt-2">
+                    <button onClick={() => setStep('LIST')} className="py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors uppercase tracking-widest text-sm">{t.settings_close}</button>
+                    <button onClick={startPractice} className="py-4 rounded-xl font-bold bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30 transition-all active:scale-95 uppercase tracking-widest text-sm flex items-center justify-center gap-2">
+                       <Icons.Play className="w-4 h-4" /> {t.prac_start}
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+     );
+  }
+
+  if (step === 'PLAYING' && selectedGameId) {
+     return (
+        <div className="absolute inset-0 z-30 flex flex-col bg-slate-900">
+           {/* Header */}
+           <div className="h-16 flex items-center justify-between px-6 bg-slate-800/50 backdrop-blur-md z-20">
+              <span className="font-bold text-white/50 text-sm tracking-widest">{MINI_GAMES.find(g => g.id === selectedGameId)?.name}</span>
+              <button onClick={() => setPaused(true)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-full transition-colors">
+                 <Icons.Pause className="w-6 h-6" />
+              </button>
+           </div>
+
+           {/* Game Area */}
+           <div className="flex-1 relative flex flex-col">
+              <div className="flex-1 p-4 md:p-8 flex items-center justify-center">
+                 <div className="w-full max-w-lg aspect-square bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-slate-700">
+                    <MiniGameRenderer 
+                       type={selectedGameId} 
+                       playerId="P1" 
+                       onComplete={handleGameComplete} 
+                       language={language}
+                       difficulty={config.difficulty}
+                       tutorialEnabled={config.tutorialEnabled}
+                    />
+                 </div>
+              </div>
+           </div>
+
+           {/* Pause Menu Overlay */}
+           {paused && (
+              <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 animate-fade-in">
+                 <h2 className="text-4xl font-black text-white uppercase tracking-widest mb-12">{t.prac_paused}</h2>
+                 <div className="flex flex-col gap-4 w-full max-w-xs">
+                    <button onClick={() => setPaused(false)} className="bg-white text-slate-900 py-4 rounded-xl font-bold uppercase tracking-widest hover:scale-105 transition-transform flex items-center justify-center gap-3">
+                       <Icons.Play className="w-5 h-5" /> {t.prac_resume}
+                    </button>
+                    <button onClick={() => { setPaused(false); setStep('DETAIL'); startPractice(); }} className="bg-slate-700 text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-600 transition-colors flex items-center justify-center gap-3">
+                       <Icons.Restart className="w-5 h-5" /> {t.prac_restart}
+                    </button>
+                    <button onClick={() => setStep('DETAIL')} className="bg-red-500/20 text-red-500 border border-red-500/50 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-red-500/30 transition-colors flex items-center justify-center gap-3">
+                       <Icons.Exit className="w-5 h-5" /> {t.prac_quit}
+                    </button>
+                 </div>
+              </div>
+           )}
+        </div>
+     );
+  }
+
+  if (step === 'RESULT' && result && selectedGameId) {
+     const game = MINI_GAMES.find(g => g.id === selectedGameId)!;
+     const currentPB = getPB(selectedGameId, config);
+     const isNewRecord = currentPB && currentPB.value === result.value && result.success;
+
+     return (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900 p-6 animate-fade-in">
+           <div className="bg-slate-800 p-8 rounded-3xl max-w-sm w-full shadow-2xl border border-slate-700 text-center relative overflow-hidden">
+              {isNewRecord && (
+                 <div className="absolute top-0 inset-x-0 bg-yellow-500 text-slate-900 font-bold text-xs py-1 tracking-[0.3em] uppercase animate-pulse">
+                    {t.prac_new_record}
+                 </div>
+              )}
+              
+              <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl shadow-lg ${result.success ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                 {result.success ? '✓' : '✕'}
+              </div>
+              
+              <h2 className="text-2xl font-black text-white uppercase tracking-wider mb-2">
+                 {result.success ? t.prac_res_success : t.prac_res_fail}
+              </h2>
+              
+              <div className="text-5xl font-mono font-bold text-blue-400 mb-8 drop-shadow-sm">
+                 {selectedGameId === 'reaction' ? `${result.value}ms` : `${(result.value / 1000).toFixed(2)}s`}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                 <button onClick={startPractice} className="w-full bg-white text-slate-900 py-3 rounded-xl font-bold uppercase tracking-widest hover:scale-105 transition-transform">
+                    {t.prac_restart}
+                 </button>
+                 <button onClick={() => setStep('DETAIL')} className="w-full bg-slate-700 text-slate-300 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-600 transition-colors">
+                    Back to Config
+                 </button>
+              </div>
+           </div>
+        </div>
+     );
+  }
+
+  return null;
 };
 
 // --- Online Lobby ---
@@ -447,7 +776,12 @@ export default function App() {
       if (savedSettings) setSettings(JSON.parse(savedSettings));
       
       const savedStats = localStorage.getItem('gridrush_stats');
-      if (savedStats) setStats(JSON.parse(savedStats));
+      if (savedStats) {
+         const parsed = JSON.parse(savedStats);
+         // Migration: Ensure practiceRecords exists if loading old save
+         if (!parsed.practiceRecords) parsed.practiceRecords = [];
+         setStats(parsed);
+      }
     } catch (e) { console.error('Load failed', e); }
   }, []);
 
@@ -495,6 +829,11 @@ export default function App() {
     setStats(DEFAULT_STATS);
     setSettings(DEFAULT_SETTINGS);
     window.location.reload();
+  };
+
+  const handlePracticeRecord = (record: PracticeRecord) => {
+      const newStats = { ...stats, practiceRecords: [...stats.practiceRecords, record] };
+      saveStats(newStats);
   };
 
   // --- Achievements Logic ---
@@ -868,7 +1207,7 @@ export default function App() {
     );
   }
 
-  if (appMode === 'PRACTICE') return <PracticeMode onBack={() => setAppMode('MENU')} t={t} language={settings.language} />;
+  if (appMode === 'PRACTICE') return <PracticeMode onBack={() => setAppMode('MENU')} t={t} language={settings.language} stats={stats} onSaveRecord={handlePracticeRecord} />;
   
   if (appMode === 'LOBBY') {
     return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} isConnecting={isConnecting} error={error} t={t} />;
@@ -986,7 +1325,13 @@ export default function App() {
                   </div>
                   <h3 className="text-center text-3xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
                   <div className="w-full flex-1">
-                     <MiniGameRenderer type={miniGameId} playerId={myId!} onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} language={settings.language} />
+                     <MiniGameRenderer 
+                       type={miniGameId} 
+                       playerId={myId!} 
+                       onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} 
+                       language={settings.language} 
+                       difficulty="HARD" 
+                     />
                   </div>
                </div>
             </div>

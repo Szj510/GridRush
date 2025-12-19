@@ -49,19 +49,35 @@ export const Icons = {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm-1.72 6.97a.75.75 0 10-1.06 1.06L10.94 12l-1.72 1.72a.75.75 0 101.06 1.06L12 13.06l1.72 1.72a.75.75 0 101.06-1.06L13.06 12l1.72-1.72a.75.75 0 10-1.06-1.06L12 10.94l-1.72-1.72z" clipRule="evenodd" />
     </svg>
+  ),
+  // New Practice Icons
+  Play: ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+    </svg>
+  ),
+  Pause: ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clipRule="evenodd" />
+    </svg>
+  ),
+  Restart: ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
+    </svg>
   )
 };
 
 export const MINI_GAMES: MiniGameConfig[] = [
-  { id: 'math', name: 'Math Rush', icon: '🧮', description: 'Solve 3 equations!' },
-  { id: 'mash', name: 'Power Mash', icon: '💥', description: 'Mash to fill the bar!' },
-  { id: 'stroop', name: 'Stroop Test', icon: '🎨', description: 'Pick the COLOR, 5 times!' },
-  { id: 'reaction', name: 'Reaction', icon: '⚡', description: 'Click on Green (<350ms)!' },
-  { id: 'memory', name: 'Matrix', icon: '🧠', description: 'Repeat the pattern!' },
-  { id: 'lockpick', name: 'Lock Pick', icon: '🔐', description: 'Tap when green! (x3)' },
-  { id: 'password', name: 'Scramble', icon: '⌨️', description: 'Type the code!' },
-  { id: 'burst', name: 'Aim Lab', icon: '🎯', description: 'Hit 5 moving targets!' },
-  { id: 'sequence', name: '1-2-3', icon: '🔢', description: 'Click in order!' },
+  { id: 'math', name: 'Math Rush', type: 'TIMED', icon: '🧮', description: 'Solve 3 equations!' },
+  { id: 'mash', name: 'Power Mash', type: 'TIMED', icon: '💥', description: 'Mash to fill the bar!' },
+  { id: 'stroop', name: 'Stroop Test', type: 'ACCURACY', icon: '🎨', description: 'Pick the COLOR, 5 times!' },
+  { id: 'reaction', name: 'Reaction', type: 'TIMED', icon: '⚡', description: 'Click on Green (<350ms)!' },
+  { id: 'memory', name: 'Matrix', type: 'ACCURACY', icon: '🧠', description: 'Repeat the pattern!' },
+  { id: 'lockpick', name: 'Lock Pick', type: 'TIMED', icon: '🔐', description: 'Tap when green! (x3)' },
+  { id: 'password', name: 'Scramble', type: 'TIMED', icon: '⌨️', description: 'Type the code!' },
+  { id: 'burst', name: 'Aim Lab', type: 'SCORE', icon: '🎯', description: 'Hit 5 moving targets!' },
+  { id: 'sequence', name: '1-2-3', type: 'TIMED', icon: '🔢', description: 'Click in order!' },
 ];
 
 export const WIN_PATTERNS = [
@@ -167,6 +183,33 @@ export const TRANSLATIONS = {
 
     exit_game: "Quit",
     level_progress: "Level",
+
+    // Practice Mode
+    prac_search: "Search games...",
+    prac_filter_all: "ALL",
+    prac_filter_timed: "TIMED",
+    prac_filter_score: "SCORE",
+    prac_filter_accuracy: "ACCURACY",
+    prac_pb: "PB:",
+    prac_no_pb: "None",
+    prac_config_title: "Configuration",
+    prac_diff: "Difficulty",
+    prac_diff_easy: "EASY",
+    prac_diff_normal: "NORMAL",
+    prac_diff_hard: "HARD",
+    prac_diff_expert: "EXPERT",
+    prac_preset_battle: "Battle Preset",
+    prac_preset_desc: "Use standard online battle settings",
+    prac_tutorial: "Tutorial Hints",
+    prac_start: "START PRACTICE",
+    prac_paused: "PAUSED",
+    prac_resume: "RESUME",
+    prac_restart: "RESTART",
+    prac_quit: "QUIT",
+    prac_res_success: "COMPLETE!",
+    prac_res_fail: "FAILED",
+    prac_new_record: "NEW RECORD!",
+    prac_history: "Recent History",
   },
   zh: {
     menu_online: "在线对战",
@@ -221,6 +264,33 @@ export const TRANSLATIONS = {
 
     exit_game: "退出",
     level_progress: "关卡",
+
+    // Practice Mode
+    prac_search: "搜索小游戏...",
+    prac_filter_all: "全部",
+    prac_filter_timed: "计时",
+    prac_filter_score: "计分",
+    prac_filter_accuracy: "准确率",
+    prac_pb: "最佳:",
+    prac_no_pb: "暂无",
+    prac_config_title: "练习设置",
+    prac_diff: "难度",
+    prac_diff_easy: "简单",
+    prac_diff_normal: "普通",
+    prac_diff_hard: "困难",
+    prac_diff_expert: "专家",
+    prac_preset_battle: "对战预设",
+    prac_preset_desc: "使用标准在线对战参数",
+    prac_tutorial: "教学提示",
+    prac_start: "开始练习",
+    prac_paused: "已暂停",
+    prac_resume: "继续",
+    prac_restart: "重开",
+    prac_quit: "退出",
+    prac_res_success: "挑战完成！",
+    prac_res_fail: "挑战失败",
+    prac_new_record: "新纪录！",
+    prac_history: "最近记录",
   }
 };
 
