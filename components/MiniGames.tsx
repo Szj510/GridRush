@@ -377,10 +377,10 @@ const MatrixGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL'
   const config = {
     // flashTime: How long it stays yellow
     // gapTime: Time between two flashes
-    EASY: { count: 3, flashTime: 1000, gapTime: 300 },
-    NORMAL: { count: 5, flashTime: 800, gapTime: 300 },
-    HARD: { count: 6, flashTime: 700, gapTime: 300 },
-    EXPERT: { count: 7, flashTime: 600, gapTime: 300 }
+    EASY: { count: 3, flashTime: 1000, gapTime: 200 },
+    NORMAL: { count: 5, flashTime: 800, gapTime: 200 },
+    HARD: { count: 6, flashTime: 600, gapTime: 200 },
+    EXPERT: { count: 7, flashTime: 400, gapTime: 200 }
   }[difficulty];
 
   const startSequence = useCallback(async () => {
@@ -503,10 +503,10 @@ const LockPickGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
   const { trigger, bgClass } = useFeedback();
 
   const diffConfig = {
-      EASY: { baseSpeed: 1, width: 60, levels: 2 },
-      NORMAL: { baseSpeed: 1.5, width: 40, levels: 3 },
-      HARD: { baseSpeed: 2.5, width: 30, levels: 3 },
-      EXPERT: { baseSpeed: 3.0, width: 25, levels: 4 }
+      EASY: { baseSpeed: 3.5, width: 60, levels: 2 },
+      NORMAL: { baseSpeed: 4.5, width: 40, levels: 3 },
+      HARD: { baseSpeed: 5.5, width: 30, levels: 3 },
+      EXPERT: { baseSpeed: 6.5, width: 25, levels: 4 }
   }[difficulty];
 
   // Update speed ref when difficulty changes
@@ -718,9 +718,9 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
 
   // Config: Targets count and shrink speed
   const config = {
-      EASY: { count: 3, shrink: 0.4 },
-      NORMAL: { count: 5, shrink: 0.8 },
-      HARD: { count: 8, shrink: 1.2 },
+      EASY: { count: 3, shrink: 1.4 },
+      NORMAL: { count: 5, shrink: 1.6 },
+      HARD: { count: 8, shrink: 1.7 },
       EXPERT: { count: 12, shrink: 1.8 }
   }[difficulty];
 
