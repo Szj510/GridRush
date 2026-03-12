@@ -4,7 +4,7 @@
 
 **GridRush** is a competitive, real-time multiplayer browser game where players race to conquer a 3×3 grid by completing fast-paced mini-games.
 
-![Status](https://img.shields.io/badge/Status-Alpha-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![React](https://img.shields.io/badge/React-19-blue)
+![Status](https://img.shields.io/badge/Status-Alpha-blue) ![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey) ![React](https://img.shields.io/badge/React-19-blue)
 
 ## 🎮 Features
 
@@ -23,21 +23,21 @@
 
 The game features **13** distinct skill-based mini-games. Each online battle randomly samples 9 of them:
 
-| # | Name | Description |
-|---|---|---|
-| 1 | **Math Rush** | Solve arithmetic problems before time runs out. |
-| 2 | **Power Mash** | Mash the button to fill the energy bar. |
-| 3 | **Stroop Test** | Click the *color* of the text, not the word. |
-| 4 | **Reaction** | Wait for green, then click instantly. |
-| 5 | **Matrix** | Memorize a flash sequence, then reproduce it. |
-| 6 | **Lock Pick** | Tap when the spinner lands in the green zone. |
-| 7 | **Scramble** | Type a code on a constantly shuffling keypad. |
-| 8 | **Aim Lab** | Hit shrinking targets before they disappear. |
-| 9 | **1-2-3 Sequence** | Click numbers in ascending order. |
-| 10 | **Don't Touch Red** | Navigate your cursor through a maze, avoiding red zones. |
-| 11 | **Gravity Maze** | Flip gravity to guide a block through spike-filled passages. |
-| 12 | **Rhythm Copy** | Watch a 3-instrument beat pattern, then replay it with S / D / F. |
-| 13 | **Odd One Out** | Spot the single different character hidden in a grid of identical ones. |
+| #   | Name                | Description                                                             |
+| --- | ------------------- | ----------------------------------------------------------------------- |
+| 1   | **Math Rush**       | Solve arithmetic problems before time runs out.                         |
+| 2   | **Power Mash**      | Mash the button to fill the energy bar.                                 |
+| 3   | **Stroop Test**     | Click the _color_ of the text, not the word.                            |
+| 4   | **Reaction**        | Wait for green, then click instantly.                                   |
+| 5   | **Matrix**          | Memorize a flash sequence, then reproduce it.                           |
+| 6   | **Lock Pick**       | Tap when the spinner lands in the green zone.                           |
+| 7   | **Scramble**        | Type a code on a constantly shuffling keypad.                           |
+| 8   | **Aim Lab**         | Hit shrinking targets before they disappear.                            |
+| 9   | **1-2-3 Sequence**  | Click numbers in ascending order.                                       |
+| 10  | **Don't Touch Red** | Navigate your cursor through a maze, avoiding red zones.                |
+| 11  | **Gravity Maze**    | Flip gravity to guide a block through spike-filled passages.            |
+| 12  | **Rhythm Copy**     | Watch a 3-instrument beat pattern, then replay it with S / D / F.       |
+| 13  | **Odd One Out**     | Spot the single different character hidden in a grid of identical ones. |
 
 ## 🛠️ Tech Stack
 
@@ -50,18 +50,18 @@ The game features **13** distinct skill-based mini-games. Each online battle ran
 
 GridRush runs entirely in the browser with no backend. All game state lives on the **host's** machine; the guest only sends action messages. All peer data and stored values are treated as untrusted:
 
-| Layer | Measure |
-|---|---|
-| **P2P messages (host-side)** | Every `NetworkMessage` is reconstructed by `services/sanitize.ts` — type-checked against an allow-list, numeric values range-clamped. |
-| **P2P messages (guest-side)** | `STATE_UPDATE` from the host is shape-validated (status allow-list, cell-count bound, required objects present) before being applied. |
-| **Skill picks** | Guest-sent skill IDs are filtered to a fixed allow-list (`STEAL`, `FREEZE`, `DUEL`). |
-| **Action rate-limiting** | `RateLimiter` (token-bucket) enforces per-action limits: `HEARTBEAT` ≤ 3/s, `CLICK_CELL` ≤ 10/s, `INTERACTION` ≤ 20/s, `COMPLETE_GAME` ≤ 2/2 s. |
-| **Room code injection** | `joinGame` validates input against `/^\d{4}$/` before passing it to PeerJS. |
-| **BroadcastChannel events** | Cross-tab lobby messages are validated by `sanitizeLobbyMessage` (type allow-list + regex-checked code). |
-| **localStorage poisoning** | `sanitizeSettings` / `sanitizeStats` rebuild objects field-by-field rather than spreading parsed JSON directly. |
-| **Content Security Policy** | A CSP `<meta>` tag restricts script sources, locks WebSocket/XHR to `*.peerjs.com`, and blocks `frame-src` / `object-src`. |
+| Layer                         | Measure                                                                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P2P messages (host-side)**  | Every `NetworkMessage` is reconstructed by `services/sanitize.ts` — type-checked against an allow-list, numeric values range-clamped.           |
+| **P2P messages (guest-side)** | `STATE_UPDATE` from the host is shape-validated (status allow-list, cell-count bound, required objects present) before being applied.           |
+| **Skill picks**               | Guest-sent skill IDs are filtered to a fixed allow-list (`STEAL`, `FREEZE`, `DUEL`).                                                            |
+| **Action rate-limiting**      | `RateLimiter` (token-bucket) enforces per-action limits: `HEARTBEAT` ≤ 3/s, `CLICK_CELL` ≤ 10/s, `INTERACTION` ≤ 20/s, `COMPLETE_GAME` ≤ 2/2 s. |
+| **Room code injection**       | `joinGame` validates input against `/^\d{4}$/` before passing it to PeerJS.                                                                     |
+| **BroadcastChannel events**   | Cross-tab lobby messages are validated by `sanitizeLobbyMessage` (type allow-list + regex-checked code).                                        |
+| **localStorage poisoning**    | `sanitizeSettings` / `sanitizeStats` rebuild objects field-by-field rather than spreading parsed JSON directly.                                 |
+| **Content Security Policy**   | A CSP `<meta>` tag restricts script sources, locks WebSocket/XHR to `*.peerjs.com`, and blocks `frame-src` / `object-src`.                      |
 
-> **Inherent limitation**: Without a trusted server, a cheating *host* can fabricate `STATE_UPDATE` messages. These measures protect against a cheating *guest* and against local data corruption.
+> **Inherent limitation**: Without a trusted server, a cheating _host_ can fabricate `STATE_UPDATE` messages. These measures protect against a cheating _guest_ and against local data corruption.
 
 ## 🚀 Running Locally
 
@@ -90,5 +90,4 @@ npm run build
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE).
-
+[CC BY-NC 4.0](LICENSE) — Free to use and modify for non-commercial purposes. Commercial use is prohibited.
