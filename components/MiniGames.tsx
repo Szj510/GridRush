@@ -143,6 +143,13 @@ const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
   const t = MINI_GAME_TRANSLATIONS[language];
   const { trigger: _trigger, bgClass } = useFeedback();
 
+  // Use ref so the interval never needs to be recreated when onComplete changes (prevents
+  // the level-skip bug caused by App re-rendering every 100 ms via setTick).
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const doneRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Difficulty adjustments
   const config = {
     EASY: { decay: 0.8, gain: 10 },
@@ -156,21 +163,24 @@ const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
     setProgress(p => Math.min(100, p + config.gain));
   };
 
+  // Decay loop — runs once per mount (config.decay won't change mid-game)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress(p => {
-        if (p >= 100) {
-           clearInterval(timer);
-           audio.playSuccess();
-           onComplete(true);
-           return 100;
-        }
-        if (p <= 0) return 0;
-        return Math.max(0, p - config.decay);
-      });
+    doneRef.current = false;
+    timerRef.current = setInterval(() => {
+      setProgress(p => Math.max(0, p - config.decay));
     }, 50);
-    return () => clearInterval(timer);
-  }, [onComplete, config.decay]);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [config.decay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Completion detector — fires when progress reaches 100
+  useEffect(() => {
+    if (progress >= 100 && !doneRef.current) {
+      doneRef.current = true;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      audio.playSuccess();
+      onCompleteRef.current(true);
+    }
+  }, [progress]);
 
   return (
     <div className={`flex flex-col items-center w-full gap-6 h-full justify-center rounded-3xl ${bgClass}`}>
@@ -1208,7 +1218,7 @@ const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NOR
     s.forEach((inst, i) => {
       setTimeout(() => {
         flashBtn(inst, 250);
-        audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 240);
+        audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 0.24);
       }, i * cfg.ms);
     });
     setTimeout(() => setPhase('playing'), s.length * cfg.ms + 150);
@@ -1219,7 +1229,7 @@ const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NOR
     if (frozenRef.current) return; // Freeze skill: block input
     onInteractRef.current?.();
     flashBtn(inst, 150);
-    audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 120);
+    audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 0.12);
     if (inst === seqRef.current[posRef.current]) {
       const next = posRef.current + 1;
       if (next >= seqRef.current.length) {

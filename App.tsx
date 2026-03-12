@@ -867,18 +867,18 @@ const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm
 
   if (waiting) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center gap-6 bg-slate-950 text-white">
+      <div className="h-screen w-screen flex flex-col items-center justify-center gap-6 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
         <div className="text-5xl animate-spin">⏳</div>
-        <p className="text-xl font-bold tracking-widest uppercase text-slate-300">{t.skill_pick_waiting}</p>
+        <p className="text-xl font-bold tracking-widest uppercase text-slate-500 dark:text-slate-300">{t.skill_pick_waiting}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center gap-8 bg-slate-950 text-white px-4">
+    <div className="h-screen w-screen flex flex-col items-center justify-center gap-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-4">
       <div className="text-center">
-        <h1 className="text-3xl font-black tracking-widest uppercase text-yellow-400 mb-2">{t.skill_pick_title}</h1>
-        <p className="text-slate-400">{t.skill_pick_instr}</p>
+        <h1 className="text-3xl font-black tracking-widest uppercase text-yellow-500 dark:text-yellow-400 mb-2">{t.skill_pick_title}</h1>
+        <p className="text-slate-500 dark:text-slate-400">{t.skill_pick_instr}</p>
       </div>
 
       <div className="flex gap-4 flex-wrap justify-center">
@@ -894,13 +894,13 @@ const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm
                 ${isSelected
                   ? 'border-yellow-400 bg-yellow-400/10 shadow-lg shadow-yellow-400/30 scale-105'
                   : isDisabled
-                    ? 'border-slate-700 bg-slate-800/40 opacity-40 cursor-not-allowed'
-                    : 'border-slate-600 bg-slate-800 hover:border-slate-400 hover:scale-105 cursor-pointer'
+                    ? 'border-slate-200 dark:border-slate-700 bg-slate-100/40 dark:bg-slate-800/40 opacity-40 cursor-not-allowed'
+                    : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-400 hover:scale-105 cursor-pointer'
                 }`}
             >
               <span className="text-5xl">{skill.icon}</span>
-              <span className="text-sm tracking-wider uppercase text-slate-100">{t[skill.nameKey] ?? skill.id}</span>
-              {isSelected && <span className="text-xs text-yellow-400 font-black">✓ SELECTED</span>}
+              <span className="text-sm tracking-wider uppercase text-slate-700 dark:text-slate-100">{t[skill.nameKey] ?? skill.id}</span>
+              {isSelected && <span className="text-xs text-yellow-500 dark:text-yellow-400 font-black">✓ SELECTED</span>}
             </button>
           );
         })}
@@ -912,7 +912,7 @@ const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm
         className={`px-10 py-4 rounded-full font-black tracking-widest uppercase text-lg transition-all duration-200
           ${selected.length === 2
             ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300 shadow-lg shadow-yellow-400/40 hover:scale-105'
-            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
       >
         {t.skill_pick_confirm} ({selected.length}/2)
@@ -947,9 +947,9 @@ const SoloDifficultyPicker = ({
   };
 
   return (
-    <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-6">
-      <h1 className="text-3xl font-black tracking-widest uppercase text-white mb-1">{t.solo_diff_title}</h1>
-      <p className="text-slate-400 text-sm mb-8">{t.solo_diff_instr}</p>
+    <div className="w-full h-full bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
+      <h1 className="text-3xl font-black tracking-widest uppercase text-slate-900 dark:text-white mb-1">{t.solo_diff_title}</h1>
+      <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">{t.solo_diff_instr}</p>
 
       <div className="grid grid-cols-2 gap-3 w-full max-w-md mb-8">
         {opts.map(o => {
@@ -961,8 +961,8 @@ const SoloDifficultyPicker = ({
               onClick={() => { audio.playClick(); setSelected(o.id); }}
               className={`p-4 rounded-2xl border-2 text-left transition-all ${
                 isSelected
-                  ? `${o.border} bg-slate-800 ${o.text}`
-                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500'
+                  ? `${o.border} bg-slate-100 dark:bg-slate-800 ${o.text}`
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'
               }`}
             >
               <div className="text-base font-black uppercase tracking-wider">{o.label}</div>
@@ -978,7 +978,7 @@ const SoloDifficultyPicker = ({
       <div className="flex gap-4">
         <button
           onClick={() => { audio.playClick(); onBack(); }}
-          className="px-6 py-3 rounded-xl border border-slate-600 text-slate-400 hover:text-white font-bold uppercase tracking-widest transition-colors"
+          className="px-6 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold uppercase tracking-widest transition-colors"
         >
           {t.solo_diff_back}
         </button>
