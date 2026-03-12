@@ -237,8 +237,7 @@ const MainMenu = ({
   onShowAchievements,
   t
 }: any) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
-    {/* Top Right Controls */}
+  <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
     <div className="absolute top-6 right-6 flex gap-3">
       <button 
         onClick={() => { audio.playClick(); onShowAchievements(); }}
@@ -708,7 +707,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 overflow-y-auto">
+    <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
       <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
       
       <h2 className="text-4xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-tighter">{t.menu_online}</h2>
@@ -782,7 +781,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
           <p className="text-[10px] text-slate-400 text-center max-w-md mx-auto">{t.online_instruction}</p>
         </div>
       )}
-      {error && <div className="mt-4 bg-red-50 text-red-500 px-6 py-3 rounded-lg text-sm border border-red-200">{error}</div>}
+      {error && <div className="mt-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 px-6 py-3 rounded-lg text-sm border border-red-200 dark:border-red-800">{error}</div>}
     </div>
   );
 };
@@ -791,7 +790,7 @@ const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic 
   roomId: string, onCancel: () => void, t: any,
   onOpenLobby: () => void, onCloseLobby: () => void, isPublic: boolean
 }) => (
-  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
+  <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
     <div className="bg-white dark:bg-slate-800 p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
       <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
       <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-8 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
@@ -1946,7 +1945,7 @@ export default function App() {
 
   if (appMode === 'MENU') {
     return (
-      <div className="w-full h-full text-slate-900 dark:text-white transition-colors duration-300">
+      <div className="w-full h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
         {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
@@ -2031,11 +2030,11 @@ export default function App() {
       {connectionStatus === 'DISCONNECTED' && (
           <div className="absolute inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-sm">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Icons.Exit className="w-8 h-8 text-red-500" />
                   </div>
                   <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">CONNECTION LOST</h2>
-                  <p className="text-slate-500 mb-6">The connection to the other player was interrupted.</p>
+                  <p className="text-slate-500 dark:text-slate-400 mb-6">The connection to the other player was interrupted.</p>
                   <button onClick={resetGame} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-red-600 transition-colors">
                       EXIT TO MENU
                   </button>
