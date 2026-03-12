@@ -636,31 +636,64 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
 
 const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) => {
   const [joinId, setJoinId] = useState('');
-  const [rooms, setRooms] = useState<string[] | null>(null);  // null = loading, [] = empty/error
+  const [rooms, setRooms] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [lobbyError, setLobbyError] = useState(false);
 
-  const fetchRooms = async () => {
+  const addRoom  = (code: string) => setRooms(prev => prev.includes(code) ? prev : [...prev, code]);
+  const dropRoom = (code: string) => setRooms(prev => prev.filter(c => c !== code));
+
+  const fetchFromServer = async () => {
     try {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 6000);
-      const res = await fetch('https://0.peerjs.com/peerjs/peers?key=peerjs', { signal: ac.signal });
+      // Correct PeerJS REST endpoint — key is part of the path, no query param
+      const res = await fetch('https://0.peerjs.com/peerjs/peers', { signal: ac.signal });
       clearTimeout(timer);
       if (!res.ok) throw new Error();
       const peers: string[] = await res.json();
-      // Only show rooms explicitly marked as public (gridrush-pub-XXXX beacon)
-      setRooms(peers.filter(id => /^gridrush-pub-\d{4}$/.test(id)).map(id => id.replace('gridrush-pub-', '')));
+      peers
+        .filter(id => /^gridrush-pub-\d{4}$/.test(id))
+        .map(id => id.replace('gridrush-pub-', ''))
+        .forEach(addRoom);
       setLobbyError(false);
     } catch {
       setLobbyError(true);
-      setRooms([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRooms();
-    const interval = setInterval(fetchRooms, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    // 1. Read localStorage: rooms registered in this browser (any tab)
+    const now = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith('gridrush_room_')) continue;
+      const ts = parseInt(localStorage.getItem(key) || '0');
+      if (now - ts < 30 * 60 * 1000) {
+        addRoom(key.replace('gridrush_room_', ''));
+        setLoading(false);
+      } else {
+        localStorage.removeItem(key); // prune stale entries
+      }
+    }
+
+    // 2. BroadcastChannel: live announcements from host tabs
+    const bc = new BroadcastChannel('gridrush_lobby');
+    bc.onmessage = (e: MessageEvent) => {
+      if (e.data.type === 'ROOM_OPEN')   { addRoom(e.data.code);  setLoading(false); }
+      if (e.data.type === 'ROOM_CLOSED') { dropRoom(e.data.code); }
+    };
+    // Ask any host tab that is already open to re-announce
+    setTimeout(() => bc.postMessage({ type: 'ROOM_QUERY' }), 150);
+
+    // 3. Try PeerJS server as a best-effort supplement
+    fetchFromServer();
+    const interval = setInterval(fetchFromServer, 15000);
+
+    return () => { bc.close(); clearInterval(interval); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 overflow-y-auto">
@@ -697,24 +730,24 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 🏛️ {t.lobby_rooms}
-                {rooms !== null && !lobbyError && (
+                {!loading && (
                   <span className="ml-2 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-bold">
                     {rooms.length}
                   </span>
                 )}
               </h3>
-              <button onClick={() => { setRooms(null); fetchRooms(); }} className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors uppercase tracking-widest">
+              <button onClick={() => { setRooms([]); setLoading(true); fetchFromServer(); }} className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors uppercase tracking-widest">
                 ↺ {t.lobby_refresh}
               </button>
             </div>
 
-            {rooms === null ? (
+            {loading && rooms.length === 0 ? (
               <div className="flex items-center gap-2 text-slate-400 text-sm py-2">
                 <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
                 {t.lobby_loading}
               </div>
-            ) : lobbyError ? (
-              <p className="text-xs text-slate-400 py-2">{t.lobby_error}</p>
+            ) : rooms.length === 0 ? (
+              <p className="text-sm text-slate-400 py-2">{lobbyError ? t.lobby_error : t.lobby_empty}</p>
             ) : rooms.length === 0 ? (
               <p className="text-sm text-slate-400 py-2">{t.lobby_empty}</p>
             ) : (
@@ -1028,6 +1061,8 @@ export default function App() {
   // Public lobby beacon (gridrush-pub-XXXX signals the room is open)
   const [isLobbyPublic, setIsLobbyPublic] = useState(false);
   const beaconPeerRef = useRef<any>(null);
+  const beaconBcRef   = useRef<BroadcastChannel | null>(null);
+  const beaconCodeRef = useRef<string | null>(null);
 
   // Challenge
   const [challengeStartTime, setChallengeStartTime] = useState<number>(0);
@@ -1757,14 +1792,37 @@ export default function App() {
     if (beaconPeerRef.current) return; // already running
     const beacon = new window.Peer(`gridrush-pub-${code}`);
     beaconPeerRef.current = beacon;
+    beaconCodeRef.current = code;
     setIsLobbyPublic(true);
     beacon.on('error', () => { /* silently ignore — may already be taken */ });
+
+    // Local discovery: write to localStorage so other tabs can read it on open
+    localStorage.setItem(`gridrush_room_${code}`, Date.now().toString());
+
+    // BroadcastChannel: real-time announcement to any open Lobby tab
+    const bc = new BroadcastChannel('gridrush_lobby');
+    beaconBcRef.current = bc;
+    bc.postMessage({ type: 'ROOM_OPEN', code });
+    // Re-announce when a Lobby tab asks
+    bc.onmessage = (e: MessageEvent) => {
+      if (e.data.type === 'ROOM_QUERY') bc.postMessage({ type: 'ROOM_OPEN', code });
+    };
   };
 
   const teardownLobbyBeacon = () => {
+    const code = beaconCodeRef.current;
     if (beaconPeerRef.current) {
       beaconPeerRef.current.destroy();
       beaconPeerRef.current = null;
+    }
+    if (beaconBcRef.current) {
+      if (code) beaconBcRef.current.postMessage({ type: 'ROOM_CLOSED', code });
+      beaconBcRef.current.close();
+      beaconBcRef.current = null;
+    }
+    if (code) {
+      localStorage.removeItem(`gridrush_room_${code}`);
+      beaconCodeRef.current = null;
     }
     setIsLobbyPublic(false);
   };
