@@ -640,10 +640,14 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
 
   const fetchRooms = async () => {
     try {
-      const res = await fetch('https://0.peerjs.com/peerjs/peers', { signal: AbortSignal.timeout(5000) });
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 6000);
+      const res = await fetch('https://0.peerjs.com/peerjs/peers?key=peerjs', { signal: ac.signal });
+      clearTimeout(timer);
       if (!res.ok) throw new Error();
       const peers: string[] = await res.json();
-      setRooms(peers.filter(id => /^gridrush-\d{4}$/.test(id)).map(id => id.replace('gridrush-', '')));
+      // Only show rooms explicitly marked as public (gridrush-pub-XXXX beacon)
+      setRooms(peers.filter(id => /^gridrush-pub-\d{4}$/.test(id)).map(id => id.replace('gridrush-pub-', '')));
       setLobbyError(false);
     } catch {
       setLobbyError(true);
@@ -653,7 +657,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
 
   useEffect(() => {
     fetchRooms();
-    const interval = setInterval(fetchRooms, 5000);
+    const interval = setInterval(fetchRooms, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -737,15 +741,28 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
   );
 };
 
-const WaitingRoom = ({ roomId, onCancel, t }: { roomId: string, onCancel: () => void, t: any }) => (
+const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic }: {
+  roomId: string, onCancel: () => void, t: any,
+  onOpenLobby: () => void, onCloseLobby: () => void, isPublic: boolean
+}) => (
   <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
     <div className="bg-white dark:bg-slate-800 p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
       <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
-      <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-10 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
-      <div className="flex items-center gap-3 mb-10">
+      <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-8 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
+      <div className="flex items-center gap-3 mb-6">
         <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
         <span className="text-blue-500 text-sm font-medium tracking-wide">{t.online_waiting}</span>
       </div>
+      <button
+        onClick={() => { audio.playClick(); isPublic ? onCloseLobby() : onOpenLobby(); }}
+        className={`mb-6 px-5 py-2.5 rounded-xl text-sm font-bold tracking-widest uppercase transition-all active:scale-95 ${
+          isPublic
+            ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200'
+            : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+        }`}
+      >
+        {isPublic ? t.lobby_listed : t.lobby_list_public}
+      </button>
       <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
     </div>
   </div>
@@ -934,6 +951,10 @@ export default function App() {
   const mySkillPicksRef = useRef<string[]>([]);
   mySkillPicksRef.current = mySkillPicks;
   const p2SkillPicksRef = useRef<string[] | null>(null); // HOST stores P2's picks
+
+  // Public lobby beacon (gridrush-pub-XXXX signals the room is open)
+  const [isLobbyPublic, setIsLobbyPublic] = useState(false);
+  const beaconPeerRef = useRef<any>(null);
 
   // Challenge
   const [challengeStartTime, setChallengeStartTime] = useState<number>(0);
@@ -1649,6 +1670,22 @@ export default function App() {
   };
 
   // --- Network Setup ---
+  const setupLobbyBeacon = (code: string) => {
+    if (beaconPeerRef.current) return; // already running
+    const beacon = new window.Peer(`gridrush-pub-${code}`);
+    beaconPeerRef.current = beacon;
+    setIsLobbyPublic(true);
+    beacon.on('error', () => { /* silently ignore — may already be taken */ });
+  };
+
+  const teardownLobbyBeacon = () => {
+    if (beaconPeerRef.current) {
+      beaconPeerRef.current.destroy();
+      beaconPeerRef.current = null;
+    }
+    setIsLobbyPublic(false);
+  };
+
   const setupHost = () => {
     setIsConnecting(true);
     setError(null);
@@ -1670,7 +1707,8 @@ export default function App() {
       connRef.current = conn;
       conn.on('data', (data: NetworkMessage) => handleGuestMessage(data));
       conn.on('open', () => {
-        // Enter skill pick phase instead of starting immediately
+        // Guest connected: remove beacon and enter skill pick phase
+        teardownLobbyBeacon();
         p2SkillPicksRef.current = null;
         setMySkillPicks([]);
         setAppMode('SKILL_PICK');
@@ -1728,6 +1766,7 @@ export default function App() {
   };
 
   const resetGame = () => {
+    teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
     setGameState(DEFAULT_GAME_STATE);
     setMyId(null);
@@ -1793,7 +1832,8 @@ export default function App() {
   }
 
   if (myId === 'P1' && roomId && gameState.status === 'IDLE') {
-    return <WaitingRoom roomId={roomId} onCancel={resetGame} t={t} />;
+    return <WaitingRoom roomId={roomId} onCancel={resetGame} t={t}
+      onOpenLobby={() => setupLobbyBeacon(roomId)} onCloseLobby={teardownLobbyBeacon} isPublic={isLobbyPublic} />;
   }
 
   // --- GAME VIEW ---

@@ -286,12 +286,14 @@ export const TRANSLATIONS = {
     skill_pick_waiting: "Waiting for opponent...",
     // Lobby
     lobby_rooms: "PUBLIC ROOMS",
-    lobby_empty: "No open rooms — host one!",
+    lobby_empty: "No open rooms — host one to get started!",
     lobby_loading: "Looking for rooms...",
     lobby_quick: "QUICK JOIN",
     lobby_join_room: "JOIN",
     lobby_refresh: "Refresh",
-    lobby_error: "Couldn't connect to lobby server",
+    lobby_error: "Lobby unavailable — enter a code to join manually",
+    lobby_list_public: "📢 List in Lobby",
+    lobby_listed: "🔒 Listed · Remove",
   },
   zh: {
     menu_online: "在线对战",
@@ -395,7 +397,9 @@ export const TRANSLATIONS = {
     lobby_quick: "快速参战",
     lobby_join_room: "加入",
     lobby_refresh: "刷新",
-    lobby_error: "无法连接大厅服务器",
+    lobby_error: "大厅无法连接，请直接输入房间号加入",
+    lobby_list_public: "📢 发布到大厅",
+    lobby_listed: "🔒 已发布 · 取消",
   }
 };
 
@@ -484,20 +488,20 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
   {
     id: 'lightning',
     titleEn: 'Lightning',
-    titleZh: '闪电刘第',
-    descEn: 'Finish Time Attack in under 45 seconds.',
-    descZh: '在45秒内完成竞速模式。',
+    titleZh: '闪电战神',
+    descEn: 'Finish Time Attack in under 3 minutes.',
+    descZh: '3分钟内完成竞速模式。',
     icon: '🌩️',
-    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 45000
+    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 180000
   },
   {
     id: 'blitz',
     titleEn: 'Blitz',
-    titleZh: '闪燃空耳',
-    descEn: 'Finish Time Attack in under 25 seconds.',
-    descZh: '在25秒内完成竞速模式。',
+    titleZh: '闪乱战神',
+    descEn: 'Finish Time Attack in under 90 seconds.',
+    descZh: '90秒内完成竞速模式。',
     icon: '☄️',
-    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 25000
+    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 90000
   },
   {
     id: 'marathon',
