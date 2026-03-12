@@ -223,8 +223,11 @@ export const TRANSLATIONS = {
 
     rules_title: "How to Play",
     rules_goal: "Control 3 cells in a row or the most cells total.",
-    rules_race: "The grid is hidden! Click a '?' to start a Mini-Game.",
-    rules_steal: "Challenge a cell your opponent owns. They have 5s to defend!",
+    rules_race: "The grid is hidden! Click a '?' to start a Mini-Game. The first player to finish claims that cell.",
+    rules_steal: "Challenge a cell your opponent owns. They have 5s to defend. If they fail, you take it!",
+    rules_skills_intro: "Before each online battle, secretly pick 2 of 3 skills.",
+    rules_freeze: "Freeze the opponent's input for 2 seconds.",
+    rules_duel: "Force both players into a simultaneous race on an empty cell you choose. The faster player claims it.",
     
     settings_title: "SETTINGS",
     settings_lang: "Language / 语言",
@@ -344,7 +347,10 @@ export const TRANSLATIONS = {
     rules_title: "游戏规则",
     rules_goal: "连成三点一线，或在棋盘占满时拥有更多格子。",
     rules_race: "格子是未知的！点击“?”开始小游戏，率先完成者占领该格。",
-    rules_steal: "你可以挑战对手已占领的格子。他们有5秒时间防守，否则归你！",
+    rules_steal: "挑战对手已占领的格子，对手有5秒防守时间，失败则格子归你！",
+    rules_skills_intro: "每局在线对战开始前，秘密从3种技能中选2种，对手无法得知你的选择。",
+    rules_freeze: "冻结对手的操作2秒。",
+    rules_duel: "强制双方同时在你选定的空格竞速，更快者占领该格。",
 
     settings_title: "游戏设置",
     settings_lang: "语言 / Language",

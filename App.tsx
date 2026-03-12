@@ -74,15 +74,24 @@ const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => (
       <h2 className="text-2xl font-bold mb-6 text-center text-slate-900 dark:text-white tracking-widest uppercase">
         {t.rules_title}
       </h2>
-      <div className="space-y-6 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
+      <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed overflow-y-auto max-h-[60vh] pr-1">
         <p><strong className="text-slate-900 dark:text-white font-semibold">Goal:</strong> {t.rules_goal}</p>
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-          <strong className="block text-blue-600 dark:text-blue-400 mb-2 font-semibold">🏁 Racing</strong>
+          <strong className="block text-blue-600 dark:text-blue-400 mb-1 font-semibold">🏁 Racing</strong>
           {t.rules_race}
         </div>
+        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold pt-1">{t.rules_skills_intro}</p>
         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
-          <strong className="block text-red-600 dark:text-red-400 mb-2 font-semibold">⚔️ Stealing</strong>
+          <strong className="block text-red-600 dark:text-red-400 mb-1 font-semibold">⭐ {t.skill_steal}</strong>
           {t.rules_steal}
+        </div>
+        <div className="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-xl border border-cyan-100 dark:border-cyan-800">
+          <strong className="block text-cyan-600 dark:text-cyan-400 mb-1 font-semibold">❄️ {t.skill_freeze}</strong>
+          {t.rules_freeze}
+        </div>
+        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
+          <strong className="block text-purple-600 dark:text-purple-400 mb-1 font-semibold">⚔️ {t.skill_duel}</strong>
+          {t.rules_duel}
         </div>
       </div>
       <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-8 bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 font-bold py-3 rounded-xl transition-all shadow-lg">
