@@ -997,6 +997,172 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
   );
 };
 
+// --- Gravity Maze types ---
+type GravCol = { x: number; gapY: number; gapH: number };
+
+// 11. Gravity Maze
+const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+  const W = 310, H = 200, BSIZE = 16, COL_W = 16, GOAL_X = 286;
+  const t = MINI_GAME_TRANSLATIONS[language];
+
+  const cfg = React.useMemo(() => ({
+    EASY:   { cols: [{x:105,gapY:55,gapH:90},{x:205,gapY:60,gapH:90}]                                                            as GravCol[], speed:1.0, grav:0.22, maxVel:4   },
+    NORMAL: { cols: [{x:90,gapY:65,gapH:68},{x:168,gapY:45,gapH:68},{x:245,gapY:70,gapH:68}]                                     as GravCol[], speed:1.3, grav:0.28, maxVel:5   },
+    HARD:   { cols: [{x:82,gapY:75,gapH:54},{x:143,gapY:50,gapH:54},{x:204,gapY:78,gapH:54},{x:258,gapY:58,gapH:54}]            as GravCol[], speed:1.6, grav:0.32, maxVel:5.5 },
+    EXPERT: { cols: [{x:72,gapY:80,gapH:44},{x:124,gapY:55,gapH:44},{x:178,gapY:74,gapH:44},{x:228,gapY:48,gapH:44},{x:272,gapY:65,gapH:44}] as GravCol[], speed:2.0, grav:0.38, maxVel:6 },
+  })[difficulty], [difficulty]);
+
+  // All physics in refs — no closure staleness in rAF
+  const bxRef      = useRef(20);
+  const byRef      = useRef(H / 2 - BSIZE / 2);
+  const velRef     = useRef(0);
+  const gravRef    = useRef<1 | -1>(1);
+  const startedRef = useRef(false);
+  const doneRef    = useRef(false);
+  const reqRef     = useRef(0);
+  const cfgRef     = useRef(cfg); cfgRef.current = cfg;
+  const onCompleteRef   = useRef(onComplete);   onCompleteRef.current   = onComplete;
+  const onInteractRef   = useRef(onInteraction); onInteractRef.current   = onInteraction;
+
+  const [display, setDisplay] = useState({
+    bx: 20, by: H / 2 - BSIZE / 2, gravDir: 1 as 1 | -1, started: false, dead: false,
+  });
+
+  const resetBlock = useCallback(() => {
+    bxRef.current  = 20;
+    byRef.current  = H / 2 - BSIZE / 2;
+    velRef.current = 0;
+    gravRef.current = 1;
+  }, []);
+
+  useEffect(() => {
+    doneRef.current = false;
+    resetBlock();
+
+    const loop = () => {
+      if (doneRef.current) return;
+      const c = cfgRef.current;
+
+      if (startedRef.current) {
+        velRef.current = Math.max(-c.maxVel, Math.min(c.maxVel,
+          velRef.current + gravRef.current * c.grav
+        ));
+        bxRef.current += c.speed;
+        byRef.current += velRef.current;
+
+        const bx = bxRef.current, by = byRef.current;
+
+        let hit = by < 0 || by + BSIZE > H;
+        if (!hit) {
+          for (const col of c.cols) {
+            if (bx + BSIZE > col.x && bx < col.x + COL_W) {
+              if (by < col.gapY || by + BSIZE > col.gapY + col.gapH) { hit = true; break; }
+            }
+          }
+        }
+
+        if (hit) {
+          audio.playFailure();
+          startedRef.current = false;
+          resetBlock();
+          setDisplay({ bx: 20, by: H / 2 - BSIZE / 2, gravDir: 1, started: false, dead: true });
+          setTimeout(() => setDisplay(d => ({ ...d, dead: false })), 600);
+        } else if (bx + BSIZE >= GOAL_X) {
+          doneRef.current = true;
+          audio.playSuccess();
+          onCompleteRef.current(true);
+          return;
+        } else {
+          setDisplay({ bx, by, gravDir: gravRef.current, started: true, dead: false });
+        }
+      }
+
+      reqRef.current = requestAnimationFrame(loop);
+    };
+
+    reqRef.current = requestAnimationFrame(loop);
+    return () => { doneRef.current = true; cancelAnimationFrame(reqRef.current); };
+  }, [resetBlock]);
+
+  const handleClick = () => {
+    if (doneRef.current) return;
+    if (onInteractRef.current) onInteractRef.current();
+    if (!startedRef.current) {
+      startedRef.current = true;
+      setDisplay(d => ({ ...d, started: true, dead: false }));
+    } else {
+      gravRef.current = gravRef.current === 1 ? -1 : 1;
+      audio.playClick();
+    }
+  };
+
+  const { bx, by, gravDir, started, dead } = display;
+  const spikeCount = Math.ceil(W / 16);
+
+  return (
+    <div className="flex flex-col items-center gap-3 w-full justify-center">
+      <div className="text-sm font-mono text-slate-500 dark:text-slate-400 h-5 text-center">
+        {dead ? '💥' : started ? t.gravity_instr : t.gravity_start}
+      </div>
+      <div
+        className={`rounded-xl overflow-hidden border-2 cursor-pointer select-none transition-colors ${
+          dead ? 'border-red-500' : started ? 'border-indigo-400' : 'border-slate-300 dark:border-slate-600'
+        }`}
+        onMouseDown={handleClick}
+      >
+        <svg width={W} height={H} className="block" style={{ background: '#0f172a' }}>
+          {/* Top & bottom wall spikes */}
+          {Array.from({ length: spikeCount }, (_, i) => (
+            <React.Fragment key={i}>
+              <polygon points={`${i*16},0 ${i*16+16},0 ${i*16+8},10`} fill="#475569" />
+              <polygon points={`${i*16},${H} ${i*16+16},${H} ${i*16+8},${H-10}`} fill="#475569" />
+            </React.Fragment>
+          ))}
+
+          {/* Obstacle columns */}
+          {cfg.cols.map((col, idx) => (
+            <g key={idx}>
+              {col.gapY > 0 && <rect x={col.x} y={0} width={COL_W} height={col.gapY} fill="#dc2626" />}
+              {col.gapY + col.gapH < H && <rect x={col.x} y={col.gapY + col.gapH} width={COL_W} height={H - col.gapY - col.gapH} fill="#dc2626" />}
+              <polygon points={`${col.x},${col.gapY} ${col.x+COL_W},${col.gapY} ${col.x+COL_W/2},${col.gapY+10}`} fill="#fca5a5" />
+              <polygon points={`${col.x},${col.gapY+col.gapH} ${col.x+COL_W},${col.gapY+col.gapH} ${col.x+COL_W/2},${col.gapY+col.gapH-10}`} fill="#fca5a5" />
+            </g>
+          ))}
+
+          {/* Goal zone */}
+          <rect x={GOAL_X} y={0} width={W - GOAL_X} height={H} fill="#064e3b" />
+          <text x={GOAL_X + (W - GOAL_X) / 2} y={H / 2} textAnchor="middle" dominantBaseline="central"
+            fontSize="18" style={{ userSelect: 'none', pointerEvents: 'none' }}>⭐</text>
+
+          {/* Block */}
+          <rect x={bx} y={by} width={BSIZE} height={BSIZE}
+            fill={gravDir === 1 ? '#818cf8' : '#34d399'} rx="3" />
+          <text x={bx + BSIZE / 2} y={gravDir === 1 ? by - 3 : by + BSIZE + 9}
+            textAnchor="middle" fontSize="8" fill="white"
+            style={{ userSelect: 'none', pointerEvents: 'none' }}>
+            {gravDir === 1 ? '▼' : '▲'}
+          </text>
+
+          {/* Start / retry / tutorial prompt */}
+          {!started && (
+            <text x={W / 2} y={H / 2 - 14} textAnchor="middle" fontSize="13"
+              fill={dead ? '#f87171' : '#94a3b8'}
+              style={{ userSelect: 'none', pointerEvents: 'none' }}>
+              {dead ? t.gravity_retry : t.gravity_start}
+            </text>
+          )}
+          {tutorialEnabled && !started && !dead && (
+            <text x={W / 2} y={H / 2 + 6} textAnchor="middle" fontSize="11" fill="#60a5fa"
+              style={{ userSelect: 'none', pointerEvents: 'none' }}>
+              Click = flip gravity
+            </text>
+          )}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 export const MiniGameRenderer = (props: Props) => {
   const { type } = props;
 
@@ -1011,6 +1177,7 @@ export const MiniGameRenderer = (props: Props) => {
     case 'burst': return <BurstGame {...props} />;
     case 'sequence': return <SequenceGame {...props} />;
     case 'mousemaze': return <MouseMazeGame {...props} />;
+    case 'gravitymaze': return <GravityMazeGame {...props} />;
     default: return <MashGame {...props} />;
   }
 };

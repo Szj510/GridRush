@@ -78,7 +78,8 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'password', name: 'Scramble', type: 'TIMED', icon: '⌨️', description: 'Type the code!' },
   { id: 'burst', name: 'Aim Lab', type: 'SCORE', icon: '🎯', description: 'Hit 5 moving targets!' },
   { id: 'sequence', name: '1-2-3', type: 'TIMED', icon: '🔢', description: 'Click in order!' },
-  { id: 'mousemaze', name: "Don't Touch Red", type: 'TIMED', icon: '🖱️', description: 'Navigate without touching red!' },
+  { id: 'mousemaze',    name: "Don't Touch Red",  type: 'TIMED', icon: '🖱️', description: 'Navigate without touching red!' },
+  { id: 'gravitymaze', name: 'Gravity Maze',      type: 'TIMED', icon: '🔄', description: 'Flip gravity to reach the star!' },
 ];
 
 export const WIN_PATTERNS = [
@@ -112,6 +113,9 @@ export const MINI_GAME_TRANSLATIONS = {
     maze_start: "Move cursor to the green circle",
     maze_playing: "Don't touch red!",
     maze_hint: "Stay on the white path",
+    gravity_start: "Click to start",
+    gravity_instr: "Click to flip gravity!",
+    gravity_retry: "Click to retry",
   },
   zh: {
     mash_instr: "疯狂点击！",
@@ -137,6 +141,9 @@ export const MINI_GAME_TRANSLATIONS = {
     maze_start: "将鼠标移到绿色圆圈",
     maze_playing: "别碰红线！",
     maze_hint: "保持在白色通道内",
+    gravity_start: "点击开始",
+    gravity_instr: "点击反转重力！",
+    gravity_retry: "点击重试",
   }
 };
 
