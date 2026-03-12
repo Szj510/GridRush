@@ -73,11 +73,12 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'mash', name: 'Power Mash', type: 'TIMED', icon: '💥', description: 'Mash to fill the bar!' },
   { id: 'stroop', name: 'Stroop Test', type: 'ACCURACY', icon: '🎨', description: 'Pick the COLOR, 5 times!' },
   { id: 'reaction', name: 'Reaction', type: 'TIMED', icon: '⚡', description: 'Click on Green (<350ms)!' },
-  { id: 'memory', name: 'Matrix', type: 'ACCURACY', icon: '🧠', description: 'Repeat the pattern!' },
+  { id: 'memory', name: 'Matrix', type: 'ACCURACY', icon: '🧠', description: 'Tap tiles in order!' },
   { id: 'lockpick', name: 'Lock Pick', type: 'TIMED', icon: '🔐', description: 'Tap when green! (x3)' },
   { id: 'password', name: 'Scramble', type: 'TIMED', icon: '⌨️', description: 'Type the code!' },
   { id: 'burst', name: 'Aim Lab', type: 'SCORE', icon: '🎯', description: 'Hit 5 moving targets!' },
   { id: 'sequence', name: '1-2-3', type: 'TIMED', icon: '🔢', description: 'Click in order!' },
+  { id: 'mousemaze', name: "Don't Touch Red", type: 'TIMED', icon: '🖱️', description: 'Navigate without touching red!' },
 ];
 
 export const WIN_PATTERNS = [
@@ -106,6 +107,11 @@ export const MINI_GAME_TRANSLATIONS = {
     clr: "C",
     score: "Score",
     retry: "Retry",
+    matrix_order: "In sequence!",
+    oddone_instr: "Find the odd one!",
+    maze_start: "Move cursor to the green circle",
+    maze_playing: "Don't touch red!",
+    maze_hint: "Stay on the white path",
   },
   zh: {
     mash_instr: "疯狂点击！",
@@ -126,6 +132,11 @@ export const MINI_GAME_TRANSLATIONS = {
     clr: "清",
     score: "得分",
     retry: "重试",
+    matrix_order: "按顺序！",
+    oddone_instr: "找不同！",
+    maze_start: "将鼠标移到绿色圆圈",
+    maze_playing: "别碰红线！",
+    maze_hint: "保持在白色通道内",
   }
 };
 

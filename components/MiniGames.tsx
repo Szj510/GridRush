@@ -373,15 +373,14 @@ const MatrixGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL'
   
   const t = MINI_GAME_TRANSLATIONS[language];
 
-  // Adjusted durations: Longer flashes for better memory retention
-  const config = {
-    // flashTime: How long it stays yellow
-    // gapTime: Time between two flashes
-    EASY: { count: 3, flashTime: 1000, gapTime: 200 },
-    NORMAL: { count: 5, flashTime: 800, gapTime: 200 },
-    HARD: { count: 6, flashTime: 600, gapTime: 200 },
-    EXPERT: { count: 7, flashTime: 400, gapTime: 200 }
-  }[difficulty];
+  // useMemo keeps the same object reference between renders so useCallback
+  // and useEffect don't fire spuriously on every re-render.
+  const config = React.useMemo(() => ({
+    EASY:   { count: 3, flashTime: 1000, gapTime: 250 },
+    NORMAL: { count: 5, flashTime: 800,  gapTime: 250 },
+    HARD:   { count: 6, flashTime: 600,  gapTime: 250 },
+    EXPERT: { count: 7, flashTime: 400,  gapTime: 250 },
+  })[difficulty], [difficulty]);
 
   const startSequence = useCallback(async () => {
     hasStartedRef.current = true;
@@ -427,46 +426,43 @@ const MatrixGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL'
 
   const handleClick = (i: number) => {
     if (phase === 'WATCH') return;
-    if (input.includes(i)) return; 
-    
-    if (onInteraction) onInteraction();
+    if (input.includes(i)) return;
 
+    if (onInteraction) onInteraction();
     audio.playClick();
-    if (pattern.includes(i)) {
-       const next = [...input, i];
-       setInput(next);
-       if (next.length === pattern.length) {
-          audio.playSuccess();
-          setTimeout(() => onComplete(true), 300);
-       }
+
+    if (i === pattern[input.length]) {
+      // Correct – next in sequence
+      const next = [...input, i];
+      setInput(next);
+      if (next.length === pattern.length) {
+        audio.playSuccess();
+        setTimeout(() => onComplete(true), 300);
+      }
     } else {
-       setWrongIdx(i);
-       audio.playFailure();
-       // Restart after failure
-       hasStartedRef.current = false;
-       setTimeout(() => startSequence(), 800); 
+      setWrongIdx(i);
+      audio.playFailure();
+      hasStartedRef.current = false;
+      setTimeout(() => startSequence(), 800);
     }
   };
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="text-xl font-bold text-blue-500 dark:text-blue-400">{phase === 'WATCH' ? t.repeat : t.repeat_go}</div>
+      <div className="flex flex-col items-center gap-1">
+        <div className="text-xl font-bold text-blue-500 dark:text-blue-400">{phase === 'WATCH' ? t.repeat : t.repeat_go}</div>
+        {phase === 'INPUT' && <div className="text-xs font-mono text-yellow-500 tracking-wider uppercase">{t.matrix_order}</div>}
+      </div>
       <div className="grid grid-cols-3 gap-3">
         {Array(9).fill(0).map((_, i) => {
-           const isTarget = pattern.includes(i);
            const isSelected = input.includes(i);
            const isWrong = wrongIdx === i;
-           
-           // Highlight logic: Only highlight if it's the CURRENTLY lit cell in sequence
            const isLit = phase === 'WATCH' && currentLitCell === i;
-
-           // Tutorial: If input phase, highlight remaining correct options gently
-           const showHint = tutorialEnabled && phase === 'INPUT' && isTarget && !isSelected;
+           const isNext = phase === 'INPUT' && i === pattern[input.length];
+           const showHint = tutorialEnabled && isNext;
 
            let bg = 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700';
-           
            if (isLit) bg = 'bg-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.8)] border-yellow-500 scale-105 transition-none';
-           
            if (phase === 'INPUT' && isSelected) bg = 'bg-green-500 shadow-[0_0_10px_#22c55e]';
            if (isWrong) bg = 'bg-red-500 animate-shake';
            if (showHint) bg += ' ring-2 ring-blue-400 animate-pulse';
@@ -860,9 +856,150 @@ const SequenceGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
   );
 };
 
+// Helper: shortest distance from point (px,py) to segment (ax,ay)-(bx,by)
+const pointToSegDist = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+};
+
+// 10. Mouse Maze – don't touch the red!
+const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+  const SIZE = 280;
+  const t = MINI_GAME_TRANSLATIONS[language];
+
+  const cfg = {
+    EASY:   { waypoints: [[20,70],[80,70],[80,210],[140,210],[140,70],[200,70],[200,210],[260,210]]                                                                    as [number,number][], halfW: 10 },
+    NORMAL: { waypoints: [[20,50],[65,50],[65,230],[115,230],[115,50],[165,50],[165,230],[215,230],[215,75],[260,75]]                                                 as [number,number][], halfW: 8 },
+    HARD:   { waypoints: [[20,40],[57,40],[57,240],[95,240],[95,40],[133,40],[133,240],[171,240],[171,40],[209,40],[209,240],[260,240]]                               as [number,number][], halfW: 6 },
+    EXPERT: { waypoints: [[20,30],[50,30],[50,250],[80,250],[80,50],[110,50],[110,250],[140,250],[140,50],[170,50],[170,250],[200,250],[200,50],[230,50],[230,250],[260,250]] as [number,number][], halfW: 5 },
+  }[difficulty];
+
+  const { waypoints, halfW } = cfg;
+  const start = waypoints[0];
+  const end   = waypoints[waypoints.length - 1];
+
+  const [started, setStarted] = React.useState(false);
+  const [failed,  setFailed]  = React.useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const inChannel = (mx: number, my: number) => {
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const [ax, ay] = waypoints[i];
+      const [bx, by] = waypoints[i + 1];
+      if (pointToSegDist(mx, my, ax, ay, bx, by) <= halfW) return true;
+    }
+    return false;
+  };
+
+  const toSvgCoords = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    return [
+      (e.clientX - rect.left) * (SIZE / rect.width),
+      (e.clientY - rect.top)  * (SIZE / rect.height),
+    ] as [number, number];
+  };
+
+  const triggerFail = () => {
+    setFailed(true);
+    audio.playFailure();
+    setTimeout(() => { setStarted(false); setFailed(false); }, 700);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (failed) return;
+    const [mx, my] = toSvgCoords(e);
+
+    if (!started) {
+      if (Math.hypot(mx - start[0], my - start[1]) <= halfW) {
+        setStarted(true);
+        if (onInteraction) onInteraction();
+      }
+      return;
+    }
+
+    if (onInteraction) onInteraction();
+
+    if (!inChannel(mx, my)) { triggerFail(); return; }
+
+    if (Math.hypot(mx - end[0], my - end[1]) <= halfW) {
+      audio.playSuccess();
+      onComplete(true);
+    }
+  };
+
+  const handleMouseLeave = () => { if (started && !failed) triggerFail(); };
+
+  const polyPts = waypoints.map(p => p.join(',')).join(' ');
+
+  return (
+    <div className="flex flex-col items-center gap-3 w-full h-full justify-center">
+      <div className="text-sm font-mono text-slate-500 dark:text-slate-400 h-5 text-center">
+        {failed ? '❌' : started ? t.maze_playing : t.maze_start}
+      </div>
+      <div className={`rounded-2xl overflow-hidden border-4 transition-all duration-150 select-none ${
+        failed  ? 'border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.6)]'
+        : started ? 'border-green-400'
+        : 'border-slate-300 dark:border-slate-700'
+      }`}>
+        <svg
+          ref={svgRef}
+          width={SIZE} height={SIZE}
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          className="block"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Danger zone background */}
+          <rect width={SIZE} height={SIZE} fill="#dc2626" />
+
+          {/* Safe path */}
+          <polyline points={polyPts} fill="none" stroke="white"
+            strokeWidth={halfW * 2} strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Tutorial: dashed guide line */}
+          {tutorialEnabled && (
+            <polyline points={polyPts} fill="none" stroke="rgba(59,130,246,0.6)"
+              strokeWidth="2" strokeDasharray="8 5"
+              strokeLinecap="round" strokeLinejoin="round" />
+          )}
+
+          {/* End zone – gold star */}
+          <circle cx={end[0]} cy={end[1]} r={halfW * 0.85} fill="#f59e0b" />
+          <text x={end[0]} y={end[1]} textAnchor="middle" dominantBaseline="central"
+            fontSize={halfW > 18 ? 18 : 12} fill="white"
+            style={{ pointerEvents: 'none', userSelect: 'none' }}>⭐</text>
+
+          {/* Start zone – green circle with pulse when waiting */}
+          <circle cx={start[0]} cy={start[1]} r={halfW * 0.85}
+            fill={started ? '#22c55e' : '#4ade80'} />
+          {!started && (
+            <circle cx={start[0]} cy={start[1]} r={halfW * 0.85}
+              fill="none" stroke="#4ade80" strokeWidth="3" opacity="0.7">
+              <animate attributeName="r"
+                values={`${halfW * 0.85};${halfW * 1.4};${halfW * 0.85}`}
+                dur="1.2s" repeatCount="indefinite" />
+              <animate attributeName="opacity"
+                values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite" />
+            </circle>
+          )}
+
+          {/* Fail overlay */}
+          {failed && <rect width={SIZE} height={SIZE} fill="rgba(239,68,68,0.35)" />}
+        </svg>
+      </div>
+      {tutorialEnabled && !started && (
+        <div className="text-xs text-blue-400 text-center">{t.maze_hint}</div>
+      )}
+    </div>
+  );
+};
+
 export const MiniGameRenderer = (props: Props) => {
   const { type } = props;
-  
+
   switch (type) {
     case 'math': return <MathGame {...props} />;
     case 'mash': return <MashGame {...props} />;
@@ -873,6 +1010,7 @@ export const MiniGameRenderer = (props: Props) => {
     case 'password': return <PasswordGame {...props} />;
     case 'burst': return <BurstGame {...props} />;
     case 'sequence': return <SequenceGame {...props} />;
+    case 'mousemaze': return <MouseMazeGame {...props} />;
     default: return <MashGame {...props} />;
   }
 };
