@@ -79,7 +79,9 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'burst', name: 'Aim Lab', type: 'SCORE', icon: '🎯', description: 'Hit 5 moving targets!' },
   { id: 'sequence', name: '1-2-3', type: 'TIMED', icon: '🔢', description: 'Click in order!' },
   { id: 'mousemaze',    name: "Don't Touch Red",  type: 'TIMED', icon: '🖱️', description: 'Navigate without touching red!' },
-  { id: 'gravitymaze', name: 'Gravity Maze',      type: 'TIMED', icon: '🔄', description: 'Flip gravity to reach the star!' },
+  { id: 'gravitymaze', name: 'Gravity Maze',  type: 'TIMED',    icon: '🔄', description: 'Flip gravity to reach the star!' },
+  { id: 'rhythmcopy',  name: 'Rhythm Copy',   type: 'ACCURACY', icon: '🥁', description: 'Watch and copy the beat!' },
+  { id: 'oddchar',     name: 'Odd One Out',   type: 'TIMED',    icon: '🔍', description: 'Find the different character!' },
 ];
 
 export const WIN_PATTERNS = [
@@ -116,6 +118,13 @@ export const MINI_GAME_TRANSLATIONS = {
     gravity_start: "Click to start",
     gravity_instr: "Click to flip gravity!",
     gravity_retry: "Click to retry",
+    rhythm_start: "Watch & copy the beat",
+    rhythm_watch: "Watch...",
+    rhythm_play: "Your turn!",
+    rhythm_retry: "Wrong beat! Retry",
+    oddchar_start: "Find the odd character",
+    oddchar_find: "Spot it!",
+    oddchar_retry: "Time's up! Retry",
   },
   zh: {
     mash_instr: "疯狂点击！",
@@ -144,6 +153,13 @@ export const MINI_GAME_TRANSLATIONS = {
     gravity_start: "点击开始",
     gravity_instr: "点击反转重力！",
     gravity_retry: "点击重试",
+    rhythm_start: "观察并复制节奏",
+    rhythm_watch: "观察中...",
+    rhythm_play: "轮到你了！",
+    rhythm_retry: "打错了！重试",
+    oddchar_start: "找出不同的字",
+    oddchar_find: "快找！",
+    oddchar_retry: "超时！重试",
   }
 };
 

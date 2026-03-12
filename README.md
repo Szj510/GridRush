@@ -15,8 +15,8 @@
 
 ## 🧩 Mini-Games / 小游戏介绍
 
-The game currently features **11** distinct skill-based mini-games, randomly sampled each online battle:
-游戏目前共有 **11** 款考验技巧的小游戏，每局在线对战将随机択取 9 款：
+The game currently features **13** distinct skill-based mini-games, randomly sampled each online battle:
+游戏目前共有 **13** 款考验技巧的小游戏，每局在线对战将随机抽取 9 款：
 
 1.  **Math Rush (速算)**: Solve arithmetic problems quickly. / 快速完成算术题。
 2.  **Power Mash (狂暴点击)**: Mash the button to fill the energy bar. / 疯狂点击按鈕充满能量条。
@@ -29,6 +29,8 @@ The game currently features **11** distinct skill-based mini-games, randomly sam
 9.  **1-2-3 Sequence (数字连线)**: Click numbers in ascending order. / 按顺序快速点击数字。
 10. **Don't Touch Red (别碰红线)**: Navigate your cursor through the maze without touching the red zones. / 将鼠标在迷宫中移动，不要碰到红色区域。
 11. **Gravity Maze (重力迷宫)**: Click to flip gravity and guide the block through spike-filled passages to the goal. / 点击反转重力，引导方块穿过尖刺通道到达终点。
+12. **Rhythm Copy (节奏复制)**: Watch the 3-instrument beat pattern, then replay it with S / D / F keys. / 观察三乐器节奏序列，用 S / D / F 键依样复制。
+13. **Odd One Out (找不同)**: Spot the single different character hidden among a grid of identical ones. / 在一屏相同文字中找出唯一混入的不同字。
 
 ## 🛠️ Tech Stack / 技术栈
 

@@ -1163,6 +1163,248 @@ const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NO
   );
 };
 
+// --- Rhythm Copy ---
+const RHYTHM_INSTR: { icon: string; bg: string; active: string; freq: number; waveform: OscillatorType; key: string }[] = [
+  { icon: '🥁', bg: 'bg-red-600',    active: 'bg-red-300',    freq: 150, waveform: 'square',   key: 'S' },
+  { icon: '🎸', bg: 'bg-amber-500',  active: 'bg-amber-300',  freq: 310, waveform: 'sawtooth', key: 'D' },
+  { icon: '🎹', bg: 'bg-indigo-600', active: 'bg-indigo-300', freq: 520, waveform: 'sine',     key: 'F' },
+];
+
+// 12. Rhythm Copy
+const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL' }: Props) => {
+  const t = MINI_GAME_TRANSLATIONS[language];
+  const cfg = React.useMemo(() => ({
+    EASY:   { beats: 4, ms: 750 },
+    NORMAL: { beats: 5, ms: 580 },
+    HARD:   { beats: 6, ms: 440 },
+    EXPERT: { beats: 7, ms: 330 },
+  })[difficulty], [difficulty]);
+
+  const [phase, setPhase]   = useState<'idle' | 'watching' | 'playing' | 'done'>('idle');
+  const [seq, setSeq]       = useState<number[]>([]);
+  const [hilite, setHilite] = useState(-1);
+  const [pos, setPos]       = useState(0);
+  const [result, setResult] = useState<'ok' | 'err' | null>(null);
+  const doneRef       = useRef(false);
+  const onCompleteRef = useRef(onComplete); onCompleteRef.current = onComplete;
+  const onInteractRef = useRef(onInteraction); onInteractRef.current = onInteraction;
+  // Refs for stable keyboard handler (no stale closures)
+  const phaseRef = useRef(phase); phaseRef.current = phase;
+  const posRef   = useRef(pos);   posRef.current   = pos;
+  const seqRef   = useRef(seq);   seqRef.current   = seq;
+
+  const flashBtn = (i: number, dur: number) => {
+    setHilite(i);
+    setTimeout(() => setHilite(-1), dur);
+  };
+
+  const startGame = () => {
+    if (phaseRef.current === 'watching') return;
+    const s = Array.from({ length: cfg.beats }, () => Math.floor(Math.random() * 3));
+    setSeq(s); setPos(0); setResult(null); doneRef.current = false;
+    setPhase('watching');
+    s.forEach((inst, i) => {
+      setTimeout(() => {
+        flashBtn(inst, 250);
+        audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 240);
+      }, i * cfg.ms);
+    });
+    setTimeout(() => setPhase('playing'), s.length * cfg.ms + 150);
+  };
+
+  const handleHit = useCallback((inst: number) => {
+    if (phaseRef.current !== 'playing' || doneRef.current) return;
+    onInteractRef.current?.();
+    flashBtn(inst, 150);
+    audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 120);
+    if (inst === seqRef.current[posRef.current]) {
+      const next = posRef.current + 1;
+      if (next >= seqRef.current.length) {
+        doneRef.current = true; setResult('ok'); setPhase('done');
+        audio.playSuccess();
+        setTimeout(() => onCompleteRef.current(true), 500);
+      } else { setPos(next); }
+    } else {
+      doneRef.current = true; setResult('err'); setPhase('done');
+      audio.playFailure();
+      setTimeout(() => { setResult(null); setPhase('idle'); doneRef.current = false; }, 700);
+    }
+  }, []); // safe: only reads refs
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // S=0(鼓), D=1(吉他), F=2(钢琴)
+      const idx = ['s', 'd', 'f'].indexOf(e.key.toLowerCase());
+      if (idx !== -1) handleHit(idx);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleHit]);
+
+  const label =
+    phase === 'watching' ? t.rhythm_watch :
+    phase === 'playing'  ? `${t.rhythm_play} ${pos + 1}/${seq.length}` :
+    result === 'ok'      ? '✓' :
+    result === 'err'     ? t.rhythm_retry : '';
+
+  return (
+    <div className="flex flex-col items-center gap-4 w-full justify-center select-none">
+      <div className="text-sm text-slate-400 h-5 text-center">{label}</div>
+      <div className="flex gap-2 h-5 items-center justify-center min-w-[140px]">
+        {phase !== 'idle' && seq.map((_, i) => (
+          <div key={i} className={`w-3.5 h-3.5 rounded-full border-2 transition-colors ${
+            phase === 'playing' && i < pos   ? 'bg-green-400 border-green-400' :
+            phase === 'playing' && i === pos ? 'bg-transparent border-white' :
+            'bg-slate-600 border-slate-600'
+          }`} />
+        ))}
+      </div>
+      <div className="flex gap-5">
+        {RHYTHM_INSTR.map((inst, i) => (
+          <button key={i} onMouseDown={() => handleHit(i)}
+            className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center gap-0.5 select-none transition-all duration-75
+              ${hilite === i ? inst.active + ' scale-90 shadow-xl' : inst.bg}
+              ${phase !== 'playing' ? 'opacity-50 cursor-default' : 'cursor-pointer active:scale-90'}
+              ${result === 'err' ? 'ring-2 ring-red-400' : ''}
+            `}
+          >
+            <span className="text-3xl leading-none">{inst.icon}</span>
+            <span className="text-xs font-bold text-white/70">[{inst.key}]</span>
+          </button>
+        ))}
+      </div>
+      {phase === 'idle' && (
+        <button onMouseDown={startGame}
+          className="mt-1 px-8 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors">
+          ▶ {t.rhythm_start}
+        </button>
+      )}
+    </div>
+  );
+};
+
+// --- Odd Character ---
+const ODD_CHAR_PAIRS: readonly [string, string][] = [
+  ['王', '玉'], ['大', '太'], ['日', '目'], ['人', '入'],
+  ['己', '已'], ['土', '士'], ['甲', '申'], ['田', '由'],
+  ['末', '未'], ['天', '夭'], ['干', '千'], ['己', '巳'],
+];
+
+// 13. Odd Character
+const OddCharGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL' }: Props) => {
+  const t = MINI_GAME_TRANSLATIONS[language];
+  const cfg = React.useMemo(() => ({
+    EASY:   { cols: 5,  timeMs: 15000, cell: 40, font: 26, pairLo: 0, pairHi: 4  },
+    NORMAL: { cols: 7,  timeMs: 12000, cell: 28, font: 18, pairLo: 2, pairHi: 8  },
+    HARD:   { cols: 9,  timeMs:  9000, cell: 21, font: 14, pairLo: 6, pairHi: 12 },
+    EXPERT: { cols: 11, timeMs:  6000, cell: 17, font: 11, pairLo: 8, pairHi: 12 },
+  })[difficulty], [difficulty]);
+
+  const total = cfg.cols * cfg.cols;
+  const [started,  setStarted]  = useState(false);
+  const [oddPos,   setOddPos]   = useState(-1);
+  const [mainCh,   setMainCh]   = useState('');
+  const [oddCh,    setOddCh]    = useState('');
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [result,   setResult]   = useState<'ok' | 'err' | null>(null);
+  const [clicked,  setClicked]  = useState(-1);
+  const doneRef       = useRef(false);
+  const onCompleteRef = useRef(onComplete); onCompleteRef.current = onComplete;
+  const onInteractRef = useRef(onInteraction); onInteractRef.current = onInteraction;
+
+  useEffect(() => {
+    if (!started || doneRef.current) return;
+    const id = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 100) {
+          clearInterval(id);
+          if (!doneRef.current) {
+            doneRef.current = true; setResult('err');
+            audio.playFailure();
+            setTimeout(() => { setResult(null); setStarted(false); doneRef.current = false; }, 700);
+          }
+          return 0;
+        }
+        return prev - 100;
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [started]);
+
+  const startGame = () => {
+    const { pairLo, pairHi } = cfg;
+    const pair = ODD_CHAR_PAIRS[pairLo + Math.floor(Math.random() * (pairHi - pairLo))];
+    const pos  = Math.floor(Math.random() * total);
+    setMainCh(pair[0]); setOddCh(pair[1]); setOddPos(pos);
+    setTimeLeft(cfg.timeMs); setResult(null); setClicked(-1);
+    doneRef.current = false; setStarted(true);
+  };
+
+  const handleClick = (idx: number) => {
+    if (!started || doneRef.current) return;
+    onInteractRef.current?.();
+    setClicked(idx);
+    if (idx === oddPos) {
+      doneRef.current = true; setResult('ok');
+      audio.playSuccess();
+      setTimeout(() => onCompleteRef.current(true), 400);
+    } else {
+      doneRef.current = true; setResult('err');
+      audio.playFailure();
+      setTimeout(() => { setResult(null); setStarted(false); doneRef.current = false; }, 700);
+    }
+  };
+
+  const pct = timeLeft / cfg.timeMs;
+  const barColor = pct > 0.5 ? 'bg-emerald-400' : pct > 0.25 ? 'bg-amber-400' : 'bg-red-500';
+
+  return (
+    <div className="flex flex-col items-center gap-3 w-full justify-center select-none">
+      {!started ? (
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-slate-400 text-sm">{t.oddchar_start}</p>
+          <button onMouseDown={startGame}
+            className="px-8 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors">
+            ▶ {t.oddchar_start}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 w-full max-w-xs">
+            <span className="text-xs text-slate-400 shrink-0">{t.oddchar_find}</span>
+            <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-none ${barColor}`} style={{ width: `${pct * 100}%` }} />
+            </div>
+          </div>
+          <div
+            className={`rounded-xl p-2 transition-colors ${
+              result === 'ok'  ? 'bg-green-900/40' :
+              result === 'err' ? 'bg-red-900/40'   : 'bg-slate-800/60'
+            }`}
+            style={{ display: 'grid', gridTemplateColumns: `repeat(${cfg.cols}, ${cfg.cell}px)`, gap: '2px' }}
+          >
+            {Array.from({ length: total }, (_, i) => {
+              const isOdd     = i === oddPos;
+              const isClicked = i === clicked;
+              let cls = 'text-slate-200 hover:bg-slate-600/50 cursor-pointer';
+              if (isClicked && result === 'err') cls = 'text-red-400 bg-red-900/40';
+              if (isOdd     && result === 'ok')  cls = 'text-green-400 bg-green-900/50';
+              return (
+                <div key={i} onMouseDown={() => handleClick(i)}
+                  className={`flex items-center justify-center rounded transition-colors ${cls}`}
+                  style={{ width: cfg.cell, height: cfg.cell, fontSize: cfg.font, fontFamily: 'serif' }}
+                >
+                  {isOdd ? oddCh : mainCh}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const MiniGameRenderer = (props: Props) => {
   const { type } = props;
 
@@ -1178,6 +1420,8 @@ export const MiniGameRenderer = (props: Props) => {
     case 'sequence': return <SequenceGame {...props} />;
     case 'mousemaze': return <MouseMazeGame {...props} />;
     case 'gravitymaze': return <GravityMazeGame {...props} />;
+    case 'rhythmcopy':  return <RhythmCopyGame {...props} />;
+    case 'oddchar':     return <OddCharGame {...props} />;
     default: return <MashGame {...props} />;
   }
 };
