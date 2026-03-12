@@ -55,6 +55,7 @@ const DEFAULT_STATS: UserStats = {
   practiceRecords: [],
   totalFreezes: 0,
   totalDuelWins: 0,
+  soloRunsByDiff: {},
 };
 
 const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
@@ -920,10 +921,82 @@ const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm
   );
 };
 
+// --- Solo Difficulty Picker ---
+
+const SoloDifficultyPicker = ({
+  t, stats, onStart, onBack,
+}: {
+  t: any;
+  stats: UserStats;
+  onStart: (diff: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT') => void;
+  onBack: () => void;
+}) => {
+  const [selected, setSelected] = useState<'EASY' | 'NORMAL' | 'HARD' | 'EXPERT'>('NORMAL');
+
+  const opts: { id: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT'; label: string; desc: string; border: string; text: string }[] = [
+    { id: 'EASY',   label: t.solo_diff_easy,   desc: t.solo_diff_desc_easy,   border: 'border-green-500',  text: 'text-green-400'  },
+    { id: 'NORMAL', label: t.solo_diff_normal,  desc: t.solo_diff_desc_normal, border: 'border-blue-500',   text: 'text-blue-400'   },
+    { id: 'HARD',   label: t.solo_diff_hard,    desc: t.solo_diff_desc_hard,   border: 'border-orange-500', text: 'text-orange-400' },
+    { id: 'EXPERT', label: t.solo_diff_expert,  desc: t.solo_diff_desc_expert, border: 'border-red-500',    text: 'text-red-400'    },
+  ];
+
+  const fmt = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return `${m}:${String(s % 60).padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-6">
+      <h1 className="text-3xl font-black tracking-widest uppercase text-white mb-1">{t.solo_diff_title}</h1>
+      <p className="text-slate-400 text-sm mb-8">{t.solo_diff_instr}</p>
+
+      <div className="grid grid-cols-2 gap-3 w-full max-w-md mb-8">
+        {opts.map(o => {
+          const best = stats.soloRunsByDiff?.[o.id];
+          const isSelected = selected === o.id;
+          return (
+            <button
+              key={o.id}
+              onClick={() => { audio.playClick(); setSelected(o.id); }}
+              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                isSelected
+                  ? `${o.border} bg-slate-800 ${o.text}`
+                  : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500'
+              }`}
+            >
+              <div className="text-base font-black uppercase tracking-wider">{o.label}</div>
+              <div className="text-xs font-normal opacity-70 mt-1 leading-snug">{o.desc}</div>
+              {best ? (
+                <div className="text-xs mt-2 font-mono opacity-90">{t.solo_diff_best} {fmt(best)}</div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-4">
+        <button
+          onClick={() => { audio.playClick(); onBack(); }}
+          className="px-6 py-3 rounded-xl border border-slate-600 text-slate-400 hover:text-white font-bold uppercase tracking-widest transition-colors"
+        >
+          {t.solo_diff_back}
+        </button>
+        <button
+          onClick={() => { audio.playClick(); onStart(selected); }}
+          className="px-8 py-3 rounded-xl bg-yellow-400 text-slate-900 font-black uppercase tracking-widest hover:bg-yellow-300 transition-colors"
+        >
+          {t.solo_diff_start}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- App ---
 
 export default function App() {
-  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK'>('MENU');
+  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK' | 'SOLO_DIFFICULTY'>('MENU');
   
   // Persisted State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -959,6 +1032,7 @@ export default function App() {
   // Challenge
   const [challengeStartTime, setChallengeStartTime] = useState<number>(0);
   const [challengeTime, setChallengeTime] = useState<string>("00:00");
+  const soloDifficultyRef = useRef<'EASY' | 'NORMAL' | 'HARD' | 'EXPERT'>('NORMAL');
   
   // Refs
   const peerRef = useRef<any>(null);
@@ -983,6 +1057,7 @@ export default function App() {
          if (!parsed.practiceRecords) parsed.practiceRecords = [];
          if (typeof parsed.totalFreezes !== 'number') parsed.totalFreezes = 0;
          if (typeof parsed.totalDuelWins !== 'number') parsed.totalDuelWins = 0;
+         if (!parsed.soloRunsByDiff) parsed.soloRunsByDiff = {};
          setStats(parsed);
       }
     } catch (e) { console.error('Load failed', e); }
@@ -1195,7 +1270,7 @@ export default function App() {
 
   // --- Game Logic ---
 
-  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }) => {
+  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }, soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT') => {
     audio.playClick();
     let gameIds: string[];
     let numCells = 9;
@@ -1246,6 +1321,7 @@ export default function App() {
        const soloGame = { ...newGame, p1: { ...newGame.p1, activeCell: 0 } };
        setGameState(soloGame);
        
+       soloDifficultyRef.current = soloDifficulty ?? 'NORMAL';
        roleRef.current = 'SOLO';
        setMyId('P1');
        setChallengeStartTime(Date.now());
@@ -1437,7 +1513,14 @@ export default function App() {
         if (finished) {
            const timeTaken = Date.now() - challengeStartTime;
            const newFastest = (stats.fastestSoloRun === 0 || timeTaken < stats.fastestSoloRun) ? timeTaken : stats.fastestSoloRun;
-           saveStats({ ...stats, fastestSoloRun: newFastest });
+           const diff = soloDifficultyRef.current;
+           const prevDiffBest = stats.soloRunsByDiff?.[diff] ?? 0;
+           const newDiffBest = prevDiffBest === 0 || timeTaken < prevDiffBest ? timeTaken : prevDiffBest;
+           saveStats({
+             ...stats,
+             fastestSoloRun: newFastest,
+             soloRunsByDiff: { ...stats.soloRunsByDiff, [diff]: newDiffBest },
+           });
            audio.playWin();
            
            return {
@@ -1789,7 +1872,7 @@ export default function App() {
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
         <MainMenu 
           onOnline={() => setAppMode('LOBBY')}
-          onChallenge={() => startNewGame('SOLO')}
+          onChallenge={() => setAppMode('SOLO_DIFFICULTY')}
           onPractice={() => setAppMode('PRACTICE')}
           onShowRules={() => setShowRules(true)}
           onShowSettings={() => setShowSettings(true)}
@@ -1801,6 +1884,17 @@ export default function App() {
   }
 
   if (appMode === 'PRACTICE') return <PracticeMode onBack={() => setAppMode('MENU')} t={t} language={settings.language} stats={stats} onSaveRecord={handlePracticeRecord} />;
+
+  if (appMode === 'SOLO_DIFFICULTY') {
+    return (
+      <SoloDifficultyPicker
+        t={t}
+        stats={stats}
+        onBack={() => setAppMode('MENU')}
+        onStart={(diff) => startNewGame('SOLO', undefined, diff)}
+      />
+    );
+  }
   
   if (appMode === 'LOBBY') {
     return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} isConnecting={isConnecting} error={error} t={t} />;
@@ -2062,7 +2156,7 @@ export default function App() {
                        onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} 
                        onInteraction={() => sendAction({ type: 'INTERACTION' })}
                        language={settings.language} 
-                       difficulty="HARD"
+                       difficulty={isSolo ? soloDifficultyRef.current : "HARD"}
                        frozen={me.frozenUntil > Date.now()}
                      />
                   </div>

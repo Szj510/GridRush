@@ -116,6 +116,7 @@ export interface UserStats {
   practiceRecords: PracticeRecord[];
   totalFreezes: number;
   totalDuelWins: number;
+  soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }
 
 export type NetworkMessage = 

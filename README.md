@@ -56,7 +56,7 @@ Follow these steps to run the game on your own machine.
 1.  **Clone or Download the code / 克隆或下载代码**:
 
     ```bash
-    git clone https://github.com/yourname/grid-rush.git
+    git clone https://github.com/Szj510/grid-rush.git
     cd grid-rush
     ```
 

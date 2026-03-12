@@ -294,6 +294,20 @@ export const TRANSLATIONS = {
     lobby_error: "Lobby unavailable — enter a code to join manually",
     lobby_list_public: "📢 List in Lobby",
     lobby_listed: "🔒 Listed · Remove",
+    // Solo Difficulty Picker
+    solo_diff_title: "SELECT DIFFICULTY",
+    solo_diff_instr: "Complete all 13 mini-games in order, as fast as you can.",
+    solo_diff_easy: "Easy",
+    solo_diff_normal: "Normal",
+    solo_diff_hard: "Hard",
+    solo_diff_expert: "Expert",
+    solo_diff_desc_easy: "Relaxed challenge, great for learning",
+    solo_diff_desc_normal: "A fair test of skill",
+    solo_diff_desc_hard: "Tough — mistakes cost time",
+    solo_diff_desc_expert: "Not for the faint of heart",
+    solo_diff_start: "START",
+    solo_diff_back: "Back",
+    solo_diff_best: "Best:",
   },
   zh: {
     menu_online: "在线对战",
@@ -400,6 +414,20 @@ export const TRANSLATIONS = {
     lobby_error: "大厅无法连接，请直接输入房间号加入",
     lobby_list_public: "📢 发布到大厅",
     lobby_listed: "🔒 已发布 · 取消",
+    // Solo Difficulty Picker
+    solo_diff_title: "选择难度",
+    solo_diff_instr: "以最快速度按顺序通关全部13个小游戏。",
+    solo_diff_easy: "简单",
+    solo_diff_normal: "普通",
+    solo_diff_hard: "困难",
+    solo_diff_expert: "专家",
+    solo_diff_desc_easy: "轻松上手，适合新手",
+    solo_diff_desc_normal: "适中的技能考验",
+    solo_diff_desc_hard: "高难度，失误代价大",
+    solo_diff_desc_expert: "非心脏强大者勿入",
+    solo_diff_start: "开始挑战",
+    solo_diff_back: "返回",
+    solo_diff_best: "最佳:",
   }
 };
 
@@ -416,11 +444,11 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
   {
     id: 'speed_demon',
     titleEn: 'Speed Demon',
-    titleZh: '极速传说',
-    descEn: 'Finish Time Attack in under 60 seconds.',
-    descZh: '在60秒内完成竞速模式挑战。',
+    titleZh: '极速初体验',
+    descEn: 'Complete Time Attack for the first time.',
+    descZh: '完成一次竞速模式挑战。',
     icon: '⚡',
-    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 60000
+    condition: (s) => s.fastestSoloRun > 0
   },
   {
     id: 'thief',
@@ -489,19 +517,19 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
     id: 'lightning',
     titleEn: 'Lightning',
     titleZh: '闪电战神',
-    descEn: 'Finish Time Attack in under 3 minutes.',
-    descZh: '3分钟内完成竞速模式。',
+    descEn: 'Finish Time Attack on Normal in under 4 minutes.',
+    descZh: '在普通难度下4分钟内完成竞速模式。',
     icon: '🌩️',
-    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 180000
+    condition: (s) => !!s.soloRunsByDiff?.NORMAL && s.soloRunsByDiff.NORMAL < 240000
   },
   {
     id: 'blitz',
     titleEn: 'Blitz',
-    titleZh: '闪乱战神',
-    descEn: 'Finish Time Attack in under 90 seconds.',
-    descZh: '90秒内完成竞速模式。',
+    titleZh: '急速战神',
+    descEn: 'Finish Time Attack on Hard in under 4 minutes.',
+    descZh: '在困难难度下4分钟内完成竞速模式。',
     icon: '☄️',
-    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 90000
+    condition: (s) => !!s.soloRunsByDiff?.HARD && s.soloRunsByDiff.HARD < 240000
   },
   {
     id: 'marathon',
