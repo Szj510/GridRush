@@ -42,6 +42,26 @@ The game currently features **13** distinct skill-based mini-games, randomly sam
 - **PeerJS**: WebRTC wrapper for P2P networking / 用于 P2P 联网的 WebRTC 封装库。
 - **Vite**: Build tool / 构建工具。
 
+## 🔒 Security Design / 安全设计
+
+GridRush runs entirely in the browser with no backend server. All gameplay state lives on the **HOST's** machine; the guest sends action messages that the host processes authoritatively. Because every message from a peer or stored value is untrusted input, the following measures are applied:
+
+GridRush 完全运行在浏览器中，无后端服务器。所有游戏状态存储在**房主**端，客机只发送动作消息，由房主权威处理。因为所有来自对端或存储的数据均为不可信输入，故采取了以下措施：
+
+| Layer / 层                          | Measure / 措施                                                                                                                                                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P2P messages (host-side)**        | Every incoming `NetworkMessage` is reconstructed from untrusted data by `services/sanitize.ts` — type-checked against an allow-list, and numeric values are range-clamped before any game logic runs.                            |
+| **P2P messages (guest-side)**       | `STATE_UPDATE` from the host is shape-validated (status allow-list, cell-count bound, required player objects present) before being applied to the local state.                                                                  |
+| **Skill picks**                     | Guest-sent skill IDs are filtered to a fixed allow-list (`STEAL`, `FREEZE`, `DUEL`). Arbitrary strings cannot be injected as skill names.                                                                                        |
+| **Action flooding / rate-limiting** | `RateLimiter` (token-bucket) limits per-action rates on the host side: `HEARTBEAT` ≤ 3/s, `CLICK_CELL` ≤ 10/s, `INTERACTION` ≤ 20/s, `COMPLETE_GAME` ≤ 2/2 s, `SKILL_PICK` ≤ 2/5 s.                                              |
+| **Room code injection**             | `joinGame` validates the user-entered code against `/^\d{4}$/` before passing it to PeerJS — prevents arbitrary peer IDs being constructed from user input.                                                                      |
+| **BroadcastChannel events**         | Cross-tab lobby messages are validated by `sanitizeLobbyMessage` (type allow-list + regex-checked room code) before being acted upon.                                                                                            |
+| **localStorage poisoning**          | `sanitizeSettings` and `sanitizeStats` rebuild stored objects from scratch — each field is individually type-checked against allow-lists or numerically clamped — rather than using the parsed JSON object directly.             |
+| **Content Security Policy**         | A CSP `<meta>` tag restricts script sources to `self`, the Tailwind CDN, PeerJS CDN, and the esm.sh importmap; WebSocket/XHR is locked to `*.peerjs.com`; `frame-src` and `object-src` are blocked to prevent embedding attacks. |
+
+> **Inherent limitations**: Without a trusted server, the host's state is authoritative but unverifiable by the guest. A cheating host can always send a fabricated `STATE_UPDATE`. These measures protect against a cheating _guest_ and against accidental or malicious corruption of local browser data.  
+> **固有局限**：缺乏可信服务器时，房主状态具有权威性但无法被客机验证。作弊的房主仍可发送伪造的 `STATE_UPDATE`。上述措施用于防范**客机作弊**以及防止本地浏览器数据被意外或恶意篡改。
+
 ## 🚀 How to Run Locally / 如何本地运行
 
 Follow these steps to run the game on your own machine.

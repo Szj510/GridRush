@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, NetworkMessage, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
+import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
+import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
 import { audio } from './services/audio';
 
@@ -682,8 +683,10 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
     // 2. BroadcastChannel: live announcements from host tabs
     const bc = new BroadcastChannel('gridrush_lobby');
     bc.onmessage = (e: MessageEvent) => {
-      if (e.data.type === 'ROOM_OPEN')   { addRoom(e.data.code);  setLoading(false); }
-      if (e.data.type === 'ROOM_CLOSED') { dropRoom(e.data.code); }
+      const msg = sanitizeLobbyMessage(e.data);
+      if (!msg) return;
+      if (msg.type === 'ROOM_OPEN'   && msg.code) { addRoom(msg.code);  setLoading(false); }
+      if (msg.type === 'ROOM_CLOSED' && msg.code) { dropRoom(msg.code); }
     };
     // Ask any host tab that is already open to re-announce
     setTimeout(() => bc.postMessage({ type: 'ROOM_QUERY' }), 150);
@@ -1074,6 +1077,7 @@ export default function App() {
   const connRef = useRef<any>(null);
   const roleRef = useRef<'HOST' | 'GUEST' | 'SOLO' | 'NONE'>('NONE');
   const lastPacketTime = useRef<number>(Date.now()); // Track last data from other peer
+  const guestRateLimiter = useRef(new RateLimiter());
   const [, setTick] = useState(0);
 
   // Helpers
@@ -1083,17 +1087,13 @@ export default function App() {
   useEffect(() => {
     try {
       const savedSettings = localStorage.getItem('gridrush_settings');
-      if (savedSettings) setSettings(JSON.parse(savedSettings));
-      
+      if (savedSettings) {
+        try { setSettings(sanitizeSettings(JSON.parse(savedSettings), DEFAULT_SETTINGS)); } catch { /* bad JSON */ }
+      }
+
       const savedStats = localStorage.getItem('gridrush_stats');
       if (savedStats) {
-         const parsed = JSON.parse(savedStats);
-         // Migration: Ensure practiceRecords exists if loading old save
-         if (!parsed.practiceRecords) parsed.practiceRecords = [];
-         if (typeof parsed.totalFreezes !== 'number') parsed.totalFreezes = 0;
-         if (typeof parsed.totalDuelWins !== 'number') parsed.totalDuelWins = 0;
-         if (!parsed.soloRunsByDiff) parsed.soloRunsByDiff = {};
-         setStats(parsed);
+        try { setStats(sanitizeStats(JSON.parse(savedStats), DEFAULT_STATS)); } catch { /* bad JSON */ }
       }
     } catch (e) { console.error('Load failed', e); }
   }, []);
@@ -1754,18 +1754,26 @@ export default function App() {
     }
   };
 
-  const handleGuestMessage = (msg: NetworkMessage) => {
-    // HOST RECEIVES MESSAGE
+  const handleGuestMessage = (raw: unknown) => {
+    // HOST RECEIVES MESSAGE — validate before trusting any peer data
+    const msg = sanitizeNetworkMessage(raw);
+    if (!msg) return; // Drop malformed messages silently
     lastPacketTime.current = Date.now(); // Mark activity
 
+    const rl = guestRateLimiter.current;
     if (msg.type === 'HEARTBEAT') {
-        setGameState(prev => ({
-            ...prev,
-            p2: { ...prev.p2, lastHeartbeat: Date.now() }
-        }));
+      if (!rl.allow('hb', 3, 1000)) return;
+      setGameState(prev => ({
+          ...prev,
+          p2: { ...prev.p2, lastHeartbeat: Date.now() }
+      }));
     }
     else if (msg.type === 'ACTION') {
       const { action } = msg;
+      // Per-action rate limits to prevent flooding
+      if (action.type === 'COMPLETE_GAME' && !rl.allow('complete',  2, 2000)) return;
+      if (action.type === 'CLICK_CELL'    && !rl.allow('click',    10, 1000)) return;
+      if (action.type === 'INTERACTION'   && !rl.allow('interact', 20, 1000)) return;
       if (action.type === 'CLICK_CELL') processCellClick('P2', action.cellIndex);
       if (action.type === 'DEFEND') processDefend('P2');
       if (action.type === 'ABANDON_CHALLENGE') processAbandon('P2');
@@ -1776,7 +1784,8 @@ export default function App() {
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P2', action.cellIndex);
     }
     else if (msg.type === 'SKILL_PICK') {
-      // P2 has submitted their skill picks
+      if (!rl.allow('skill_pick', 2, 5000)) return;
+      // P2 has submitted their skill picks (already filtered to valid skill IDs)
       p2SkillPicksRef.current = msg.skills;
       // If HOST already picked, start the game now (use ref to avoid stale closure)
       const hostPicks = mySkillPicksRef.current;
@@ -1805,7 +1814,8 @@ export default function App() {
     bc.postMessage({ type: 'ROOM_OPEN', code });
     // Re-announce when a Lobby tab asks
     bc.onmessage = (e: MessageEvent) => {
-      if (e.data.type === 'ROOM_QUERY') bc.postMessage({ type: 'ROOM_OPEN', code });
+      const msg = sanitizeLobbyMessage(e.data);
+      if (msg?.type === 'ROOM_QUERY') bc.postMessage({ type: 'ROOM_OPEN', code });
     };
   };
 
@@ -1846,7 +1856,7 @@ export default function App() {
 
     peer.on('connection', (conn: any) => {
       connRef.current = conn;
-      conn.on('data', (data: NetworkMessage) => handleGuestMessage(data));
+      conn.on('data', (data: unknown) => handleGuestMessage(data));
       conn.on('open', () => {
         // Guest connected: remove beacon and enter skill pick phase
         teardownLobbyBeacon();
@@ -1865,6 +1875,7 @@ export default function App() {
   };
 
   const joinGame = (code: string) => {
+    if (!isValidRoomCode(code)) { setError('Invalid room code'); return; }
     setIsConnecting(true);
     setError(null);
     const peer = new window.Peer(); 
@@ -1884,8 +1895,10 @@ export default function App() {
         setMySkillPicks([]);
         setAppMode('SKILL_PICK'); // Will show skill pick screen; game starts when HOST sends STATE_UPDATE
       });
-      conn.on('data', (data: NetworkMessage) => {
-        // GUEST RECEIVES MESSAGE
+      conn.on('data', (raw: unknown) => {
+        // GUEST RECEIVES MESSAGE — validate before trusting host data
+        const data = sanitizeNetworkMessage(raw);
+        if (!data) return;
         lastPacketTime.current = Date.now(); // Mark activity
 
         if (data.type === 'STATE_UPDATE') {
