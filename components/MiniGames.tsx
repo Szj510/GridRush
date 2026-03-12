@@ -1002,14 +1002,14 @@ type GravCol = { x: number; gapY: number; gapH: number };
 
 // 11. Gravity Maze
 const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
-  const W = 310, H = 200, BSIZE = 16, COL_W = 16, GOAL_X = 286;
+  const W = 310, H = 240, BSIZE = 14, COL_W = 16, GOAL_X = 286, SPIKE_H = 10;
   const t = MINI_GAME_TRANSLATIONS[language];
 
   const cfg = React.useMemo(() => ({
-    EASY:   { cols: [{x:105,gapY:55,gapH:90},{x:205,gapY:60,gapH:90}]                                                            as GravCol[], speed:1.0, grav:0.22, maxVel:4   },
-    NORMAL: { cols: [{x:90,gapY:65,gapH:68},{x:168,gapY:45,gapH:68},{x:245,gapY:70,gapH:68}]                                     as GravCol[], speed:1.3, grav:0.28, maxVel:5   },
-    HARD:   { cols: [{x:82,gapY:75,gapH:54},{x:143,gapY:50,gapH:54},{x:204,gapY:78,gapH:54},{x:258,gapY:58,gapH:54}]            as GravCol[], speed:1.6, grav:0.32, maxVel:5.5 },
-    EXPERT: { cols: [{x:72,gapY:80,gapH:44},{x:124,gapY:55,gapH:44},{x:178,gapY:74,gapH:44},{x:228,gapY:48,gapH:44},{x:272,gapY:65,gapH:44}] as GravCol[], speed:2.0, grav:0.38, maxVel:6 },
+    EASY:   { cols: [{x:110,gapY:70,gapH:110},{x:210,gapY:80,gapH:110}]                                                          as GravCol[], speed:1.0, grav:0.050, maxVel:2.0 },
+    NORMAL: { cols: [{x:105,gapY:56,gapH:96},{x:215,gapY:98,gapH:96}]                                                            as GravCol[], speed:1.1, grav:0.058, maxVel:2.3 },
+    HARD:   { cols: [{x:90,gapY:52,gapH:110},{x:170,gapY:108,gapH:100},{x:248,gapY:100,gapH:100}]                                    as GravCol[], speed:1.35, grav:0.070, maxVel:2.8 },
+    EXPERT: { cols: [{x:80,gapY:60,gapH:150},{x:148,gapY:112,gapH:160},{x:214,gapY:68,gapH:100},{x:272,gapY:112,gapH:164}]          as GravCol[], speed:1.4,  grav:0.085, maxVel:3.3 },
   })[difficulty], [difficulty]);
 
   // All physics in refs — no closure staleness in rAF
@@ -1052,7 +1052,7 @@ const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NO
 
         const bx = bxRef.current, by = byRef.current;
 
-        let hit = by < 0 || by + BSIZE > H;
+        let hit = by < SPIKE_H || by + BSIZE > H - SPIKE_H;
         if (!hit) {
           for (const col of c.cols) {
             if (bx + BSIZE > col.x && bx < col.x + COL_W) {
