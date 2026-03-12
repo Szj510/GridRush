@@ -9,7 +9,10 @@
 - **Online Multiplayer / 在线对战**: Real-time 1v1 battles using PeerJS (P2P). / 使用 PeerJS 实现的实时 P2P 对战。
 - **Time Attack Mode / 竞速模式**: A solo speed-run through all mini-games in sequence. / 单人连续尝试所有小游戏的最快通关。
 - **Practice Gym / 练习道场**: Train specific mini-games individually. / 针对特定小游戏进行单独训练。
-- **Steal Mechanic / 抢夺机制**: In multiplayer, challenge an opponent's captured cell to steal it back! / 在多人模式中，可以发起挑战抢夺对手已经占领的格子！
+- **Skill System / 技能系统**: Before each online battle, secretly pick 2 of 3 skills. Opponent can't see your picks! / 每局在线对战开始前，秘密选择 3 种技能中的 2 种，对方看不到你的选择！
+  - ⭐ **Steal (夺旗)**: Challenge an opponent's cell — they have 5s to defend! / 挑战对手格子，对方有 5 秒时间防守！
+  - ❄️ **Freeze (冻结)**: Freeze the opponent's input for 2 seconds. / 冻结对手操作 2 秒。
+  - ⚔️ **Duel (决斗)**: Force both players into a simultaneous race on an empty cell you pick. / 强制双方同时在你选定的空格竞速。
 - **Achievements / 成就系统**: LocalStorage-based achievement tracking. / 基于本地存储的成就记录系统。
 - **Dual Language / 双语支持**: Full English and Chinese support. / 完整的中文与英文支持。
 

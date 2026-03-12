@@ -721,46 +721,43 @@ const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame }:
       </div>
       <div>
         <div className={`font-bold ${colorClass} text-lg tracking-wide`}>{isMe ? t.game_you : player.name}</div>
-        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-          {player.stealsRemaining > 0 ? (
-             <>
-               <span className="text-yellow-500">★</span> 
-               <span className="opacity-70">{t.game_ready}</span>
-             </>
-          ) : (
-             <span className="opacity-30">{t.game_no_steal}</span>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {/* Steal — only visible to self */}
+          {isMe && player.stealsRemaining > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-yellow-100 dark:bg-yellow-900/40 text-yellow-600 dark:text-yellow-300">
+              ⭐ {t.skill_steal}
+            </span>
+          )}
+          {/* Freeze skill button — only for my own badge, only if selected */}
+          {isMe && onFreeze && player.freezesRemaining > 0 && (
+            <button
+              onClick={onFreeze}
+              disabled={!oppInGame}
+              title={!oppInGame ? 'Opponent not in game' : 'Freeze opponent for 2s'}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                oppInGame
+                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer active:scale-95'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
+              }`}
+            >
+              ❄️ {t.skill_freeze}
+            </button>
+          )}
+          {/* Duel skill button — only if selected */}
+          {isMe && onDuel && player.duelsRemaining > 0 && (
+            <button
+              onClick={onDuel}
+              title="Force a duel — pick an empty cell to race!"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 cursor-pointer active:scale-95 transition-all"
+            >
+              ⚔️ {t.skill_duel}
+            </button>
+          )}
+          {/* Fallback — only shown to self when all skills used */}
+          {isMe && player.stealsRemaining <= 0 && player.freezesRemaining <= 0 && player.duelsRemaining <= 0 && (
+            <span className="text-xs text-slate-400 opacity-50">{t.game_no_steal}</span>
           )}
         </div>
-        {/* Freeze skill button — only for my own badge */}
-        {isMe && onFreeze && (
-          <button
-            onClick={onFreeze}
-            disabled={player.freezesRemaining <= 0 || !oppInGame}
-            title={player.freezesRemaining <= 0 ? 'Already used' : !oppInGame ? 'Opponent not in game' : 'Freeze opponent for 2s'}
-            className={`mt-1 flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-              player.freezesRemaining > 0 && oppInGame
-                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer active:scale-95'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
-            }`}
-          >
-            ❄️ {player.freezesRemaining > 0 ? t.skill_freeze : t.skill_used}
-          </button>
-        )}
-        {/* Duel skill button */}
-        {isMe && onDuel && (
-          <button
-            onClick={onDuel}
-            disabled={player.duelsRemaining <= 0}
-            title={player.duelsRemaining <= 0 ? 'Already used' : 'Force a duel — pick an empty cell to race!'}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
-              player.duelsRemaining > 0
-                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 cursor-pointer active:scale-95'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
-            }`}
-          >
-            ⚔️ {player.duelsRemaining > 0 ? t.skill_duel : t.skill_used}
-          </button>
-        )}
       </div>
     </div>
   );
