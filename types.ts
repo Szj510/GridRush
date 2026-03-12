@@ -113,7 +113,9 @@ export interface UserStats {
   totalDefends: number;
   gamesPlayed: number;
   unlockedAchievements: string[];
-  practiceRecords: PracticeRecord[]; // New: Store practice history
+  practiceRecords: PracticeRecord[];
+  totalFreezes: number;
+  totalDuelWins: number;
 }
 
 export type NetworkMessage = 

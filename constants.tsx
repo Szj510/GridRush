@@ -284,6 +284,14 @@ export const TRANSLATIONS = {
     skill_pick_instr: "Choose 2 skills to bring into battle. Your opponent can't see your picks.",
     skill_pick_confirm: "CONFIRM",
     skill_pick_waiting: "Waiting for opponent...",
+    // Lobby
+    lobby_rooms: "PUBLIC ROOMS",
+    lobby_empty: "No open rooms — host one!",
+    lobby_loading: "Looking for rooms...",
+    lobby_quick: "QUICK JOIN",
+    lobby_join_room: "JOIN",
+    lobby_refresh: "Refresh",
+    lobby_error: "Couldn't connect to lobby server",
   },
   zh: {
     menu_online: "在线对战",
@@ -380,6 +388,14 @@ export const TRANSLATIONS = {
     skill_pick_instr: "选择2个带入对局的技能，对方看不到你的选择。",
     skill_pick_confirm: "确认",
     skill_pick_waiting: "等待对手选择……",
+    // Lobby
+    lobby_rooms: "公开大厅",
+    lobby_empty: "暂无开放对局，快去创建吧！",
+    lobby_loading: "搜索对局中…",
+    lobby_quick: "快速参战",
+    lobby_join_room: "加入",
+    lobby_refresh: "刷新",
+    lobby_error: "无法连接大厅服务器",
   }
 };
 
@@ -428,5 +444,86 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
     descZh: '总计游玩10局游戏。',
     icon: '🎖️',
     condition: (s) => s.gamesPlayed >= 10
-  }
+  },
+  {
+    id: 'dominator',
+    titleEn: 'Dominator',
+    titleZh: '火力全开',
+    descEn: 'Win 5 Online Battles.',
+    descZh: '在线对战得胜5局。',
+    icon: '💥',
+    condition: (s) => s.onlineWins >= 5
+  },
+  {
+    id: 'champion',
+    titleEn: 'Champion',
+    titleZh: '冠军',
+    descEn: 'Win 20 Online Battles.',
+    descZh: '在线对战得胜20局。',
+    icon: '👑',
+    condition: (s) => s.onlineWins >= 20
+  },
+  {
+    id: 'serial_thief',
+    titleEn: 'Serial Thief',
+    titleZh: '专业山大王',
+    descEn: 'Steal 5 cells.',
+    descZh: '抢夺对手根5个格子。',
+    icon: '🗡️',
+    condition: (s) => s.totalSteals >= 5
+  },
+  {
+    id: 'fortress',
+    titleEn: 'Fortress',
+    titleZh: '山城抽不拼',
+    descEn: 'Defend your cells 5 times.',
+    descZh: '成功防徣5次对手的抢夺。',
+    icon: '🏰',
+    condition: (s) => s.totalDefends >= 5
+  },
+  {
+    id: 'lightning',
+    titleEn: 'Lightning',
+    titleZh: '闪电刘第',
+    descEn: 'Finish Time Attack in under 45 seconds.',
+    descZh: '在45秒内完成竞速模式。',
+    icon: '🌩️',
+    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 45000
+  },
+  {
+    id: 'blitz',
+    titleEn: 'Blitz',
+    titleZh: '闪燃空耳',
+    descEn: 'Finish Time Attack in under 25 seconds.',
+    descZh: '在25秒内完成竞速模式。',
+    icon: '☄️',
+    condition: (s) => s.fastestSoloRun > 0 && s.fastestSoloRun < 25000
+  },
+  {
+    id: 'marathon',
+    titleEn: 'Marathon',
+    titleZh: '马拉松选手',
+    descEn: 'Play 50 games total.',
+    descZh: '总计游璁50局。',
+    icon: '🏃',
+    condition: (s) => s.gamesPlayed >= 50
+  },
+  {
+    id: 'ice_age',
+    titleEn: 'Ice Age',
+    titleZh: '永冻时代',
+    descEn: 'Use the Freeze skill 3 times.',
+    descZh: '使用冻结技能 3 次。',
+    icon: '❄️',
+    condition: (s) => (s.totalFreezes ?? 0) >= 3
+  },
+  {
+    id: 'duel_master',
+    titleEn: 'Duel Master',
+    titleZh: '决斗王者',
+    descEn: 'Win 5 duels.',
+    descZh: '在决斗中得胜5次。',
+    icon: '⚔️',
+    condition: (s) => (s.totalDuelWins ?? 0) >= 5
+  },
 ];

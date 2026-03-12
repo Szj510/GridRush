@@ -52,7 +52,9 @@ const DEFAULT_STATS: UserStats = {
   totalDefends: 0,
   gamesPlayed: 0,
   unlockedAchievements: [],
-  practiceRecords: []
+  practiceRecords: [],
+  totalFreezes: 0,
+  totalDuelWins: 0,
 };
 
 const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
@@ -633,12 +635,33 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
 
 const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) => {
   const [joinId, setJoinId] = useState('');
+  const [rooms, setRooms] = useState<string[] | null>(null);  // null = loading, [] = empty/error
+  const [lobbyError, setLobbyError] = useState(false);
+
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch('https://0.peerjs.com/peerjs/peers', { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error();
+      const peers: string[] = await res.json();
+      setRooms(peers.filter(id => /^gridrush-\d{4}$/.test(id)).map(id => id.replace('gridrush-', '')));
+      setLobbyError(false);
+    } catch {
+      setLobbyError(true);
+      setRooms([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchRooms();
+    const interval = setInterval(fetchRooms, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6">
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 overflow-y-auto">
       <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
       
-      <h2 className="text-4xl font-black mb-12 text-slate-900 dark:text-white uppercase tracking-tighter">{t.menu_online}</h2>
+      <h2 className="text-4xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-tighter">{t.menu_online}</h2>
       
       {isConnecting ? (
         <div className="flex flex-col items-center animate-fade-in">
@@ -647,31 +670,69 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
         </div>
       ) : (
         <div className="flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in">
+          {/* HOST / JOIN cards */}
           <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors group">
+            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors">
               <h3 className="text-lg font-bold mb-2 text-blue-500 uppercase tracking-widest">{t.online_host}</h3>
               <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_host_desc}</p>
               <button onClick={() => { audio.playClick(); onCreate(); }} className="w-full py-4 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-500/30 text-white transition-all active:scale-95">{t.online_create}</button>
             </div>
-            
-            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-red-500 transition-colors group">
+            <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-red-500 transition-colors">
               <h3 className="text-lg font-bold mb-2 text-red-500 uppercase tracking-widest">{t.online_join}</h3>
               <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_join_desc}</p>
               <div className="flex w-full gap-2">
-                <input 
-                  value={joinId} 
-                  onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} 
-                  placeholder="CODE" 
-                  className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-red-500 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-slate-900 dark:text-white placeholder-slate-400 transition-colors" 
-                />
+                <input value={joinId} onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} placeholder="CODE" className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-red-500 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-slate-900 dark:text-white placeholder-slate-400 transition-colors" />
                 <button onClick={() => { audio.playClick(); onJoin(joinId); }} disabled={joinId.length !== 4} className="px-6 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-500/30 transition-all active:scale-95">{t.online_join_btn}</button>
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 mt-8 text-center max-w-md mx-auto">{t.online_instruction}</p>
+
+          {/* Public Lobby */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                🏛️ {t.lobby_rooms}
+                {rooms !== null && !lobbyError && (
+                  <span className="ml-2 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                    {rooms.length}
+                  </span>
+                )}
+              </h3>
+              <button onClick={() => { setRooms(null); fetchRooms(); }} className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors uppercase tracking-widest">
+                ↺ {t.lobby_refresh}
+              </button>
+            </div>
+
+            {rooms === null ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-2">
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+                {t.lobby_loading}
+              </div>
+            ) : lobbyError ? (
+              <p className="text-xs text-slate-400 py-2">{t.lobby_error}</p>
+            ) : rooms.length === 0 ? (
+              <p className="text-sm text-slate-400 py-2">{t.lobby_empty}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {rooms.map(code => (
+                  <div key={code} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700">
+                    <span className="font-mono font-bold text-slate-700 dark:text-slate-200 tracking-widest">{code}</span>
+                    <button onClick={() => { audio.playClick(); onJoin(code); }} className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-lg transition-all active:scale-95">
+                      {t.lobby_join_room}
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => { audio.playClick(); onJoin(rooms[0]); }} className="mt-1 w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black text-sm tracking-widest uppercase rounded-xl shadow-lg shadow-yellow-400/30 transition-all active:scale-95">
+                  ⚡ {t.lobby_quick}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-[10px] text-slate-400 text-center max-w-md mx-auto">{t.online_instruction}</p>
         </div>
       )}
-      {error && <div className="mt-8 bg-red-50 text-red-500 px-6 py-3 rounded-lg text-sm border border-red-200">{error}</div>}
+      {error && <div className="mt-4 bg-red-50 text-red-500 px-6 py-3 rounded-lg text-sm border border-red-200">{error}</div>}
     </div>
   );
 };
@@ -899,6 +960,8 @@ export default function App() {
          const parsed = JSON.parse(savedStats);
          // Migration: Ensure practiceRecords exists if loading old save
          if (!parsed.practiceRecords) parsed.practiceRecords = [];
+         if (typeof parsed.totalFreezes !== 'number') parsed.totalFreezes = 0;
+         if (typeof parsed.totalDuelWins !== 'number') parsed.totalDuelWins = 0;
          setStats(parsed);
       }
     } catch (e) { console.error('Load failed', e); }
@@ -1428,6 +1491,10 @@ export default function App() {
       if (roleRef.current === 'HOST' && winner) {
           if (winner === 'P1') saveStats({ ...stats, onlineWins: stats.onlineWins + 1 });
       }
+      // Track duel win for P1 (when the won cell was the duel cell)
+      if (roleRef.current === 'HOST' && pid === 'P1' && prev.duelState?.phase === 'RACING' && prev.duelState?.cellId === cellIdx) {
+        saveStats({ ...stats, totalDuelWins: (stats.totalDuelWins ?? 0) + 1 });
+      }
 
       if (winner) audio.playWin();
 
@@ -1457,6 +1524,10 @@ export default function App() {
       const defKey = pid === 'P1' ? 'p2' : 'p1';
       const attacker = prev[atkKey];
       if (attacker.freezesRemaining <= 0) return prev;
+      // Track freeze usage for P1 (HOST)
+      if (roleRef.current === 'HOST' && pid === 'P1') {
+        saveStats({ ...stats, totalFreezes: (stats.totalFreezes ?? 0) + 1 });
+      }
       audio.playTone(220, 'sine', 400);
       return {
         ...prev,
