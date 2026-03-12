@@ -1,4 +1,4 @@
-import { CellData, PlayerId, GameState } from '../types';
+import { CellData, PlayerId } from '../types';
 import { WIN_PATTERNS } from '../constants';
 
 export const checkWinner = (cells: CellData[]): PlayerId | 'DRAW' | null => {

@@ -1,5 +1,4 @@
-import React from 'react';
-import { MiniGameConfig, Achievement, UserStats } from './types';
+import { MiniGameConfig, Achievement } from './types';
 
 // Using simple SVG icons as components for better visuals
 export const Icons = {
@@ -118,6 +117,19 @@ export const MINI_GAME_TRANSLATIONS = {
     gravity_start: "Click to start",
     gravity_instr: "Click to flip gravity!",
     gravity_retry: "Click to retry",
+    skill_freeze: "FREEZE",
+    skill_used: "USED",
+    skill_steal: "STEAL",
+    skill_duel: "DUEL",
+    duel_title: "DUEL!",
+    duel_pick_instr: "Pick an empty cell to race —",
+    duel_opp_picking: "Opponent is picking a cell...",
+    duel_racing: "DUEL RACING",
+    duel_cell: "Cell",
+    skill_pick_title: "EQUIP SKILLS",
+    skill_pick_instr: "Choose 2 skills to bring into battle. Your opponent can't see your picks.",
+    skill_pick_confirm: "CONFIRM",
+    skill_pick_waiting: "Waiting for opponent...",
     rhythm_start: "Watch & copy the beat",
     rhythm_watch: "Watch...",
     rhythm_play: "Your turn!",
@@ -153,6 +165,19 @@ export const MINI_GAME_TRANSLATIONS = {
     gravity_start: "点击开始",
     gravity_instr: "点击反转重力！",
     gravity_retry: "点击重试",
+    skill_freeze: "冻结",
+    skill_used: "已用",
+    skill_steal: "夺旗",
+    skill_duel: "决斗",
+    duel_title: "决斗！",
+    duel_pick_instr: "选择一个空格开始决斗 —",
+    duel_opp_picking: "对手正在选择格子……",
+    duel_racing: "决斗进行中",
+    duel_cell: "第",
+    skill_pick_title: "选择技能",
+    skill_pick_instr: "选择2个带入对局的技能，对方看不到你的选择。",
+    skill_pick_confirm: "确认",
+    skill_pick_waiting: "等待对手选择……",
     rhythm_start: "观察并复制节奏",
     rhythm_watch: "观察中...",
     rhythm_play: "轮到你了！",
@@ -244,6 +269,21 @@ export const TRANSLATIONS = {
     prac_res_fail: "FAILED",
     prac_new_record: "NEW RECORD!",
     prac_history: "Recent History",
+
+    // Skills
+    skill_steal: "STEAL",
+    skill_freeze: "FREEZE",
+    skill_duel: "DUEL",
+    skill_used: "USED",
+    duel_title: "DUEL!",
+    duel_pick_instr: "Pick an empty cell to race —",
+    duel_opp_picking: "Opponent is picking a cell...",
+    duel_racing: "DUEL RACING",
+    duel_cell: "Cell",
+    skill_pick_title: "EQUIP SKILLS",
+    skill_pick_instr: "Choose 2 skills to bring into battle. Your opponent can't see your picks.",
+    skill_pick_confirm: "CONFIRM",
+    skill_pick_waiting: "Waiting for opponent...",
   },
   zh: {
     menu_online: "在线对战",
@@ -325,6 +365,21 @@ export const TRANSLATIONS = {
     prac_res_fail: "挑战失败",
     prac_new_record: "新纪录！",
     prac_history: "最近记录",
+
+    // Skills
+    skill_steal: "夺旗",
+    skill_freeze: "冻结",
+    skill_duel: "决斗",
+    skill_used: "已用",
+    duel_title: "决斗！",
+    duel_pick_instr: "选择一个空格开始决斗 —",
+    duel_opp_picking: "对手正在选择格子……",
+    duel_racing: "决斗进行中",
+    duel_cell: "第",
+    skill_pick_title: "选择技能",
+    skill_pick_instr: "选择2个带入对局的技能，对方看不到你的选择。",
+    skill_pick_confirm: "确认",
+    skill_pick_waiting: "等待对手选择……",
   }
 };
 

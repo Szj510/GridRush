@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, StealNotification, NetworkMessage, GameAction, AppSettings, UserStats, Achievement, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
+import { GameState, PlayerId, PlayerState, CellData, NetworkMessage, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { MiniGameRenderer } from './components/MiniGames';
@@ -22,7 +22,10 @@ const INITIAL_PLAYER_STATE = (id: PlayerId, name: string): PlayerState => ({
   lastInputTime: Date.now(),
   cellFailures: {},
   cellCooldowns: {},
-  stealCooldown: 0
+  stealCooldown: 0,
+  freezesRemaining: 1,
+  frozenUntil: 0,
+  duelsRemaining: 1,
 });
 
 const DEFAULT_GAME_STATE: GameState = {
@@ -32,6 +35,7 @@ const DEFAULT_GAME_STATE: GameState = {
   p2: INITIAL_PLAYER_STATE('P2', 'Player Red'),
   winner: null,
   stealNotification: null,
+  duelState: null,
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -286,7 +290,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
   const [startTime, setStartTime] = useState(0);
   
   // FIXED: Moved Hook to top level (outside of conditional block)
-  const [paused, setPaused] = useState(false);
+  const [_paused, setPaused] = useState(false);
 
   // Helper to get PB for current config
   const getPB = (gid: string, cfg: PracticeConfig) => {
@@ -585,7 +589,6 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
   }
 
   if (step === 'RESULT' && result && selectedGameId) {
-     const game = MINI_GAMES.find(g => g.id === selectedGameId)!;
      const currentPB = getPB(selectedGameId, config);
      const isNewRecord = currentPB && currentPB.value === result.value && result.success;
 
@@ -687,13 +690,17 @@ const WaitingRoom = ({ roomId, onCancel, t }: { roomId: string, onCancel: () => 
   </div>
 );
 
-const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe: boolean, opponent?: boolean, t: any }) => {
+const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame }: {
+  player: PlayerState, isMe: boolean, opponent?: boolean, t: any,
+  onFreeze?: () => void, onDuel?: () => void, oppInGame?: boolean
+}) => {
   const colorClass = player.id === 'P1' ? 'text-blue-500' : 'text-red-500';
   const borderClass = player.id === 'P1' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
   
   // Cooldown status
   const cooldownEnd = player.stealCooldown > Date.now() ? player.stealCooldown : 0;
   const isCooldown = cooldownEnd > 0;
+  const isFrozen = player.frozenUntil > Date.now();
   
   return (
     <div className={`flex items-center gap-4 ${opponent ? 'flex-row-reverse text-right' : ''}`}>
@@ -703,13 +710,18 @@ const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe:
                  {Math.ceil((cooldownEnd - Date.now())/1000)}s
              </div>
          )}
+         {isFrozen && (
+             <div className="absolute inset-0 bg-blue-500/60 flex items-center justify-center text-xl z-10">
+                 ❄️
+             </div>
+         )}
         <span className={player.id === 'P1' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}>
             {player.id === 'P1' ? 'P1' : 'P2'}
         </span>
       </div>
       <div>
         <div className={`font-bold ${colorClass} text-lg tracking-wide`}>{isMe ? t.game_you : player.name}</div>
-        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
           {player.stealsRemaining > 0 ? (
              <>
                <span className="text-yellow-500">★</span> 
@@ -719,7 +731,116 @@ const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe:
              <span className="opacity-30">{t.game_no_steal}</span>
           )}
         </div>
+        {/* Freeze skill button — only for my own badge */}
+        {isMe && onFreeze && (
+          <button
+            onClick={onFreeze}
+            disabled={player.freezesRemaining <= 0 || !oppInGame}
+            title={player.freezesRemaining <= 0 ? 'Already used' : !oppInGame ? 'Opponent not in game' : 'Freeze opponent for 2s'}
+            className={`mt-1 flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+              player.freezesRemaining > 0 && oppInGame
+                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer active:scale-95'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
+            }`}
+          >
+            ❄️ {player.freezesRemaining > 0 ? t.skill_freeze : t.skill_used}
+          </button>
+        )}
+        {/* Duel skill button */}
+        {isMe && onDuel && (
+          <button
+            onClick={onDuel}
+            disabled={player.duelsRemaining <= 0}
+            title={player.duelsRemaining <= 0 ? 'Already used' : 'Force a duel — pick an empty cell to race!'}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
+              player.duelsRemaining > 0
+                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 cursor-pointer active:scale-95'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
+            }`}
+          >
+            ⚔️ {player.duelsRemaining > 0 ? t.skill_duel : t.skill_used}
+          </button>
+        )}
       </div>
+    </div>
+  );
+};
+
+// --- Skill Pick Screen ---
+
+const SKILL_DEFS = [
+  { id: 'STEAL',  icon: '⭐', nameKey: 'skill_steal'  as const },
+  { id: 'FREEZE', icon: '❄️',  nameKey: 'skill_freeze' as const },
+  { id: 'DUEL',   icon: '⚔️',  nameKey: 'skill_duel'   as const },
+];
+
+interface SkillPickScreenProps {
+  t: Record<string, string>;
+  waiting: boolean;
+  onConfirm: (picks: string[]) => void;
+}
+
+const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm }) => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+
+  const toggle = (id: string) => {
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : prev.length < 2 ? [...prev, id] : prev
+    );
+  };
+
+  if (waiting) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center gap-6 bg-slate-950 text-white">
+        <div className="text-5xl animate-spin">⏳</div>
+        <p className="text-xl font-bold tracking-widest uppercase text-slate-300">{t.skill_pick_waiting}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen w-screen flex flex-col items-center justify-center gap-8 bg-slate-950 text-white px-4">
+      <div className="text-center">
+        <h1 className="text-3xl font-black tracking-widest uppercase text-yellow-400 mb-2">{t.skill_pick_title}</h1>
+        <p className="text-slate-400">{t.skill_pick_instr}</p>
+      </div>
+
+      <div className="flex gap-4 flex-wrap justify-center">
+        {SKILL_DEFS.map(skill => {
+          const isSelected = selected.includes(skill.id);
+          const isDisabled = !isSelected && selected.length >= 2;
+          return (
+            <button
+              key={skill.id}
+              onClick={() => toggle(skill.id)}
+              disabled={isDisabled}
+              className={`w-36 h-44 rounded-2xl border-2 flex flex-col items-center justify-center gap-3 font-bold transition-all duration-200
+                ${isSelected
+                  ? 'border-yellow-400 bg-yellow-400/10 shadow-lg shadow-yellow-400/30 scale-105'
+                  : isDisabled
+                    ? 'border-slate-700 bg-slate-800/40 opacity-40 cursor-not-allowed'
+                    : 'border-slate-600 bg-slate-800 hover:border-slate-400 hover:scale-105 cursor-pointer'
+                }`}
+            >
+              <span className="text-5xl">{skill.icon}</span>
+              <span className="text-sm tracking-wider uppercase text-slate-100">{t[skill.nameKey] ?? skill.id}</span>
+              {isSelected && <span className="text-xs text-yellow-400 font-black">✓ SELECTED</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => onConfirm(selected)}
+        disabled={selected.length !== 2}
+        className={`px-10 py-4 rounded-full font-black tracking-widest uppercase text-lg transition-all duration-200
+          ${selected.length === 2
+            ? 'bg-yellow-400 text-slate-900 hover:bg-yellow-300 shadow-lg shadow-yellow-400/40 hover:scale-105'
+            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+          }`}
+      >
+        {t.skill_pick_confirm} ({selected.length}/2)
+      </button>
     </div>
   );
 };
@@ -727,7 +848,7 @@ const PlayerBadge = ({ player, isMe, opponent, t }: { player: PlayerState, isMe:
 // --- App ---
 
 export default function App() {
-  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME'>('MENU');
+  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK'>('MENU');
   
   // Persisted State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -749,6 +870,12 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [newAchievement, setNewAchievement] = useState<string | null>(null);
+
+  // Skill pick phase (online only)
+  const [mySkillPicks, setMySkillPicks] = useState<string[]>([]);
+  const mySkillPicksRef = useRef<string[]>([]);
+  mySkillPicksRef.current = mySkillPicks;
+  const p2SkillPicksRef = useRef<string[] | null>(null); // HOST stores P2's picks
 
   // Challenge
   const [challengeStartTime, setChallengeStartTime] = useState<number>(0);
@@ -938,6 +1065,19 @@ export default function App() {
             }
           }
 
+          // Clear expired freezes
+          if (nextState.p1.frozenUntil > 0 && now > nextState.p1.frozenUntil) {
+            nextState.p1 = { ...nextState.p1, frozenUntil: 0 }; stateChanged = true;
+          }
+          if (nextState.p2.frozenUntil > 0 && now > nextState.p2.frozenUntil) {
+            nextState.p2 = { ...nextState.p2, frozenUntil: 0 }; stateChanged = true;
+          }
+
+          // Duel PICKING timeout: cancel duel if initiator hasn't picked within deadline
+          if (nextState.duelState?.phase === 'PICKING' && now > nextState.duelState.pickDeadline) {
+            nextState.duelState = null; stateChanged = true;
+          }
+
           if (stateChanged) {
               setGameState(nextState);
               syncState(nextState);
@@ -955,7 +1095,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState.status, gameState.stealNotification, challengeStartTime, gameState]);
+  }, [gameState.status, gameState.stealNotification, gameState.duelState, challengeStartTime, gameState]);
 
   const syncState = (newState?: GameState) => {
     if (roleRef.current === 'HOST' && connRef.current) {
@@ -974,17 +1114,15 @@ export default function App() {
 
   // --- Game Logic ---
 
-  const startNewGame = (mode: 'ONLINE' | 'SOLO') => {
+  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }) => {
     audio.playClick();
     let gameIds: string[];
     let numCells = 9;
 
     if (mode === 'SOLO') {
-       // Solo: All games in inventory or a fixed large number
        gameIds = shuffleGames(MINI_GAMES.map(g => g.id));
        numCells = gameIds.length;
     } else {
-       // Online: 9 random games
        gameIds = shuffleGames(MINI_GAMES.map(g => g.id)).slice(0, 9);
     }
 
@@ -996,13 +1134,21 @@ export default function App() {
       lastInteraction: 0,
     }));
 
+    const makePlayer = (id: PlayerId, name: string, picks?: string[]): PlayerState => ({
+      ...INITIAL_PLAYER_STATE(id, name),
+      stealsRemaining: picks ? (picks.includes('STEAL')  ? 1 : 0) : 1,
+      freezesRemaining: picks ? (picks.includes('FREEZE') ? 1 : 0) : 1,
+      duelsRemaining:   picks ? (picks.includes('DUEL')   ? 1 : 0) : 1,
+    });
+
     const newGame: GameState = {
       status: 'PLAYING',
       cells,
-      p1: INITIAL_PLAYER_STATE('P1', 'Player Blue'),
-      p2: INITIAL_PLAYER_STATE('P2', 'Player Red'),
+      p1: makePlayer('P1', 'Player Blue', skillOverrides?.p1),
+      p2: makePlayer('P2', 'Player Red',  skillOverrides?.p2),
       winner: null,
       stealNotification: null,
+      duelState: null,
     };
     
     if (mode === 'ONLINE') {
@@ -1263,9 +1409,6 @@ export default function App() {
 
       // SUCCESS HANDLING
       // Prevent race condition: If already owned by someone else (unlikely with this logic but good safety)
-      // Actually, check if cell has owner.
-      const currentOwner = prev.cells[cellIdx].owner;
-      
       // If Stealing or Neutral
       const newCells = prev.cells.map((c, i) => {
         if (i === cellIdx) {
@@ -1303,7 +1446,88 @@ export default function App() {
             cellFailures: { ...prev[pKey].cellFailures, [cellIdx]: 0 } // Reset failures on success
         },
         [oppKey]: newOppState,
-        stealNotification: prev.stealNotification?.cellId === cellIdx ? null : prev.stealNotification
+        stealNotification: prev.stealNotification?.cellId === cellIdx ? null : prev.stealNotification,
+        // Clear duel if this cell was being dueled
+        duelState: prev.duelState?.cellId === cellIdx ? null : prev.duelState,
+      };
+    });
+  };
+
+  const processUseFreeze = (pid: PlayerId) => {
+    if (roleRef.current === 'SOLO') return;
+    setGameState(prev => {
+      const atkKey = pid === 'P1' ? 'p1' : 'p2';
+      const defKey = pid === 'P1' ? 'p2' : 'p1';
+      const attacker = prev[atkKey];
+      if (attacker.freezesRemaining <= 0) return prev;
+      audio.playTone(220, 'sine', 400);
+      return {
+        ...prev,
+        [atkKey]: { ...attacker, freezesRemaining: attacker.freezesRemaining - 1 },
+        [defKey]: { ...prev[defKey], frozenUntil: Date.now() + 2000 },
+      };
+    });
+  };
+
+  const processUseDuel = (pid: PlayerId) => {
+    if (roleRef.current === 'SOLO') return;
+    setGameState(prev => {
+      const pKey = pid === 'P1' ? 'p1' : 'p2';
+      const oppKey = pid === 'P1' ? 'p2' : 'p1';
+      if (prev[pKey].duelsRemaining <= 0) return prev;
+      if (prev.duelState) return prev; // already a duel in progress
+
+      // Kick opponent out of their current cell
+      const oppCellIdx = prev[oppKey].activeCell;
+      let cells = prev.cells;
+      if (oppCellIdx !== null) {
+        cells = cells.map((c, i) =>
+          i === oppCellIdx ? { ...c, activePlayers: c.activePlayers.filter(id => id !== prev[oppKey].id) } : c
+        );
+      }
+      // Also kick initiator out of current cell
+      const myCellIdx = prev[pKey].activeCell;
+      if (myCellIdx !== null) {
+        cells = cells.map((c, i) =>
+          i === myCellIdx ? { ...c, activePlayers: c.activePlayers.filter(id => id !== prev[pKey].id) } : c
+        );
+      }
+
+      audio.playTone(440, 'square', 300);
+      return {
+        ...prev,
+        cells,
+        [pKey]:    { ...prev[pKey],    duelsRemaining: prev[pKey].duelsRemaining - 1, activeCell: null, isDefending: false },
+        [oppKey]:  { ...prev[oppKey],  activeCell: null, isDefending: false },
+        duelState: { initiatorId: pid, cellId: null, phase: 'PICKING', pickDeadline: Date.now() + 20000 },
+      };
+    });
+  };
+
+  const processDuelPickCell = (pid: PlayerId, cellIndex: number) => {
+    if (roleRef.current === 'SOLO') return;
+    setGameState(prev => {
+      if (!prev.duelState || prev.duelState.phase !== 'PICKING') return prev;
+      if (prev.duelState.initiatorId !== pid) return prev;
+      // Cell must be unowned
+      const cell = prev.cells[cellIndex];
+      if (!cell || cell.owner !== null) return prev;
+
+      const oppKey = pid === 'P1' ? 'p2' : 'p1';
+      const pKey   = pid === 'P1' ? 'p1' : 'p2';
+      const now = Date.now();
+
+      const newCells = prev.cells.map((c, i) =>
+        i === cellIndex ? { ...c, activePlayers: [prev[pKey].id, prev[oppKey].id] } : c
+      );
+
+      audio.playTone(660, 'sine', 200);
+      return {
+        ...prev,
+        cells: newCells,
+        [pKey]:   { ...prev[pKey],   activeCell: cellIndex, challengeStartTime: now, lastInputTime: now, isDefending: false },
+        [oppKey]: { ...prev[oppKey], activeCell: cellIndex, challengeStartTime: now, lastInputTime: now, isDefending: false },
+        duelState: { ...prev.duelState, cellId: cellIndex, phase: 'RACING' },
       };
     });
   };
@@ -1315,6 +1539,9 @@ export default function App() {
       if (action.type === 'ABANDON_CHALLENGE') processAbandon('P1');
       if (action.type === 'INTERACTION') processInteraction('P1');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P1', action.success);
+      if (action.type === 'USE_SKILL' && action.skill === 'FREEZE') processUseFreeze('P1');
+      if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P1');
+      if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P1', action.cellIndex);
     } else {
       if (connRef.current) connRef.current.send({ type: 'ACTION', action });
     }
@@ -1337,6 +1564,19 @@ export default function App() {
       if (action.type === 'ABANDON_CHALLENGE') processAbandon('P2');
       if (action.type === 'INTERACTION') processInteraction('P2');
       if (action.type === 'COMPLETE_GAME') processGameComplete('P2', action.success);
+      if (action.type === 'USE_SKILL' && action.skill === 'FREEZE') processUseFreeze('P2');
+      if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P2');
+      if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P2', action.cellIndex);
+    }
+    else if (msg.type === 'SKILL_PICK') {
+      // P2 has submitted their skill picks
+      p2SkillPicksRef.current = msg.skills;
+      // If HOST already picked, start the game now (use ref to avoid stale closure)
+      const hostPicks = mySkillPicksRef.current;
+      if (hostPicks.length === 2) {
+        setAppMode('GAME');
+        startNewGame('ONLINE', { p1: hostPicks, p2: msg.skills });
+      }
     }
   };
 
@@ -1361,11 +1601,15 @@ export default function App() {
     peer.on('connection', (conn: any) => {
       connRef.current = conn;
       conn.on('data', (data: NetworkMessage) => handleGuestMessage(data));
-      conn.on('open', () => startNewGame('ONLINE'));
+      conn.on('open', () => {
+        // Enter skill pick phase instead of starting immediately
+        p2SkillPicksRef.current = null;
+        setMySkillPicks([]);
+        setAppMode('SKILL_PICK');
+        conn.send({ type: 'SKILL_PICK_PHASE' });
+      });
       conn.on('close', () => {
-          // Explicit PeerJS close event
-          // For Host, we just mark P2 as disconnected via logic loop, but here we can force it too
-          setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: 0 } })); // Force timeout logic
+          setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: 0 } }));
       });
     });
 
@@ -1389,8 +1633,9 @@ export default function App() {
       conn.on('open', () => {
         setRoomId(code);
         setIsConnecting(false);
-        setAppMode('GAME');
         setConnectionStatus('CONNECTED');
+        setMySkillPicks([]);
+        setAppMode('SKILL_PICK'); // Will show skill pick screen; game starts when HOST sends STATE_UPDATE
       });
       conn.on('data', (data: NetworkMessage) => {
         // GUEST RECEIVES MESSAGE
@@ -1398,11 +1643,10 @@ export default function App() {
 
         if (data.type === 'STATE_UPDATE') {
             setGameState(data.state);
+            if (data.state.status === 'PLAYING') {
+              setAppMode('GAME');
+            }
             // Calculate time offset: Local - Server
-            // So if Server says 1000 and Local is 800, offset is -200.
-            // When reading server time (1000), we add offset (-200) to get 800 (Local equivalent).
-            // Actually, we usually want: EstimatedServerTime = LocalTime - Offset
-            // So Offset = LocalTime - ServerTime.
             if (data.serverTime) {
                 const now = Date.now();
                 timeOffsetRef.current = now - data.serverTime;
@@ -1453,6 +1697,31 @@ export default function App() {
   
   if (appMode === 'LOBBY') {
     return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} isConnecting={isConnecting} error={error} t={t} />;
+  }
+
+  if (appMode === 'SKILL_PICK') {
+    const handleSkillConfirm = (picks: string[]) => {
+      setMySkillPicks(picks);
+      mySkillPicksRef.current = picks;
+      if (roleRef.current === 'GUEST' && connRef.current) {
+        // GUEST: send picks to HOST and wait
+        connRef.current.send({ type: 'SKILL_PICK', skills: picks });
+      } else if (roleRef.current === 'HOST') {
+        // HOST: check if P2 already submitted
+        if (p2SkillPicksRef.current) {
+          setAppMode('GAME');
+          startNewGame('ONLINE', { p1: picks, p2: p2SkillPicksRef.current });
+        }
+        // else: wait — game starts when SKILL_PICK arrives from guest
+      }
+    };
+    return (
+      <SkillPickScreen
+        t={t}
+        waiting={mySkillPicks.length === 2}
+        onConfirm={handleSkillConfirm}
+      />
+    );
   }
 
   if (myId === 'P1' && roomId && gameState.status === 'IDLE') {
@@ -1546,9 +1815,71 @@ export default function App() {
         </div>
       )}
 
+      {/* Duel Banner (Only Online) */}
+      {gameState.duelState && !isSolo && (() => {
+        const ds = gameState.duelState!;
+        const amInitiator = myId === ds.initiatorId;
+
+        if (ds.phase === 'PICKING') {
+          const pickRemaining = Math.max(0, Math.ceil((ds.pickDeadline - Date.now()) / 1000));
+          return (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="bg-slate-900 rounded-3xl p-6 w-full max-w-md mx-4 text-white shadow-2xl border border-orange-500/50">
+                <h2 className="text-2xl font-black uppercase tracking-widest text-orange-400 mb-1 text-center">⚔️ {t.duel_title}</h2>
+                {amInitiator ? (
+                  <>
+                    <p className="text-center text-sm text-slate-400 mb-4">{t.duel_pick_instr} <span className="text-white font-bold">{pickRemaining}s</span></p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {gameState.cells.map((cell) => {
+                        const canPick = cell.owner === null;
+                        return (
+                          <button key={cell.id}
+                            onClick={() => { if (canPick) { audio.playClick(); sendAction({ type: 'DUEL_PICK_CELL', cellIndex: cell.id }); } }}
+                            className={`aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-bold transition-all ${
+                              canPick
+                                ? 'bg-orange-600 hover:bg-orange-500 hover:scale-105 cursor-pointer active:scale-95'
+                                : 'bg-slate-700 opacity-40 cursor-not-allowed'
+                            }`}
+                          >
+                            {cell.owner ? (
+                              <span className={cell.owner === 'P1' ? 'text-blue-400' : 'text-red-400'}>⚑</span>
+                            ) : (
+                              <span>{cell.id + 1}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-center text-slate-300 mt-4">{t.duel_opp_picking} <span className="font-bold text-white">{pickRemaining}s</span></p>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        // RACING phase — just show a small banner
+        if (ds.phase === 'RACING' && ds.cellId !== null) {
+          return (
+            <div className="absolute top-28 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+              <div className="bg-orange-500 text-white px-6 py-2 rounded-full font-black uppercase tracking-widest shadow-xl text-sm">
+                ⚔️ {t.duel_racing} — {t.duel_cell} {ds.cellId + 1}
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
+
       {/* HUD */}
       <div className="h-20 md:h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center px-4 md:px-12 z-10 shrink-0 relative shadow-sm">
-         <PlayerBadge player={me} isMe={true} t={t} />
+         <PlayerBadge player={me} isMe={true} t={t}
+           onFreeze={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'FREEZE' }); }}
+           onDuel={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'DUEL' }); }}
+           oppInGame={opponent.activeCell !== null}
+         />
          <div className="flex flex-col items-center">
             {isSolo ? (
                 <div className="flex flex-col items-center gap-1">
@@ -1607,14 +1938,24 @@ export default function App() {
                   )}
 
                   <h3 className="text-center text-3xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
-                  <div className="w-full flex-1">
+                  <div className="w-full flex-1 relative">
+                     {/* Frozen overlay — blocks interaction when this player is frozen */}
+                     {me.frozenUntil > Date.now() && (
+                       <div className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-2 rounded-2xl"
+                            style={{ background: 'rgba(59,130,246,0.45)', backdropFilter: 'blur(3px)' }}
+                       >
+                         <span className="text-5xl select-none">❄️</span>
+                         <span className="text-white font-black text-xl uppercase tracking-widest select-none">FROZEN</span>
+                       </div>
+                     )}
                      <MiniGameRenderer 
                        type={miniGameId} 
                        playerId={myId!} 
                        onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} 
                        onInteraction={() => sendAction({ type: 'INTERACTION' })}
                        language={settings.language} 
-                       difficulty="HARD" 
+                       difficulty="HARD"
+                       frozen={me.frozenUntil > Date.now()}
                      />
                   </div>
                </div>

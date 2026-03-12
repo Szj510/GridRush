@@ -10,7 +10,8 @@ interface Props {
   playerId: 'P1' | 'P2';
   language: Language;
   difficulty?: Difficulty; 
-  tutorialEnabled?: boolean; 
+  tutorialEnabled?: boolean;
+  frozen?: boolean; // When true, gameplay input is blocked (Freeze skill)
 }
 
 const Button = ({ onClick, children, className, style, disabled, onInteraction }: any) => (
@@ -140,7 +141,7 @@ const MathGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
 const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [progress, setProgress] = useState(30);
   const t = MINI_GAME_TRANSLATIONS[language];
-  const { trigger, bgClass } = useFeedback();
+  const { trigger: _trigger, bgClass } = useFeedback();
 
   // Difficulty adjustments
   const config = {
@@ -1171,7 +1172,7 @@ const RHYTHM_INSTR: { icon: string; bg: string; active: string; freq: number; wa
 ];
 
 // 12. Rhythm Copy
-const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL' }: Props) => {
+const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', frozen }: Props) => {
   const t = MINI_GAME_TRANSLATIONS[language];
   const cfg = React.useMemo(() => ({
     EASY:   { beats: 4, ms: 750 },
@@ -1189,9 +1190,10 @@ const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NOR
   const onCompleteRef = useRef(onComplete); onCompleteRef.current = onComplete;
   const onInteractRef = useRef(onInteraction); onInteractRef.current = onInteraction;
   // Refs for stable keyboard handler (no stale closures)
-  const phaseRef = useRef(phase); phaseRef.current = phase;
-  const posRef   = useRef(pos);   posRef.current   = pos;
-  const seqRef   = useRef(seq);   seqRef.current   = seq;
+  const phaseRef  = useRef(phase);  phaseRef.current  = phase;
+  const posRef    = useRef(pos);    posRef.current    = pos;
+  const seqRef    = useRef(seq);    seqRef.current    = seq;
+  const frozenRef = useRef(frozen); frozenRef.current = !!frozen;
 
   const flashBtn = (i: number, dur: number) => {
     setHilite(i);
@@ -1214,6 +1216,7 @@ const RhythmCopyGame = ({ onComplete, onInteraction, language, difficulty = 'NOR
 
   const handleHit = useCallback((inst: number) => {
     if (phaseRef.current !== 'playing' || doneRef.current) return;
+    if (frozenRef.current) return; // Freeze skill: block input
     onInteractRef.current?.();
     flashBtn(inst, 150);
     audio.playTone(RHYTHM_INSTR[inst].freq, RHYTHM_INSTR[inst].waveform, 120);
