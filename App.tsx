@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, RpsMove } from './types';
+import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
-import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
+import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeGuestResumeSession, sanitizeHostResumeSession, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
 import { audio } from './services/audio';
 
@@ -909,7 +909,22 @@ interface RpsDisplayState {
   seriesWinner: RpsSeriesWinner | null;
 }
 
+interface NetworkQualityState {
+  rttMs: number | null;
+  jitterMs: number | null;
+  lossPct: number;
+  phase: MatchPhase;
+  revision: number;
+}
+
 const RPS_ICONS: Record<RpsMove, string> = { R: '✊', P: '✋', S: '✌️' };
+const MATCH_PHASE_LABEL_KEY: Record<MatchPhase, string> = {
+  WAITING: 'net_phase_waiting',
+  SKILL_PICK: 'net_phase_skills',
+  RPS: 'net_phase_rps',
+  PLAYING: 'net_phase_playing',
+  RESULT: 'net_phase_result',
+};
 
 function getRpsRoundWinner(p1: RpsMove, p2: RpsMove): 'P1' | 'P2' | 'DRAW' {
   if (p1 === p2) return 'DRAW';
@@ -1017,6 +1032,64 @@ const RpsScreen: React.FC<{
           <span>{t.rps_waiting}</span>
         </div>
       )}
+    </div>
+  );
+};
+
+const NetworkQualityPanel = ({
+  t,
+  status,
+  quality,
+  reconnectAttempt,
+}: {
+  t: Record<string, string>;
+  status: 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
+  quality: NetworkQualityState;
+  reconnectAttempt: number;
+}) => {
+  const dotClass = status === 'CONNECTED'
+    ? 'bg-green-500'
+    : status === 'RECONNECTING'
+      ? 'bg-amber-500'
+      : 'bg-red-500';
+
+  const phaseLabel = t[MATCH_PHASE_LABEL_KEY[quality.phase]] ?? quality.phase;
+  const fmtMs = (value: number | null) => value === null ? '--' : `${Math.round(value)}ms`;
+  const fmtPct = `${Math.round(quality.lossPct)}%`;
+
+  return (
+    <div className="mt-2 min-w-[250px] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-3 py-2 shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${dotClass} ${status !== 'DISCONNECTED' ? 'animate-pulse' : ''}`} />
+          <span className="text-[10px] font-black tracking-[0.25em] uppercase text-slate-500 dark:text-slate-400">{t.net_quality}</span>
+        </div>
+        {status === 'RECONNECTING' && reconnectAttempt > 0 && (
+          <span className="text-[10px] font-mono text-amber-500">{t.conn_attempt} {reconnectAttempt}</span>
+        )}
+      </div>
+      <div className="grid grid-cols-5 gap-2 text-center">
+        <div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-400">{t.net_rtt}</div>
+          <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fmtMs(quality.rttMs)}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-400">{t.net_jitter}</div>
+          <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fmtMs(quality.jitterMs)}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-400">{t.net_loss}</div>
+          <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fmtPct}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-400">{t.net_revision}</div>
+          <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{quality.revision}</div>
+        </div>
+        <div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-400">{t.net_phase}</div>
+          <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{phaseLabel}</div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1179,7 +1252,16 @@ export default function App() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('CONNECTED');
+  const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED'>('CONNECTED');
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQualityState>({
+    rttMs: null,
+    jitterMs: null,
+    lossPct: 0,
+    phase: 'WAITING',
+    revision: 0,
+  });
+  const [, setMatchPhase] = useState<MatchPhase>('WAITING');
   
   // Time Sync
   const timeOffsetRef = useRef<number>(0);
@@ -1221,12 +1303,258 @@ export default function App() {
   const peerRef = useRef<any>(null);
   const connRef = useRef<any>(null);
   const roleRef = useRef<'HOST' | 'GUEST' | 'SOLO' | 'NONE'>('NONE');
+  const roomIdRef = useRef<string | null>(null);
+  const guestSessionIdRef = useRef<string | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const hostReconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const hostReconnectAttemptRef = useRef(0);
+  const manualDisconnectRef = useRef(false);
+  const matchPhaseRef = useRef<MatchPhase>('WAITING');
+  const authorityRevisionRef = useRef(0);
+  const lastAppliedAuthorityRevisionRef = useRef(0);
+  const guestActionSeqRef = useRef(0);
+  const lastGuestActionSeqRef = useRef(0);
+  const guestActionHistoryRef = useRef<string[]>([]);
+  const guestActionIdsRef = useRef<Set<string>>(new Set());
+  const pendingPingRef = useRef<{ pingId: string; timeoutId: number } | null>(null);
+  const pingWindowRef = useRef<boolean[]>([]);
+  const lastRttSampleRef = useRef<number | null>(null);
+  const jitterRef = useRef<number | null>(null);
   const lastPacketTime = useRef<number>(Date.now()); // Track last data from other peer
   const guestRateLimiter = useRef(new RateLimiter());
   const [, setTick] = useState(0);
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
+  const MAX_GUEST_RECONNECT_ATTEMPTS = 6;
+  const MAX_HOST_RECONNECT_ATTEMPTS = 8;
+  const GUEST_RESUME_STORAGE_KEY = 'gridrush_guest_resume';
+  const GUEST_RESUME_MAX_AGE_MS = 15 * 60 * 1000;
+  const HOST_RESUME_STORAGE_KEY = 'gridrush_host_resume';
+  const HOST_RESUME_MAX_AGE_MS = 15 * 60 * 1000;
+
+  const setMatchPhaseLocal = (phase: MatchPhase) => {
+    matchPhaseRef.current = phase;
+    setMatchPhase(phase);
+    setNetworkQuality(prev => ({ ...prev, phase }));
+  };
+
+  const setMatchPhaseAndUi = (phase: MatchPhase) => {
+    setMatchPhaseLocal(phase);
+    if (phase === 'WAITING' && roleRef.current === 'HOST') setAppMode('GAME');
+    if (phase === 'SKILL_PICK') setAppMode('SKILL_PICK');
+    if (phase === 'RPS') setAppMode('RPS');
+    if (phase === 'PLAYING' || phase === 'RESULT') setAppMode('GAME');
+  };
+
+  const nextAuthorityRevision = () => {
+    authorityRevisionRef.current += 1;
+    setNetworkQuality(prev => ({ ...prev, revision: authorityRevisionRef.current }));
+    return authorityRevisionRef.current;
+  };
+
+  const clearReconnectTimer = () => {
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  };
+
+  const clearHostReconnectTimer = () => {
+    if (hostReconnectTimerRef.current !== null) {
+      window.clearTimeout(hostReconnectTimerRef.current);
+      hostReconnectTimerRef.current = null;
+    }
+  };
+
+  const clearPendingPing = () => {
+    if (pendingPingRef.current) {
+      window.clearTimeout(pendingPingRef.current.timeoutId);
+      pendingPingRef.current = null;
+    }
+  };
+
+  const recordProbeResult = (success: boolean, rttMs?: number) => {
+    pingWindowRef.current.push(success);
+    if (pingWindowRef.current.length > 20) pingWindowRef.current.shift();
+    const failed = pingWindowRef.current.filter(sample => !sample).length;
+    const lossPct = pingWindowRef.current.length === 0 ? 0 : (failed / pingWindowRef.current.length) * 100;
+
+    if (success && rttMs !== undefined) {
+      const nextJitter = lastRttSampleRef.current === null
+        ? 0
+        : Math.round(((jitterRef.current ?? 0) * 0.7) + (Math.abs(rttMs - lastRttSampleRef.current) * 0.3));
+      lastRttSampleRef.current = rttMs;
+      jitterRef.current = nextJitter;
+      setNetworkQuality(prev => ({ ...prev, rttMs, jitterMs: nextJitter, lossPct }));
+      return;
+    }
+
+    setNetworkQuality(prev => ({ ...prev, lossPct }));
+  };
+
+  const handleProbePong = (pingId: string, sentAt: number) => {
+    const pending = pendingPingRef.current;
+    if (!pending || pending.pingId !== pingId) return;
+    clearPendingPing();
+    recordProbeResult(true, Date.now() - sentAt);
+  };
+
+  const sendProbePing = () => {
+    if (!connRef.current?.open || roleRef.current === 'NONE' || roleRef.current === 'SOLO') return;
+    if (pendingPingRef.current) return;
+
+    const pingId = `ping-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const sentAt = Date.now();
+    const timeoutId = window.setTimeout(() => {
+      if (!pendingPingRef.current || pendingPingRef.current.pingId !== pingId) return;
+      pendingPingRef.current = null;
+      recordProbeResult(false);
+    }, 8000);
+
+    pendingPingRef.current = { pingId, timeoutId };
+    connRef.current.send({ type: 'PING', pingId, sentAt });
+  };
+
+  const setRoomIdLocal = (nextRoomId: string | null) => {
+    roomIdRef.current = nextRoomId;
+    setRoomId(nextRoomId);
+  };
+
+  const generateGuestSessionId = () =>
+    `guest-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+
+  const sendStateSnapshot = (connection: any, state: GameState, phase: MatchPhase, revision: number) => {
+    if (!connection?.open) return;
+    connection.send({
+      type: 'STATE_UPDATE',
+      state,
+      phase,
+      revision,
+      serverTime: Date.now(),
+    });
+  };
+
+  const clearGuestResumeSession = () => {
+    try {
+      localStorage.removeItem(GUEST_RESUME_STORAGE_KEY);
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const clearHostResumeSession = () => {
+    try {
+      localStorage.removeItem(HOST_RESUME_STORAGE_KEY);
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const persistGuestResumeSession = (phaseOverride?: MatchPhase, revisionOverride?: number) => {
+    if (roleRef.current !== 'GUEST' || !roomIdRef.current || !guestSessionIdRef.current) return;
+    try {
+      localStorage.setItem(GUEST_RESUME_STORAGE_KEY, JSON.stringify({
+        roomId: roomIdRef.current,
+        guestSessionId: guestSessionIdRef.current,
+        lastRevision: revisionOverride ?? lastAppliedAuthorityRevisionRef.current,
+        phase: phaseOverride ?? matchPhaseRef.current,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const persistHostResumeSession = (stateOverride?: GameState, phaseOverride?: MatchPhase, revisionOverride?: number) => {
+    if (roleRef.current !== 'HOST' || !roomIdRef.current) return;
+    try {
+      localStorage.setItem(HOST_RESUME_STORAGE_KEY, JSON.stringify({
+        roomId: roomIdRef.current,
+        phase: phaseOverride ?? matchPhaseRef.current,
+        revision: revisionOverride ?? authorityRevisionRef.current,
+        guestSessionId: guestSessionIdRef.current,
+        gameState: stateOverride ?? gameState,
+        mySkillPicks: mySkillPicksRef.current,
+        p2SkillPicks: p2SkillPicksRef.current,
+        rpsState: {
+          round: rpsRoundRef.current,
+          scores: rpsScoresRef.current,
+          myMove: rpsMyPickRef.current,
+          p2Move: rpsP2PickRef.current,
+        },
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const sendPhaseMessage = (connection: any, phase: Extract<MatchPhase, 'SKILL_PICK' | 'RPS'>, revision: number) => {
+    if (!connection?.open) return;
+    connection.send(phase === 'SKILL_PICK'
+      ? { type: 'SKILL_PICK_PHASE', revision }
+      : { type: 'RPS_PHASE', revision });
+  };
+
+  const replayAuthoritativeStateTo = (connection: any) => {
+    const revision = authorityRevisionRef.current;
+    if (matchPhaseRef.current === 'PLAYING' || matchPhaseRef.current === 'RESULT') {
+      sendStateSnapshot(connection, gameState, matchPhaseRef.current, revision);
+      return;
+    }
+    if (matchPhaseRef.current === 'SKILL_PICK' || matchPhaseRef.current === 'RPS') {
+      sendPhaseMessage(connection, matchPhaseRef.current, revision);
+    }
+  };
+
+  const noteRemoteRevision = (revision: number) => {
+    lastAppliedAuthorityRevisionRef.current = revision;
+    authorityRevisionRef.current = Math.max(authorityRevisionRef.current, revision);
+    setNetworkQuality(prev => ({ ...prev, revision }));
+  };
+
+  const shouldApplyAuthoritativeMessage = (revision: number) => revision > lastAppliedAuthorityRevisionRef.current;
+
+  const rememberGuestActionId = (actionId: string) => {
+    guestActionIdsRef.current.add(actionId);
+    guestActionHistoryRef.current.push(actionId);
+    if (guestActionHistoryRef.current.length > 256) {
+      const dropped = guestActionHistoryRef.current.shift();
+      if (dropped) guestActionIdsRef.current.delete(dropped);
+    }
+  };
+
+  const resetOnlineProtocolState = () => {
+    clearReconnectTimer();
+    clearHostReconnectTimer();
+    clearPendingPing();
+    guestSessionIdRef.current = null;
+    authorityRevisionRef.current = 0;
+    lastAppliedAuthorityRevisionRef.current = 0;
+    guestActionSeqRef.current = 0;
+    lastGuestActionSeqRef.current = 0;
+    guestActionHistoryRef.current = [];
+    guestActionIdsRef.current.clear();
+    pingWindowRef.current = [];
+    lastRttSampleRef.current = null;
+    jitterRef.current = null;
+    reconnectAttemptRef.current = 0;
+    hostReconnectAttemptRef.current = 0;
+    setReconnectAttempt(0);
+    setNetworkQuality({ rttMs: null, jitterMs: null, lossPct: 0, phase: 'WAITING', revision: 0 });
+    setMatchPhaseLocal('WAITING');
+  };
+
+  const sendAuthoritativePhase = (phase: Extract<MatchPhase, 'SKILL_PICK' | 'RPS'>) => {
+    const revision = nextAuthorityRevision();
+    setMatchPhaseAndUi(phase);
+    if (connRef.current) {
+      sendPhaseMessage(connRef.current, phase, revision);
+    }
+    persistHostResumeSession(undefined, phase, revision);
+  };
 
   // --- Persistence ---
   useEffect(() => {
@@ -1242,6 +1570,79 @@ export default function App() {
       }
     } catch (e) { console.error('Load failed', e); }
   }, []);
+
+  useEffect(() => {
+    try {
+      const rawHost = localStorage.getItem(HOST_RESUME_STORAGE_KEY);
+      if (rawHost) {
+        const hostSaved = sanitizeHostResumeSession(JSON.parse(rawHost));
+        if (hostSaved && Date.now() - hostSaved.savedAt <= HOST_RESUME_MAX_AGE_MS) {
+          manualDisconnectRef.current = false;
+          clearGuestResumeSession();
+          roleRef.current = 'HOST';
+          setMyId('P1');
+          guestSessionIdRef.current = hostSaved.guestSessionId;
+          p2SkillPicksRef.current = hostSaved.p2SkillPicks;
+          setMySkillPicks(hostSaved.mySkillPicks);
+          mySkillPicksRef.current = hostSaved.mySkillPicks;
+          rpsRoundRef.current = hostSaved.rpsState.round;
+          rpsScoresRef.current = hostSaved.rpsState.scores;
+          rpsMyPickRef.current = hostSaved.rpsState.myMove;
+          rpsP2PickRef.current = hostSaved.rpsState.p2Move;
+          setRpsState(prev => ({
+            ...prev,
+            round: hostSaved.rpsState.round,
+            myScore: hostSaved.rpsState.scores.P1,
+            oppScore: hostSaved.rpsState.scores.P2,
+            myMove: hostSaved.rpsState.myMove,
+            oppMove: hostSaved.rpsState.p2Move,
+          }));
+
+          setGameState(hostSaved.gameState);
+          setConnectionStatus('RECONNECTING');
+          setMatchPhaseAndUi(hostSaved.phase);
+          noteRemoteRevision(hostSaved.revision);
+          connectHostTransport(hostSaved.roomId, true);
+          return;
+        }
+        clearHostResumeSession();
+      }
+
+      const raw = localStorage.getItem(GUEST_RESUME_STORAGE_KEY);
+      if (!raw) return;
+      const saved = sanitizeGuestResumeSession(JSON.parse(raw));
+      if (!saved || Date.now() - saved.savedAt > GUEST_RESUME_MAX_AGE_MS) {
+        clearGuestResumeSession();
+        return;
+      }
+
+      guestSessionIdRef.current = saved.guestSessionId;
+      lastAppliedAuthorityRevisionRef.current = saved.lastRevision;
+      authorityRevisionRef.current = saved.lastRevision;
+      setNetworkQuality(prev => ({ ...prev, revision: saved.lastRevision }));
+      setConnectionStatus('RECONNECTING');
+      setMatchPhaseAndUi(saved.phase);
+      connectGuestTransport(saved.roomId, true);
+    } catch {
+      clearGuestResumeSession();
+    }
+  }, []);
+
+  useEffect(() => () => {
+    clearReconnectTimer();
+    clearHostReconnectTimer();
+    clearPendingPing();
+  }, []);
+
+  useEffect(() => {
+    if (roleRef.current === 'NONE' || roleRef.current === 'SOLO' || !roomId) return;
+
+    const pingInterval = window.setInterval(() => {
+      sendProbePing();
+    }, 4000);
+
+    return () => window.clearInterval(pingInterval);
+  }, [roomId]);
 
   // --- Audio & Theme Effects ---
   useEffect(() => {
@@ -1284,6 +1685,8 @@ export default function App() {
   const clearData = () => {
     localStorage.removeItem('gridrush_stats');
     localStorage.removeItem('gridrush_settings');
+    clearGuestResumeSession();
+    clearHostResumeSession();
     setStats(DEFAULT_STATS);
     setSettings(DEFAULT_SETTINGS);
     window.location.reload();
@@ -1360,6 +1763,12 @@ export default function App() {
           let stateChanged = false;
           const nextState = { ...gameState };
 
+          if (guestSessionIdRef.current && now - nextState.p2.lastHeartbeat > 10000) {
+            setConnectionStatus('RECONNECTING');
+          } else if (guestSessionIdRef.current) {
+            setConnectionStatus('CONNECTED');
+          }
+
           const checkPlayerAnomaly = (pid: PlayerId) => {
               const pKey = pid === 'P1' ? 'p1' : 'p2';
               const player = nextState[pKey];
@@ -1416,16 +1825,13 @@ export default function App() {
 
           if (stateChanged) {
               setGameState(nextState);
-              syncState(nextState);
           }
       } 
       // --- GUEST LOGIC: DETECT HOST DISCONNECT ---
       else if (roleRef.current === 'GUEST') {
           // If no packet from Host for > 10s, consider disconnected
           if (now - lastPacketTime.current > 10000) {
-              setConnectionStatus('DISCONNECTED');
-          } else {
-              setConnectionStatus('CONNECTED');
+            scheduleGuestReconnect();
           }
       }
     }, 1000);
@@ -1433,20 +1839,32 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gameState.status, gameState.stealNotification, gameState.duelState, challengeStartTime, gameState]);
 
-  const syncState = (newState?: GameState) => {
+  const syncState = (newState?: GameState, phaseOverride?: MatchPhase) => {
     if (roleRef.current === 'HOST' && connRef.current) {
-      const stateToSend = newState || gameState; 
-      connRef.current.send({ type: 'STATE_UPDATE', state: stateToSend, serverTime: Date.now() });
+      const stateToSend = newState || gameState;
+      const phase = phaseOverride ?? (stateToSend.winner ? 'RESULT' : matchPhaseRef.current);
+      sendStateSnapshot(connRef.current, stateToSend, phase, nextAuthorityRevision());
     }
   };
 
   useEffect(() => {
     if (roleRef.current === 'HOST' && gameState.status !== 'IDLE') {
       if (connRef.current && connRef.current.open) {
-        connRef.current.send({ type: 'STATE_UPDATE', state: gameState, serverTime: Date.now() });
+        syncState(gameState, gameState.winner ? 'RESULT' : matchPhaseRef.current);
       }
     }
   }, [gameState]);
+
+  useEffect(() => {
+    if (roleRef.current !== 'HOST' || !roomIdRef.current) return;
+    persistHostResumeSession();
+  }, [gameState, appMode, mySkillPicks, rpsState]);
+
+  useEffect(() => {
+    if (gameState.winner && roleRef.current !== 'SOLO' && matchPhaseRef.current !== 'RESULT') {
+      setMatchPhaseAndUi('RESULT');
+    }
+  }, [gameState.winner]);
 
   // --- Game Logic ---
 
@@ -1495,12 +1913,14 @@ export default function App() {
     }
     
     if (mode === 'ONLINE') {
+       setMatchPhaseAndUi('PLAYING');
+       guestActionSeqRef.current = 0;
+       lastGuestActionSeqRef.current = 0;
+       guestActionHistoryRef.current = [];
+       guestActionIdsRef.current.clear();
        setGameState(newGame);
        setConnectionStatus('CONNECTED');
        lastPacketTime.current = Date.now(); // Reset timestamp
-       if (roleRef.current === 'HOST' && connRef.current) {
-          connRef.current.send({ type: 'STATE_UPDATE', state: newGame, serverTime: Date.now() });
-       }
        saveStats({ ...stats, gamesPlayed: stats.gamesPlayed + 1 });
     } else {
        // Setup Solo State
@@ -1902,7 +2322,18 @@ export default function App() {
       if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P1');
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P1', action.cellIndex);
     } else {
-      if (connRef.current) connRef.current.send({ type: 'ACTION', action });
+      if (matchPhaseRef.current !== 'PLAYING') return;
+      if (connRef.current) {
+        guestActionSeqRef.current += 1;
+        const seq = guestActionSeqRef.current;
+        connRef.current.send({
+          type: 'ACTION',
+          action,
+          actionId: `guest-${seq}-${Date.now()}`,
+          seq,
+          phase: 'PLAYING'
+        });
+      }
     }
   };
 
@@ -1921,7 +2352,7 @@ export default function App() {
       : null;
 
     if (connRef.current) {
-      connRef.current.send({ type: 'RPS_RESULT', p1Move, p2Move, roundWinner, round, scores: newScores, headstartWinner: hw });
+      connRef.current.send({ type: 'RPS_RESULT', p1Move, p2Move, roundWinner, round, scores: newScores, headstartWinner: hw, revision: nextAuthorityRevision() });
     }
 
     const myRoundResult: RpsResult = roundWinner === 'P1' ? 'WIN' : roundWinner === 'P2' ? 'LOSE' : 'DRAW';
@@ -1942,11 +2373,88 @@ export default function App() {
     }, 1800);
   };
 
-  const handleGuestMessage = (raw: unknown) => {
+  const sendSessionSync = (connection: any, accepted: boolean, reason: 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED') => {
+    if (!connection?.open) return;
+    connection.send({
+      type: 'SESSION_SYNC',
+      accepted,
+      guestSessionId: accepted ? guestSessionIdRef.current : null,
+      phase: matchPhaseRef.current,
+      revision: authorityRevisionRef.current,
+      reason,
+    });
+  };
+
+  const acceptGuestConnection = (connection: any, requestedSessionId: string | null) => {
+    clearPendingPing();
+    const hasExistingSession = guestSessionIdRef.current !== null;
+    const isResume = hasExistingSession && requestedSessionId === guestSessionIdRef.current;
+    const canCreateFreshSession = !hasExistingSession || matchPhaseRef.current === 'WAITING';
+
+    if (!isResume && !canCreateFreshSession) {
+      sendSessionSync(connection, false, 'ROOM_BUSY');
+      connection.close?.();
+      return;
+    }
+
+    const previousConn = connRef.current;
+    connRef.current = connection;
+    if (previousConn && previousConn !== connection && previousConn.open) previousConn.close();
+
+    if (!isResume) {
+      teardownLobbyBeacon();
+      guestSessionIdRef.current = generateGuestSessionId();
+      p2SkillPicksRef.current = null;
+      rpsP2PickRef.current = null;
+      rpsMyPickRef.current = null;
+      rpsScoresRef.current = { P1: 0, P2: 0 };
+      rpsRoundRef.current = 1;
+      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+      setMySkillPicks([]);
+      mySkillPicksRef.current = [];
+    }
+
+    setConnectionStatus('CONNECTED');
+    reconnectAttemptRef.current = 0;
+    setReconnectAttempt(0);
+    lastPacketTime.current = Date.now();
+    sendSessionSync(connection, true, 'OK');
+
+    if (gameState.status !== 'IDLE') {
+      setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: Date.now() } }));
+    }
+
+    if (!isResume && matchPhaseRef.current === 'WAITING') {
+      sendAuthoritativePhase('SKILL_PICK');
+    } else {
+      replayAuthoritativeStateTo(connection);
+    }
+
+    persistHostResumeSession();
+  };
+
+  const handleGuestMessage = (connection: any, raw: unknown) => {
     // HOST RECEIVES MESSAGE — validate before trusting any peer data
     const msg = sanitizeNetworkMessage(raw);
     if (!msg) return; // Drop malformed messages silently
-    lastPacketTime.current = Date.now(); // Mark activity
+    lastPacketTime.current = Date.now();
+
+    if (msg.type === 'JOIN_REQUEST') {
+      acceptGuestConnection(connection, msg.guestSessionId);
+      return;
+    }
+
+    if (connection !== connRef.current) return;
+
+    if (msg.type === 'PING') {
+      connection.send({ type: 'PONG', pingId: msg.pingId, sentAt: msg.sentAt });
+      return;
+    }
+
+    if (msg.type === 'PONG') {
+      handleProbePong(msg.pingId, msg.sentAt);
+      return;
+    }
 
     const rl = guestRateLimiter.current;
     if (msg.type === 'HEARTBEAT') {
@@ -1957,8 +2465,13 @@ export default function App() {
       }));
     }
     else if (msg.type === 'ACTION') {
+      if (matchPhaseRef.current !== 'PLAYING' || msg.phase !== 'PLAYING') return;
+      if (msg.seq <= lastGuestActionSeqRef.current) return;
+      if (guestActionIdsRef.current.has(msg.actionId)) return;
+      lastGuestActionSeqRef.current = msg.seq;
+      rememberGuestActionId(msg.actionId);
+
       const { action } = msg;
-      // Per-action rate limits to prevent flooding
       if (action.type === 'COMPLETE_GAME' && !rl.allow('complete',  2, 2000)) return;
       if (action.type === 'CLICK_CELL'    && !rl.allow('click',    10, 1000)) return;
       if (action.type === 'INTERACTION'   && !rl.allow('interact', 20, 1000)) return;
@@ -1972,29 +2485,291 @@ export default function App() {
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P2', action.cellIndex);
     }
     else if (msg.type === 'SKILL_PICK') {
+      if (matchPhaseRef.current !== 'SKILL_PICK' || msg.phase !== 'SKILL_PICK') return;
       if (!rl.allow('skill_pick', 2, 5000)) return;
-      // P2 has submitted their skill picks (already filtered to valid skill IDs)
       p2SkillPicksRef.current = msg.skills;
-      // If HOST already picked, start the game now (use ref to avoid stale closure)
+      persistHostResumeSession();
       const hostPicks = mySkillPicksRef.current;
       if (hostPicks.length === 2) {
-        // Both players picked skills → enter RPS phase
         rpsMyPickRef.current = null;
         rpsP2PickRef.current = null;
         rpsScoresRef.current = { P1: 0, P2: 0 };
         rpsRoundRef.current = 1;
         setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
-        setAppMode('RPS');
-        if (connRef.current) connRef.current.send({ type: 'RPS_PHASE' });
+        sendAuthoritativePhase('RPS');
       }
     }
     else if (msg.type === 'RPS_PICK') {
+      if (matchPhaseRef.current !== 'RPS' || msg.phase !== 'RPS') return;
       if (!rl.allow('rps_pick', 5, 5000)) return;
       rpsP2PickRef.current = msg.move;
       if (rpsMyPickRef.current) {
         resolveRpsRound(rpsMyPickRef.current, msg.move);
       }
     }
+  };
+
+  const scheduleGuestReconnect = () => {
+    if (manualDisconnectRef.current || roleRef.current !== 'GUEST') return;
+    clearPendingPing();
+    const code = roomIdRef.current;
+    if (!code) {
+      clearGuestResumeSession();
+      setConnectionStatus('DISCONNECTED');
+      return;
+    }
+    if (reconnectTimerRef.current !== null) return;
+    if (reconnectAttemptRef.current >= MAX_GUEST_RECONNECT_ATTEMPTS) {
+      clearGuestResumeSession();
+      setConnectionStatus('DISCONNECTED');
+      setError('Reconnect failed');
+      return;
+    }
+
+    reconnectAttemptRef.current += 1;
+    setReconnectAttempt(reconnectAttemptRef.current);
+    setConnectionStatus('RECONNECTING');
+    const delay = Math.min(1500 * reconnectAttemptRef.current, 5000);
+    reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = null;
+      connectGuestTransport(code, true);
+    }, delay);
+  };
+
+  const scheduleHostReconnect = (code: string) => {
+    if (manualDisconnectRef.current || roleRef.current !== 'HOST') return;
+    if (hostReconnectTimerRef.current !== null) return;
+    if (hostReconnectAttemptRef.current >= MAX_HOST_RECONNECT_ATTEMPTS) {
+      setConnectionStatus('DISCONNECTED');
+      setError('Conn Error');
+      return;
+    }
+
+    hostReconnectAttemptRef.current += 1;
+    const delay = Math.min(1000 * hostReconnectAttemptRef.current, 5000);
+    hostReconnectTimerRef.current = window.setTimeout(() => {
+      hostReconnectTimerRef.current = null;
+      connectHostTransport(code, true);
+    }, delay);
+  };
+
+  const handleGuestServerMessage = (raw: unknown) => {
+    const data = sanitizeNetworkMessage(raw);
+    if (!data) return;
+    lastPacketTime.current = Date.now();
+
+    if (data.type === 'PING') {
+      connRef.current?.send({ type: 'PONG', pingId: data.pingId, sentAt: data.sentAt });
+      return;
+    }
+
+    if (data.type === 'PONG') {
+      handleProbePong(data.pingId, data.sentAt);
+      return;
+    }
+
+    if (data.type === 'SESSION_SYNC') {
+      if (!data.accepted || !data.guestSessionId) {
+        clearGuestResumeSession();
+        clearReconnectTimer();
+        setIsConnecting(false);
+        setConnectionStatus('DISCONNECTED');
+        setError(data.reason === 'ROOM_BUSY' ? 'Room busy' : 'Session expired');
+        return;
+      }
+      guestSessionIdRef.current = data.guestSessionId;
+      authorityRevisionRef.current = Math.max(authorityRevisionRef.current, data.revision);
+      setNetworkQuality(prev => ({ ...prev, revision: data.revision }));
+      reconnectAttemptRef.current = 0;
+      setReconnectAttempt(0);
+      clearReconnectTimer();
+      setIsConnecting(false);
+      setConnectionStatus('CONNECTED');
+      setError(null);
+      setMatchPhaseAndUi(data.phase);
+      persistGuestResumeSession(data.phase, data.revision);
+      return;
+    }
+
+    if (data.type === 'STATE_UPDATE') {
+        if (!shouldApplyAuthoritativeMessage(data.revision)) return;
+        const previousPhase = matchPhaseRef.current;
+        noteRemoteRevision(data.revision);
+        setGameState(data.state);
+        setMatchPhaseAndUi(data.phase);
+        setConnectionStatus('CONNECTED');
+        if (data.phase !== previousPhase) persistGuestResumeSession(data.phase, data.revision);
+        if (data.serverTime) {
+            const now = Date.now();
+            timeOffsetRef.current = now - data.serverTime;
+        }
+    }
+    else if (data.type === 'SKILL_PICK_PHASE') {
+      if (!shouldApplyAuthoritativeMessage(data.revision)) return;
+      noteRemoteRevision(data.revision);
+      setConnectionStatus('CONNECTED');
+      setMatchPhaseAndUi('SKILL_PICK');
+      persistGuestResumeSession('SKILL_PICK', data.revision);
+    }
+    else if (data.type === 'RPS_PHASE') {
+      if (!shouldApplyAuthoritativeMessage(data.revision)) return;
+      noteRemoteRevision(data.revision);
+      rpsMyPickRef.current = null;
+      rpsScoresRef.current = { P1: 0, P2: 0 };
+      rpsRoundRef.current = 1;
+      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+      setConnectionStatus('CONNECTED');
+      setMatchPhaseAndUi('RPS');
+      persistGuestResumeSession('RPS', data.revision);
+    }
+    else if (data.type === 'RPS_RESULT') {
+      if (!shouldApplyAuthoritativeMessage(data.revision)) return;
+      noteRemoteRevision(data.revision);
+      setConnectionStatus('CONNECTED');
+      persistGuestResumeSession(matchPhaseRef.current, data.revision);
+      const myRoundResult: RpsResult = data.roundWinner === 'P2' ? 'WIN' : data.roundWinner === 'P1' ? 'LOSE' : 'DRAW';
+      const mySeriesWinner: RpsSeriesWinner | null = data.headstartWinner === null ? null
+        : data.headstartWinner === 'P2' ? 'ME'
+        : data.headstartWinner === 'P1' ? 'OPP'
+        : 'DRAW';
+      setRpsState(prev => ({
+        ...prev,
+        round: data.round,
+        myScore: data.scores.P2,
+        oppScore: data.scores.P1,
+        oppMove: data.p1Move,
+        roundResult: myRoundResult,
+        seriesWinner: mySeriesWinner,
+      }));
+      if (data.headstartWinner === null) {
+        setTimeout(() => {
+          rpsMyPickRef.current = null;
+          setRpsState(prev => ({ ...prev, round: data.round + 1, myMove: null, oppMove: null, roundResult: null }));
+        }, 1800);
+      }
+    }
+  };
+
+  const connectHostTransport = (code: string, isResume: boolean) => {
+    clearPendingPing();
+    clearHostReconnectTimer();
+    const previousPeer = peerRef.current;
+    const peer = new window.Peer(`gridrush-${code}`);
+    peerRef.current = peer;
+    if (previousPeer && previousPeer !== peer && !previousPeer.destroyed) previousPeer.destroy();
+
+    roleRef.current = 'HOST';
+    setMyId('P1');
+    setRoomIdLocal(code);
+    timeOffsetRef.current = 0;
+    lastPacketTime.current = Date.now();
+    setError(null);
+    setIsConnecting(!isResume);
+
+    peer.on('open', () => {
+      if (peer !== peerRef.current) return;
+      hostReconnectAttemptRef.current = 0;
+      setIsConnecting(false);
+      setConnectionStatus(guestSessionIdRef.current ? 'RECONNECTING' : 'CONNECTED');
+      if (!isResume) {
+        setMatchPhaseAndUi('WAITING');
+      }
+      persistHostResumeSession();
+    });
+
+    peer.on('connection', (conn: any) => {
+      conn.on('data', (data: unknown) => handleGuestMessage(conn, data));
+      conn.on('close', () => {
+        if (conn !== connRef.current) return;
+        connRef.current = null;
+        setConnectionStatus('RECONNECTING');
+        setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: 0 } }));
+        persistHostResumeSession();
+      });
+    });
+
+    peer.on('error', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      setIsConnecting(false);
+      setConnectionStatus('RECONNECTING');
+      scheduleHostReconnect(code);
+    });
+
+    peer.on('disconnected', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      setConnectionStatus('RECONNECTING');
+      scheduleHostReconnect(code);
+    });
+
+    peer.on('close', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      setConnectionStatus('RECONNECTING');
+      scheduleHostReconnect(code);
+    });
+  };
+
+  const connectGuestTransport = (code: string, isResume: boolean) => {
+    clearPendingPing();
+    const previousConn = connRef.current;
+    connRef.current = null;
+    const previousPeer = peerRef.current;
+    const peer = new window.Peer();
+    peerRef.current = peer;
+    if (previousConn && previousConn.open) previousConn.close();
+    if (previousPeer && previousPeer !== peer && !previousPeer.destroyed) previousPeer.destroy();
+
+    roleRef.current = 'GUEST';
+    setMyId('P2');
+    setRoomIdLocal(code);
+    lastPacketTime.current = Date.now();
+
+    if (!isResume) {
+      clearGuestResumeSession();
+      setIsConnecting(true);
+      setError(null);
+      setMySkillPicks([]);
+    } else {
+      setConnectionStatus('RECONNECTING');
+    }
+
+    peer.on('open', () => {
+      if (peer !== peerRef.current) return;
+      const conn = peer.connect(`gridrush-${code}`);
+      connRef.current = conn;
+
+      conn.on('open', () => {
+        if (conn !== connRef.current) return;
+        setIsConnecting(false);
+        lastPacketTime.current = Date.now();
+        conn.send({
+          type: 'JOIN_REQUEST',
+          guestSessionId: guestSessionIdRef.current,
+          lastRevision: lastAppliedAuthorityRevisionRef.current,
+        });
+      });
+
+      conn.on('data', (raw: unknown) => {
+        if (conn !== connRef.current) return;
+        handleGuestServerMessage(raw);
+      });
+
+      conn.on('close', () => {
+        if (conn !== connRef.current || manualDisconnectRef.current) return;
+        connRef.current = null;
+        scheduleGuestReconnect();
+      });
+    });
+
+    peer.on('error', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      setIsConnecting(false);
+      scheduleGuestReconnect();
+    });
+
+    peer.on('disconnected', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      scheduleGuestReconnect();
+    });
   };
 
   // --- Network Setup ---
@@ -2039,127 +2814,33 @@ export default function App() {
   };
 
   const setupHost = () => {
-    setIsConnecting(true);
-    setError(null);
+    manualDisconnectRef.current = false;
+    clearGuestResumeSession();
+    clearHostResumeSession();
+    resetOnlineProtocolState();
     const code = Math.floor(Math.random() * 9000 + 1000).toString();
-    const peer = new window.Peer(`gridrush-${code}`);
-    peerRef.current = peer;
-
-    peer.on('open', () => {
-      setRoomId(code);
-      setMyId('P1');
-      roleRef.current = 'HOST';
-      timeOffsetRef.current = 0; // Host has 0 offset
-      lastPacketTime.current = Date.now();
-      setIsConnecting(false);
-      setAppMode('GAME');
-    });
-
-    peer.on('connection', (conn: any) => {
-      connRef.current = conn;
-      conn.on('data', (data: unknown) => handleGuestMessage(data));
-      conn.on('open', () => {
-        // Guest connected: remove beacon and enter skill pick phase
-        teardownLobbyBeacon();
-        p2SkillPicksRef.current = null;
-        setMySkillPicks([]);
-        setAppMode('SKILL_PICK');
-        conn.send({ type: 'SKILL_PICK_PHASE' });
-      });
-      conn.on('close', () => {
-          setGameState(prev => ({ ...prev, p2: { ...prev.p2, lastHeartbeat: 0 } }));
-      });
-    });
-
-    peer.on('error', () => { setError("Conn Error"); setIsConnecting(false); });
-    peer.on('disconnected', () => { setConnectionStatus('DISCONNECTED'); });
+    connectHostTransport(code, false);
   };
 
   const joinGame = (code: string) => {
     if (!isValidRoomCode(code)) { setError('Invalid room code'); return; }
-    setIsConnecting(true);
-    setError(null);
-    const peer = new window.Peer(); 
-    peerRef.current = peer;
-
-    peer.on('open', () => {
-      const conn = peer.connect(`gridrush-${code}`);
-      connRef.current = conn;
-      roleRef.current = 'GUEST';
-      setMyId('P2');
-      lastPacketTime.current = Date.now(); // Init
-
-      conn.on('open', () => {
-        setRoomId(code);
-        setIsConnecting(false);
-        setConnectionStatus('CONNECTED');
-        setMySkillPicks([]);
-        setAppMode('SKILL_PICK'); // Will show skill pick screen; game starts when HOST sends STATE_UPDATE
-      });
-      conn.on('data', (raw: unknown) => {
-        // GUEST RECEIVES MESSAGE — validate before trusting host data
-        const data = sanitizeNetworkMessage(raw);
-        if (!data) return;
-        lastPacketTime.current = Date.now(); // Mark activity
-
-        if (data.type === 'STATE_UPDATE') {
-            setGameState(data.state);
-            if (data.state.status === 'PLAYING') {
-              setAppMode('GAME');
-            }
-            // Calculate time offset: Local - Server
-            if (data.serverTime) {
-                const now = Date.now();
-                timeOffsetRef.current = now - data.serverTime;
-            }
-        }
-        else if (data.type === 'RPS_PHASE') {
-          // HOST signals RPS phase start
-          rpsMyPickRef.current = null;
-          rpsScoresRef.current = { P1: 0, P2: 0 };
-          rpsRoundRef.current = 1;
-          setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
-          setAppMode('RPS');
-        }
-        else if (data.type === 'RPS_RESULT') {
-          // HOST sends round outcome (guest is P2)
-          const myRoundResult: RpsResult = data.roundWinner === 'P2' ? 'WIN' : data.roundWinner === 'P1' ? 'LOSE' : 'DRAW';
-          const mySeriesWinner: RpsSeriesWinner | null = data.headstartWinner === null ? null
-            : data.headstartWinner === 'P2' ? 'ME'
-            : data.headstartWinner === 'P1' ? 'OPP'
-            : 'DRAW';
-          setRpsState(prev => ({
-            ...prev,
-            round: data.round,
-            myScore: data.scores.P2,
-            oppScore: data.scores.P1,
-            oppMove: data.p1Move,   // P1's move = opponent's move from guest's view
-            roundResult: myRoundResult,
-            seriesWinner: mySeriesWinner,
-          }));
-          if (data.headstartWinner !== null) {
-            // Series over — wait for STATE_UPDATE from host (which switches to GAME)
-            // Reset for next round display only if series continues (covered above)
-          } else {
-            setTimeout(() => {
-              rpsMyPickRef.current = null;
-              setRpsState(prev => ({ ...prev, round: data.round + 1, myMove: null, oppMove: null, roundResult: null }));
-            }, 1800);
-          }
-        }
-      });
-      conn.on('close', () => { setConnectionStatus('DISCONNECTED'); });
-      peer.on('error', () => { setError("Err"); setIsConnecting(false); });
-      peer.on('disconnected', () => { setConnectionStatus('DISCONNECTED'); });
-    });
+    manualDisconnectRef.current = false;
+    clearHostResumeSession();
+    resetOnlineProtocolState();
+    connectGuestTransport(code, false);
   };
 
   const resetGame = () => {
+    manualDisconnectRef.current = true;
+    clearReconnectTimer();
+    clearGuestResumeSession();
+    clearHostResumeSession();
     teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
+    resetOnlineProtocolState();
     setGameState(DEFAULT_GAME_STATE);
     setMyId(null);
-    setRoomId(null);
+    setRoomIdLocal(null);
     setIsConnecting(false);
     setConnectionStatus('CONNECTED');
     roleRef.current = 'NONE';
@@ -2212,7 +2893,7 @@ export default function App() {
       mySkillPicksRef.current = picks;
       if (roleRef.current === 'GUEST' && connRef.current) {
         // GUEST: send picks to HOST and wait for RPS_PHASE
-        connRef.current.send({ type: 'SKILL_PICK', skills: picks });
+        connRef.current.send({ type: 'SKILL_PICK', skills: picks, phase: 'SKILL_PICK' });
       } else if (roleRef.current === 'HOST') {
         // HOST: check if P2 already submitted
         if (p2SkillPicksRef.current) {
@@ -2222,8 +2903,7 @@ export default function App() {
           rpsScoresRef.current = { P1: 0, P2: 0 };
           rpsRoundRef.current = 1;
           setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
-          setAppMode('RPS');
-          if (connRef.current) connRef.current.send({ type: 'RPS_PHASE' });
+          sendAuthoritativePhase('RPS');
         }
         // else: wait — RPS starts when SKILL_PICK arrives from guest
       }
@@ -2243,7 +2923,7 @@ export default function App() {
       rpsMyPickRef.current = move;
       setRpsState(prev => ({ ...prev, myMove: move }));
       if (roleRef.current === 'GUEST' && connRef.current) {
-        connRef.current.send({ type: 'RPS_PICK', move });
+        connRef.current.send({ type: 'RPS_PICK', move, phase: 'RPS' });
       } else if (roleRef.current === 'HOST') {
         // HOST picks — check if p2 already submitted
         if (rpsP2PickRef.current) {
@@ -2276,17 +2956,31 @@ export default function App() {
       
       {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
 
-      {/* Disconnection / Exit Modal */}
-      {connectionStatus === 'DISCONNECTED' && (
+      {/* Disconnection / Reconnect Modal */}
+      {connectionStatus !== 'CONNECTED' && (
           <div className="absolute inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-sm">
-                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Icons.Exit className="w-8 h-8 text-red-500" />
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${connectionStatus === 'RECONNECTING' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                      <Icons.Exit className={`w-8 h-8 ${connectionStatus === 'RECONNECTING' ? 'text-amber-500' : 'text-red-500'}`} />
                   </div>
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">CONNECTION LOST</h2>
-                  <p className="text-slate-500 dark:text-slate-400 mb-6">The connection to the other player was interrupted.</p>
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">
+                    {connectionStatus === 'RECONNECTING'
+                      ? (roleRef.current === 'GUEST' ? t.conn_reconnecting_title : t.conn_waiting_title)
+                      : t.conn_lost_title}
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 mb-2">
+                    {connectionStatus === 'RECONNECTING'
+                      ? (roleRef.current === 'GUEST' ? t.conn_reconnecting_desc : t.conn_waiting_desc)
+                      : t.conn_lost_desc}
+                  </p>
+                  {connectionStatus === 'RECONNECTING' && roleRef.current === 'GUEST' && reconnectAttempt > 0 && (
+                    <p className="text-xs font-mono text-amber-500 mb-6 uppercase tracking-widest">
+                      {t.conn_attempt} {reconnectAttempt}/{MAX_GUEST_RECONNECT_ATTEMPTS}
+                    </p>
+                  )}
+                  {!(connectionStatus === 'RECONNECTING' && roleRef.current === 'GUEST' && reconnectAttempt > 0) && <div className="mb-6" />}
                   <button onClick={resetGame} className="w-full bg-red-500 text-white py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-red-600 transition-colors">
-                      EXIT TO MENU
+                      {t.conn_exit_menu}
                   </button>
               </div>
           </div>
@@ -2420,10 +3114,16 @@ export default function App() {
             ) : (
                 <>
                     <div className="text-3xl font-black italic text-slate-100 dark:text-slate-800 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
-                    <div className="flex items-center gap-2 mt-8 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
-                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <div className="flex items-center gap-2 mt-4 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : connectionStatus === 'RECONNECTING' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
                         <div className="text-[10px] text-slate-400 font-mono">ROOM: {roomId}</div>
                     </div>
+                <NetworkQualityPanel
+                  t={t}
+                  status={connectionStatus}
+                  quality={networkQuality}
+                  reconnectAttempt={reconnectAttempt}
+                />
                 </>
             )}
          </div>

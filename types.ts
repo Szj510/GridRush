@@ -119,18 +119,48 @@ export interface UserStats {
   soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }
 
+export type MatchPhase = 'WAITING' | 'SKILL_PICK' | 'RPS' | 'PLAYING' | 'RESULT';
 export type RpsMove = 'R' | 'P' | 'S';
 
+export interface GuestResumeSession {
+  roomId: string;
+  guestSessionId: string;
+  lastRevision: number;
+  phase: MatchPhase;
+  savedAt: number;
+}
+
+export interface HostResumeSession {
+  roomId: string;
+  phase: MatchPhase;
+  revision: number;
+  guestSessionId: string | null;
+  gameState: GameState;
+  mySkillPicks: string[];
+  p2SkillPicks: string[] | null;
+  rpsState: {
+    round: number;
+    scores: { P1: number; P2: number };
+    myMove: RpsMove | null;
+    p2Move: RpsMove | null;
+  };
+  savedAt: number;
+}
+
 export type NetworkMessage = 
-  | { type: 'STATE_UPDATE'; state: GameState; serverTime?: number }
-  | { type: 'ACTION'; action: GameAction }
+  | { type: 'JOIN_REQUEST'; guestSessionId: string | null; lastRevision: number }
+  | { type: 'SESSION_SYNC'; accepted: boolean; guestSessionId: string | null; phase: MatchPhase; revision: number; reason: 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED' }
+  | { type: 'PING'; pingId: string; sentAt: number }
+  | { type: 'PONG'; pingId: string; sentAt: number }
+  | { type: 'STATE_UPDATE'; state: GameState; phase: MatchPhase; revision: number; serverTime?: number }
+  | { type: 'ACTION'; action: GameAction; actionId: string; seq: number; phase: 'PLAYING' }
   | { type: 'HEARTBEAT'; id: PlayerId; timestamp: number }
   | { type: 'RESTART' }
-  | { type: 'SKILL_PICK_PHASE' }                // HOST → GUEST: enter skill pick screen
-  | { type: 'SKILL_PICK'; skills: string[] }     // GUEST → HOST: submit chosen skill ids
-  | { type: 'RPS_PHASE' }                        // HOST → GUEST: enter RPS screen
-  | { type: 'RPS_PICK'; move: RpsMove }          // GUEST → HOST: submit RPS move
-  | { type: 'RPS_RESULT'; p1Move: RpsMove; p2Move: RpsMove; roundWinner: 'P1' | 'P2' | 'DRAW'; round: number; scores: { P1: number; P2: number }; headstartWinner: 'P1' | 'P2' | 'DRAW' | null }; // HOST → GUEST: round outcome
+  | { type: 'SKILL_PICK_PHASE'; revision: number }                // HOST → GUEST: enter skill pick screen
+  | { type: 'SKILL_PICK'; skills: string[]; phase: 'SKILL_PICK' } // GUEST → HOST: submit chosen skill ids
+  | { type: 'RPS_PHASE'; revision: number }                       // HOST → GUEST: enter RPS screen
+  | { type: 'RPS_PICK'; move: RpsMove; phase: 'RPS' }             // GUEST → HOST: submit RPS move
+  | { type: 'RPS_RESULT'; p1Move: RpsMove; p2Move: RpsMove; roundWinner: 'P1' | 'P2' | 'DRAW'; round: number; scores: { P1: number; P2: number }; headstartWinner: 'P1' | 'P2' | 'DRAW' | null; revision: number }; // HOST → GUEST: round outcome
 
 export type GameAction = 
   | { type: 'CLICK_CELL'; cellIndex: number }

@@ -6,12 +6,14 @@
  * and must be validated before use.
  */
 
-import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord, RpsMove } from '../types';
+import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord, RpsMove, MatchPhase, GuestResumeSession, HostResumeSession } from '../types';
 
 // ─── Allow-lists ─────────────────────────────────────────────────────────────
 
-const VALID_MSG_TYPES    = new Set(['STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART', 'SKILL_PICK_PHASE', 'SKILL_PICK', 'RPS_PHASE', 'RPS_PICK', 'RPS_RESULT']);
+const VALID_MSG_TYPES    = new Set(['JOIN_REQUEST', 'SESSION_SYNC', 'PING', 'PONG', 'STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART', 'SKILL_PICK_PHASE', 'SKILL_PICK', 'RPS_PHASE', 'RPS_PICK', 'RPS_RESULT']);
 const VALID_RPS_MOVES    = new Set(['R', 'P', 'S']);
+const VALID_MATCH_PHASES = new Set(['WAITING', 'SKILL_PICK', 'RPS', 'PLAYING', 'RESULT']);
+const VALID_SESSION_SYNC_REASONS = new Set(['OK', 'ROOM_BUSY', 'SESSION_EXPIRED']);
 const VALID_ACTION_TYPES = new Set(['CLICK_CELL', 'ABANDON_CHALLENGE', 'DEFEND', 'INTERACTION', 'COMPLETE_GAME', 'USE_SKILL', 'DUEL_PICK_CELL']);
 const VALID_SKILLS       = new Set(['STEAL', 'FREEZE', 'DUEL']);
 const VALID_LANGUAGES    = new Set(['en', 'zh']);
@@ -24,6 +26,7 @@ const MAX_CELLS = 13;
 const isStr  = (v: unknown): v is string  => typeof v === 'string';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
 const isNum  = (v: unknown): v is number  => typeof v === 'number' && Number.isFinite(v);
+const isMatchPhase = (v: unknown): v is MatchPhase => isStr(v) && VALID_MATCH_PHASES.has(v);
 
 /** Coerce v to an integer in [lo, hi], returning fb on failure. */
 const clampInt = (v: unknown, lo: number, hi: number, fb: number): number => {
@@ -72,6 +75,40 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
   if (!isStr(m.type) || !VALID_MSG_TYPES.has(m.type)) return null;
 
   switch (m.type) {
+    case 'JOIN_REQUEST': {
+      const guestSessionId = m.guestSessionId === null
+        ? null
+        : (isStr(m.guestSessionId) && m.guestSessionId.length <= 128 ? m.guestSessionId : null);
+      return { type: 'JOIN_REQUEST', guestSessionId, lastRevision: clampInt(m.lastRevision, 0, Number.MAX_SAFE_INTEGER, 0) };
+    }
+
+    case 'SESSION_SYNC': {
+      if (!isBool(m.accepted)) return null;
+      if (!isMatchPhase(m.phase)) return null;
+      if (!isStr(m.reason) || !VALID_SESSION_SYNC_REASONS.has(m.reason)) return null;
+      const guestSessionId = m.guestSessionId === null
+        ? null
+        : (isStr(m.guestSessionId) && m.guestSessionId.length <= 128 ? m.guestSessionId : null);
+      return {
+        type: 'SESSION_SYNC',
+        accepted: m.accepted,
+        guestSessionId,
+        phase: m.phase,
+        revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0),
+        reason: m.reason as 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED',
+      };
+    }
+
+    case 'PING': {
+      if (!isStr(m.pingId) || m.pingId.length > 128) return null;
+      return { type: 'PING', pingId: m.pingId, sentAt: clampInt(m.sentAt, 0, Number.MAX_SAFE_INTEGER, 0) };
+    }
+
+    case 'PONG': {
+      if (!isStr(m.pingId) || m.pingId.length > 128) return null;
+      return { type: 'PONG', pingId: m.pingId, sentAt: clampInt(m.sentAt, 0, Number.MAX_SAFE_INTEGER, 0) };
+    }
+
     case 'HEARTBEAT': {
       if (m.id !== 'P1' && m.id !== 'P2') return null;
       const ts = clampInt(m.timestamp, 0, Number.MAX_SAFE_INTEGER, 0);
@@ -87,36 +124,50 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
       if (!Array.isArray(s.cells) || s.cells.length > MAX_CELLS) return null;
       if (typeof s.p1 !== 'object' || s.p1 === null) return null;
       if (typeof s.p2 !== 'object' || s.p2 === null) return null;
+      if (!isMatchPhase(m.phase)) return null;
+      const revision = clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0);
       return {
         type: 'STATE_UPDATE',
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         state: m.state as any,
+        phase: m.phase,
+        revision,
         serverTime: isNum(m.serverTime) ? (m.serverTime as number) : undefined,
       };
     }
 
     case 'ACTION': {
       if (m.action === null || typeof m.action !== 'object' || Array.isArray(m.action)) return null;
+      if (!isStr(m.actionId) || m.actionId.length > 128) return null;
+      if (m.phase !== 'PLAYING') return null;
       const action = sanitizeAction(m.action as Record<string, unknown>);
       if (!action) return null;
-      return { type: 'ACTION', action };
+      return {
+        type: 'ACTION',
+        action,
+        actionId: m.actionId,
+        seq: clampInt(m.seq, 0, Number.MAX_SAFE_INTEGER, 0),
+        phase: 'PLAYING',
+      };
     }
 
     case 'RESTART':          return { type: 'RESTART' };
-    case 'SKILL_PICK_PHASE': return { type: 'SKILL_PICK_PHASE' };
-    case 'RPS_PHASE':        return { type: 'RPS_PHASE' };
+    case 'SKILL_PICK_PHASE': return { type: 'SKILL_PICK_PHASE', revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
+    case 'RPS_PHASE':        return { type: 'RPS_PHASE', revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
 
     case 'SKILL_PICK': {
+      if (m.phase !== 'SKILL_PICK') return null;
       if (!Array.isArray(m.skills)) return null;
       const skills = (m.skills as unknown[])
         .filter((s): s is string => isStr(s) && VALID_SKILLS.has(s))
         .slice(0, 2);
-      return { type: 'SKILL_PICK', skills };
+      return { type: 'SKILL_PICK', skills, phase: 'SKILL_PICK' };
     }
 
     case 'RPS_PICK': {
+      if (m.phase !== 'RPS') return null;
       if (!isStr(m.move) || !VALID_RPS_MOVES.has(m.move)) return null;
-      return { type: 'RPS_PICK', move: m.move as RpsMove };
+      return { type: 'RPS_PICK', move: m.move as RpsMove, phase: 'RPS' };
     }
 
     case 'RPS_RESULT': {
@@ -130,7 +181,7 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
       const hw = (m.headstartWinner === 'P1' || m.headstartWinner === 'P2' || m.headstartWinner === 'DRAW')
         ? m.headstartWinner as 'P1' | 'P2' | 'DRAW'
         : null;
-      return { type: 'RPS_RESULT', p1Move: m.p1Move as RpsMove, p2Move: m.p2Move as RpsMove, roundWinner: m.roundWinner as 'P1' | 'P2' | 'DRAW', round, scores, headstartWinner: hw };
+      return { type: 'RPS_RESULT', p1Move: m.p1Move as RpsMove, p2Move: m.p2Move as RpsMove, roundWinner: m.roundWinner as 'P1' | 'P2' | 'DRAW', round, scores, headstartWinner: hw, revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
     }
 
     default: return null;
@@ -184,6 +235,83 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
         ).slice(0, 1000)
       : defaults.practiceRecords,
     soloRunsByDiff,
+  };
+}
+
+export function sanitizeGuestResumeSession(raw: unknown): GuestResumeSession | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const s = raw as Record<string, unknown>;
+  if (!isStr(s.roomId) || !isValidRoomCode(s.roomId)) return null;
+  if (!isStr(s.guestSessionId) || s.guestSessionId.length > 128) return null;
+  if (!isMatchPhase(s.phase)) return null;
+
+  return {
+    roomId: s.roomId,
+    guestSessionId: s.guestSessionId,
+    lastRevision: clampInt(s.lastRevision, 0, Number.MAX_SAFE_INTEGER, 0),
+    phase: s.phase,
+    savedAt: clampInt(s.savedAt, 0, Number.MAX_SAFE_INTEGER, 0),
+  };
+}
+
+export function sanitizeHostResumeSession(raw: unknown): HostResumeSession | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const s = raw as Record<string, unknown>;
+  if (!isStr(s.roomId) || !isValidRoomCode(s.roomId)) return null;
+  if (!isMatchPhase(s.phase)) return null;
+
+  const stateMsg = sanitizeNetworkMessage({
+    type: 'STATE_UPDATE',
+    state: s.gameState,
+    phase: s.phase,
+    revision: s.revision,
+  });
+  if (!stateMsg || stateMsg.type !== 'STATE_UPDATE') return null;
+
+  const mySkillPicks = Array.isArray(s.mySkillPicks)
+    ? (s.mySkillPicks as unknown[]).filter((v): v is string => isStr(v) && VALID_SKILLS.has(v)).slice(0, 2)
+    : [];
+
+  const p2SkillPicks = s.p2SkillPicks === null
+    ? null
+    : (Array.isArray(s.p2SkillPicks)
+      ? (s.p2SkillPicks as unknown[]).filter((v): v is string => isStr(v) && VALID_SKILLS.has(v)).slice(0, 2)
+      : null);
+
+  if (s.rpsState === null || typeof s.rpsState !== 'object' || Array.isArray(s.rpsState)) return null;
+  const rs = s.rpsState as Record<string, unknown>;
+  if (rs.scores === null || typeof rs.scores !== 'object' || Array.isArray(rs.scores)) return null;
+  const scoresRaw = rs.scores as Record<string, unknown>;
+
+  const myMove = (rs.myMove === null || (isStr(rs.myMove) && VALID_RPS_MOVES.has(rs.myMove)))
+    ? rs.myMove as RpsMove | null
+    : null;
+  const p2Move = (rs.p2Move === null || (isStr(rs.p2Move) && VALID_RPS_MOVES.has(rs.p2Move)))
+    ? rs.p2Move as RpsMove | null
+    : null;
+
+  const guestSessionId = s.guestSessionId === null
+    ? null
+    : (isStr(s.guestSessionId) && s.guestSessionId.length <= 128 ? s.guestSessionId : null);
+
+  return {
+    roomId: s.roomId,
+    phase: s.phase,
+    revision: clampInt(s.revision, 0, Number.MAX_SAFE_INTEGER, 0),
+    guestSessionId,
+    gameState: stateMsg.state,
+    mySkillPicks,
+    p2SkillPicks,
+    rpsState: {
+      round: clampInt(rs.round, 1, 3, 1),
+      scores: {
+        P1: clampInt(scoresRaw['P1'], 0, 3, 0),
+        P2: clampInt(scoresRaw['P2'], 0, 3, 0),
+      },
+      myMove,
+      p2Move,
+    },
+    savedAt: clampInt(s.savedAt, 0, Number.MAX_SAFE_INTEGER, 0),
   };
 }
 
