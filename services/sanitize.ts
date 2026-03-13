@@ -6,11 +6,12 @@
  * and must be validated before use.
  */
 
-import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord } from '../types';
+import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord, RpsMove } from '../types';
 
 // ─── Allow-lists ─────────────────────────────────────────────────────────────
 
-const VALID_MSG_TYPES    = new Set(['STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART', 'SKILL_PICK_PHASE', 'SKILL_PICK']);
+const VALID_MSG_TYPES    = new Set(['STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART', 'SKILL_PICK_PHASE', 'SKILL_PICK', 'RPS_PHASE', 'RPS_PICK', 'RPS_RESULT']);
+const VALID_RPS_MOVES    = new Set(['R', 'P', 'S']);
 const VALID_ACTION_TYPES = new Set(['CLICK_CELL', 'ABANDON_CHALLENGE', 'DEFEND', 'INTERACTION', 'COMPLETE_GAME', 'USE_SKILL', 'DUEL_PICK_CELL']);
 const VALID_SKILLS       = new Set(['STEAL', 'FREEZE', 'DUEL']);
 const VALID_LANGUAGES    = new Set(['en', 'zh']);
@@ -103,6 +104,7 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
 
     case 'RESTART':          return { type: 'RESTART' };
     case 'SKILL_PICK_PHASE': return { type: 'SKILL_PICK_PHASE' };
+    case 'RPS_PHASE':        return { type: 'RPS_PHASE' };
 
     case 'SKILL_PICK': {
       if (!Array.isArray(m.skills)) return null;
@@ -110,6 +112,25 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
         .filter((s): s is string => isStr(s) && VALID_SKILLS.has(s))
         .slice(0, 2);
       return { type: 'SKILL_PICK', skills };
+    }
+
+    case 'RPS_PICK': {
+      if (!isStr(m.move) || !VALID_RPS_MOVES.has(m.move)) return null;
+      return { type: 'RPS_PICK', move: m.move as RpsMove };
+    }
+
+    case 'RPS_RESULT': {
+      if (!isStr(m.p1Move) || !VALID_RPS_MOVES.has(m.p1Move)) return null;
+      if (!isStr(m.p2Move) || !VALID_RPS_MOVES.has(m.p2Move)) return null;
+      if (m.roundWinner !== 'P1' && m.roundWinner !== 'P2' && m.roundWinner !== 'DRAW') return null;
+      const round = clampInt(m.round, 1, 3, 1);
+      if (m.scores === null || typeof m.scores !== 'object' || Array.isArray(m.scores)) return null;
+      const sc = m.scores as Record<string, unknown>;
+      const scores = { P1: clampInt(sc['P1'], 0, 3, 0), P2: clampInt(sc['P2'], 0, 3, 0) };
+      const hw = (m.headstartWinner === 'P1' || m.headstartWinner === 'P2' || m.headstartWinner === 'DRAW')
+        ? m.headstartWinner as 'P1' | 'P2' | 'DRAW'
+        : null;
+      return { type: 'RPS_RESULT', p1Move: m.p1Move as RpsMove, p2Move: m.p2Move as RpsMove, roundWinner: m.roundWinner as 'P1' | 'P2' | 'DRAW', round, scores, headstartWinner: hw };
     }
 
     default: return null;

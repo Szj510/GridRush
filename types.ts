@@ -119,13 +119,18 @@ export interface UserStats {
   soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }
 
+export type RpsMove = 'R' | 'P' | 'S';
+
 export type NetworkMessage = 
   | { type: 'STATE_UPDATE'; state: GameState; serverTime?: number }
   | { type: 'ACTION'; action: GameAction }
   | { type: 'HEARTBEAT'; id: PlayerId; timestamp: number }
   | { type: 'RESTART' }
   | { type: 'SKILL_PICK_PHASE' }                // HOST → GUEST: enter skill pick screen
-  | { type: 'SKILL_PICK'; skills: string[] };    // GUEST → HOST: submit chosen skill ids
+  | { type: 'SKILL_PICK'; skills: string[] }     // GUEST → HOST: submit chosen skill ids
+  | { type: 'RPS_PHASE' }                        // HOST → GUEST: enter RPS screen
+  | { type: 'RPS_PICK'; move: RpsMove }          // GUEST → HOST: submit RPS move
+  | { type: 'RPS_RESULT'; p1Move: RpsMove; p2Move: RpsMove; roundWinner: 'P1' | 'P2' | 'DRAW'; round: number; scores: { P1: number; P2: number }; headstartWinner: 'P1' | 'P2' | 'DRAW' | null }; // HOST → GUEST: round outcome
 
 export type GameAction = 
   | { type: 'CLICK_CELL'; cellIndex: number }

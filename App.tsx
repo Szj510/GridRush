@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty } from './types';
+import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, RpsMove } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
@@ -894,6 +894,133 @@ const SKILL_DEFS = [
   { id: 'DUEL',   icon: '⚔️',  nameKey: 'skill_duel'   as const },
 ];
 
+// --- Rock-Paper-Scissors ---
+
+type RpsResult = 'WIN' | 'LOSE' | 'DRAW';
+type RpsSeriesWinner = 'ME' | 'OPP' | 'DRAW';
+
+interface RpsDisplayState {
+  round: number;
+  myScore: number;
+  oppScore: number;
+  myMove: RpsMove | null;
+  oppMove: RpsMove | null;
+  roundResult: RpsResult | null;
+  seriesWinner: RpsSeriesWinner | null;
+}
+
+const RPS_ICONS: Record<RpsMove, string> = { R: '✊', P: '✋', S: '✌️' };
+
+function getRpsRoundWinner(p1: RpsMove, p2: RpsMove): 'P1' | 'P2' | 'DRAW' {
+  if (p1 === p2) return 'DRAW';
+  if ((p1 === 'R' && p2 === 'S') || (p1 === 'P' && p2 === 'R') || (p1 === 'S' && p2 === 'P')) return 'P1';
+  return 'P2';
+}
+
+const RpsScreen: React.FC<{
+  t: Record<string, string>;
+  state: RpsDisplayState;
+  onPick: (move: RpsMove) => void;
+}> = ({ t, state, onPick }) => {
+  const moves: RpsMove[] = ['R', 'P', 'S'];
+  const moveLabels = [t.rps_rock, t.rps_paper, t.rps_scissors];
+  const showButtons = !state.myMove && !state.seriesWinner;
+  const showWaiting = !!state.myMove && !state.roundResult && !state.seriesWinner;
+
+  return (
+    <div className="h-screen w-screen flex flex-col items-center justify-center gap-6 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-4">
+      <div className="text-center">
+        <h1 className="text-3xl font-black tracking-widest uppercase text-yellow-500 dark:text-yellow-400">{t.rps_title}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{t.rps_instr}</p>
+      </div>
+
+      {/* Scoreboard */}
+      <div className="flex gap-10 items-center text-center">
+        <div>
+          <div className="text-5xl font-black">{state.myScore}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 tracking-wider uppercase mt-1">{t.rps_you}</div>
+        </div>
+        <div className="text-slate-400 dark:text-slate-500 font-bold text-sm">{t.rps_round} {state.round} / 3</div>
+        <div>
+          <div className="text-5xl font-black">{state.oppScore}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 tracking-wider uppercase mt-1">{t.rps_opp}</div>
+        </div>
+      </div>
+
+      {/* Round result reveal */}
+      {state.roundResult && state.oppMove && (
+        <div className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <div className="flex gap-8 items-center">
+            <div className="text-center">
+              <div className="text-6xl">{RPS_ICONS[state.myMove!]}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t.rps_you}</div>
+            </div>
+            <div className="text-xl font-black text-slate-400">VS</div>
+            <div className="text-center">
+              <div className="text-6xl">{RPS_ICONS[state.oppMove]}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t.rps_opp}</div>
+            </div>
+          </div>
+          <div className={`font-black text-xl tracking-widest ${
+            state.roundResult === 'WIN'  ? 'text-green-500' :
+            state.roundResult === 'LOSE' ? 'text-red-500' :
+                                           'text-slate-400 dark:text-slate-300'
+          }`}>
+            {state.roundResult === 'WIN'  ? t.rps_you_win :
+             state.roundResult === 'LOSE' ? t.rps_you_lose :
+                                            t.rps_draw}
+          </div>
+        </div>
+      )}
+
+      {/* Series final result */}
+      {state.seriesWinner && (
+        <div className={`text-center font-black text-xl px-6 py-3 rounded-full border ${
+          state.seriesWinner === 'ME'   ? 'bg-green-500/10 text-green-400 border-green-500/40' :
+          state.seriesWinner === 'DRAW' ? 'bg-slate-500/10 text-slate-400 border-slate-500/40' :
+                                          'bg-red-500/10 text-red-400 border-red-500/40'
+        }`}>
+          {state.seriesWinner === 'ME'   ? t.rps_headstart_win :
+           state.seriesWinner === 'DRAW' ? t.rps_headstart_draw :
+                                           t.rps_headstart_lose}
+        </div>
+      )}
+
+      {/* Move picker */}
+      {showButtons && (
+        <div className="flex gap-4">
+          {moves.map((move, i) => (
+            <button
+              key={move}
+              onClick={() => onPick(move)}
+              className="w-28 h-28 rounded-2xl border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-yellow-400 hover:bg-yellow-400/5 hover:scale-110 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer"
+            >
+              <span className="text-5xl">{RPS_ICONS[move]}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{moveLabels[i]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Pick confirmed, showing your choice */}
+      {state.myMove && !state.roundResult && (
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-6xl">{RPS_ICONS[state.myMove]}</div>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">{t.rps_you_picked}</p>
+        </div>
+      )}
+
+      {/* Waiting spinner */}
+      {showWaiting && (
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+          <span className="animate-spin text-lg">⏳</span>
+          <span>{t.rps_waiting}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface SkillPickScreenProps {
   t: Record<string, string>;
   waiting: boolean;
@@ -1040,7 +1167,7 @@ const SoloDifficultyPicker = ({
 // --- App ---
 
 export default function App() {
-  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK' | 'SOLO_DIFFICULTY'>('MENU');
+  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK' | 'SOLO_DIFFICULTY' | 'RPS'>('MENU');
   
   // Persisted State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -1068,6 +1195,16 @@ export default function App() {
   const mySkillPicksRef = useRef<string[]>([]);
   mySkillPicksRef.current = mySkillPicks;
   const p2SkillPicksRef = useRef<string[] | null>(null); // HOST stores P2's picks
+
+  // Rock-Paper-Scissors phase (online only)
+  const rpsMyPickRef  = useRef<RpsMove | null>(null); // HOST's current-round move
+  const rpsP2PickRef  = useRef<RpsMove | null>(null); // P2's current-round move (HOST only)
+  const rpsScoresRef  = useRef<{ P1: number; P2: number }>({ P1: 0, P2: 0 });
+  const rpsRoundRef   = useRef<number>(1);
+  const [rpsState, setRpsState] = useState<RpsDisplayState>({
+    round: 1, myScore: 0, oppScore: 0,
+    myMove: null, oppMove: null, roundResult: null, seriesWinner: null,
+  });
 
   // Public lobby beacon (gridrush-pub-XXXX signals the room is open)
   const [isLobbyPublic, setIsLobbyPublic] = useState(false);
@@ -1313,7 +1450,7 @@ export default function App() {
 
   // --- Game Logic ---
 
-  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }, soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT') => {
+  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }, soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT', headstartLoser?: 'P1' | 'P2' | null) => {
     audio.playClick();
     let gameIds: string[];
     let numCells = 9;
@@ -1340,7 +1477,7 @@ export default function App() {
       duelsRemaining:   picks ? (picks.includes('DUEL')   ? 1 : 0) : 1,
     });
 
-    const newGame: GameState = {
+    let newGame: GameState = {
       status: 'PLAYING',
       cells,
       p1: makePlayer('P1', 'Player Blue', skillOverrides?.p1),
@@ -1349,6 +1486,13 @@ export default function App() {
       stealNotification: null,
       duelState: null,
     };
+
+    // Apply 2-second input freeze to the RPS loser
+    if (headstartLoser === 'P1') {
+      newGame = { ...newGame, p1: { ...newGame.p1, frozenUntil: Date.now() + 2000 } };
+    } else if (headstartLoser === 'P2') {
+      newGame = { ...newGame, p2: { ...newGame.p2, frozenUntil: Date.now() + 2000 } };
+    }
     
     if (mode === 'ONLINE') {
        setGameState(newGame);
@@ -1762,6 +1906,42 @@ export default function App() {
     }
   };
 
+  // HOST resolves a single RPS round, updates display, and sends result to guest
+  const resolveRpsRound = (p1Move: RpsMove, p2Move: RpsMove) => {
+    const roundWinner = getRpsRoundWinner(p1Move, p2Move);
+    const newScores = { ...rpsScoresRef.current };
+    if (roundWinner === 'P1') newScores.P1++;
+    else if (roundWinner === 'P2') newScores.P2++;
+    rpsScoresRef.current = newScores;
+
+    const round = rpsRoundRef.current;
+    const seriesOver = newScores.P1 >= 2 || newScores.P2 >= 2 || round >= 3;
+    const hw: 'P1' | 'P2' | 'DRAW' | null = seriesOver
+      ? (newScores.P1 > newScores.P2 ? 'P1' : newScores.P2 > newScores.P1 ? 'P2' : 'DRAW')
+      : null;
+
+    if (connRef.current) {
+      connRef.current.send({ type: 'RPS_RESULT', p1Move, p2Move, roundWinner, round, scores: newScores, headstartWinner: hw });
+    }
+
+    const myRoundResult: RpsResult = roundWinner === 'P1' ? 'WIN' : roundWinner === 'P2' ? 'LOSE' : 'DRAW';
+    const mySeriesWinner: RpsSeriesWinner | null = hw === null ? null : hw === 'P1' ? 'ME' : hw === 'P2' ? 'OPP' : 'DRAW';
+    setRpsState(prev => ({ ...prev, oppMove: p2Move, roundResult: myRoundResult, myScore: newScores.P1, oppScore: newScores.P2, seriesWinner: mySeriesWinner }));
+
+    setTimeout(() => {
+      if (hw !== null) {
+        const loser: 'P1' | 'P2' | null = hw === 'P1' ? 'P2' : hw === 'P2' ? 'P1' : null;
+        startNewGame('ONLINE', { p1: mySkillPicksRef.current, p2: p2SkillPicksRef.current! }, undefined, loser);
+        setAppMode('GAME');
+      } else {
+        rpsRoundRef.current = round + 1;
+        rpsMyPickRef.current = null;
+        rpsP2PickRef.current = null;
+        setRpsState(prev => ({ ...prev, round: round + 1, myMove: null, oppMove: null, roundResult: null }));
+      }
+    }, 1800);
+  };
+
   const handleGuestMessage = (raw: unknown) => {
     // HOST RECEIVES MESSAGE — validate before trusting any peer data
     const msg = sanitizeNetworkMessage(raw);
@@ -1798,8 +1978,21 @@ export default function App() {
       // If HOST already picked, start the game now (use ref to avoid stale closure)
       const hostPicks = mySkillPicksRef.current;
       if (hostPicks.length === 2) {
-        setAppMode('GAME');
-        startNewGame('ONLINE', { p1: hostPicks, p2: msg.skills });
+        // Both players picked skills → enter RPS phase
+        rpsMyPickRef.current = null;
+        rpsP2PickRef.current = null;
+        rpsScoresRef.current = { P1: 0, P2: 0 };
+        rpsRoundRef.current = 1;
+        setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+        setAppMode('RPS');
+        if (connRef.current) connRef.current.send({ type: 'RPS_PHASE' });
+      }
+    }
+    else if (msg.type === 'RPS_PICK') {
+      if (!rl.allow('rps_pick', 5, 5000)) return;
+      rpsP2PickRef.current = msg.move;
+      if (rpsMyPickRef.current) {
+        resolveRpsRound(rpsMyPickRef.current, msg.move);
       }
     }
   };
@@ -1920,6 +2113,40 @@ export default function App() {
                 timeOffsetRef.current = now - data.serverTime;
             }
         }
+        else if (data.type === 'RPS_PHASE') {
+          // HOST signals RPS phase start
+          rpsMyPickRef.current = null;
+          rpsScoresRef.current = { P1: 0, P2: 0 };
+          rpsRoundRef.current = 1;
+          setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+          setAppMode('RPS');
+        }
+        else if (data.type === 'RPS_RESULT') {
+          // HOST sends round outcome (guest is P2)
+          const myRoundResult: RpsResult = data.roundWinner === 'P2' ? 'WIN' : data.roundWinner === 'P1' ? 'LOSE' : 'DRAW';
+          const mySeriesWinner: RpsSeriesWinner | null = data.headstartWinner === null ? null
+            : data.headstartWinner === 'P2' ? 'ME'
+            : data.headstartWinner === 'P1' ? 'OPP'
+            : 'DRAW';
+          setRpsState(prev => ({
+            ...prev,
+            round: data.round,
+            myScore: data.scores.P2,
+            oppScore: data.scores.P1,
+            oppMove: data.p1Move,   // P1's move = opponent's move from guest's view
+            roundResult: myRoundResult,
+            seriesWinner: mySeriesWinner,
+          }));
+          if (data.headstartWinner !== null) {
+            // Series over — wait for STATE_UPDATE from host (which switches to GAME)
+            // Reset for next round display only if series continues (covered above)
+          } else {
+            setTimeout(() => {
+              rpsMyPickRef.current = null;
+              setRpsState(prev => ({ ...prev, round: data.round + 1, myMove: null, oppMove: null, roundResult: null }));
+            }, 1800);
+          }
+        }
       });
       conn.on('close', () => { setConnectionStatus('DISCONNECTED'); });
       peer.on('error', () => { setError("Err"); setIsConnecting(false); });
@@ -1984,15 +2211,21 @@ export default function App() {
       setMySkillPicks(picks);
       mySkillPicksRef.current = picks;
       if (roleRef.current === 'GUEST' && connRef.current) {
-        // GUEST: send picks to HOST and wait
+        // GUEST: send picks to HOST and wait for RPS_PHASE
         connRef.current.send({ type: 'SKILL_PICK', skills: picks });
       } else if (roleRef.current === 'HOST') {
         // HOST: check if P2 already submitted
         if (p2SkillPicksRef.current) {
-          setAppMode('GAME');
-          startNewGame('ONLINE', { p1: picks, p2: p2SkillPicksRef.current });
+          // Both picked → enter RPS
+          rpsMyPickRef.current = null;
+          rpsP2PickRef.current = null;
+          rpsScoresRef.current = { P1: 0, P2: 0 };
+          rpsRoundRef.current = 1;
+          setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+          setAppMode('RPS');
+          if (connRef.current) connRef.current.send({ type: 'RPS_PHASE' });
         }
-        // else: wait — game starts when SKILL_PICK arrives from guest
+        // else: wait — RPS starts when SKILL_PICK arrives from guest
       }
     };
     return (
@@ -2002,6 +2235,23 @@ export default function App() {
         onConfirm={handleSkillConfirm}
       />
     );
+  }
+
+  if (appMode === 'RPS') {
+    const handleRpsPick = (move: RpsMove) => {
+      if (rpsState.myMove !== null || rpsState.seriesWinner !== null) return; // already picked
+      rpsMyPickRef.current = move;
+      setRpsState(prev => ({ ...prev, myMove: move }));
+      if (roleRef.current === 'GUEST' && connRef.current) {
+        connRef.current.send({ type: 'RPS_PICK', move });
+      } else if (roleRef.current === 'HOST') {
+        // HOST picks — check if p2 already submitted
+        if (rpsP2PickRef.current) {
+          resolveRpsRound(move, rpsP2PickRef.current);
+        }
+      }
+    };
+    return <RpsScreen t={t} state={rpsState} onPick={handleRpsPick} />;
   }
 
   if (myId === 'P1' && roomId && gameState.status === 'IDLE') {
