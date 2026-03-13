@@ -1,4 +1,4 @@
-import { MiniGameConfig, Achievement } from './types';
+import { MiniGameConfig, Achievement, FunCardId, FunCard } from './types';
 
 // Using simple SVG icons as components for better visuals
 export const Icons = {
@@ -188,6 +188,15 @@ export const MINI_GAME_TRANSLATIONS = {
   }
 };
 
+export const FUN_CARDS: FunCard[] = [
+  { id: 'EGG'       as FunCardId, icon: '🥚', nameKey: 'fun_egg',       descKey: 'fun_egg_desc' },
+  { id: 'SHUFFLE'   as FunCardId, icon: '🔀', nameKey: 'fun_shuffle',   descKey: 'fun_shuffle_desc' },
+  { id: 'ZAP'       as FunCardId, icon: '⚡', nameKey: 'fun_zap',       descKey: 'fun_zap_desc' },
+  { id: 'HARD_MODE' as FunCardId, icon: '🔥', nameKey: 'fun_hard_mode', descKey: 'fun_hard_mode_desc' },
+  { id: 'FLIP'      as FunCardId, icon: '🙃', nameKey: 'fun_flip',      descKey: 'fun_flip_desc' },
+  { id: 'BOMB'      as FunCardId, icon: '💣', nameKey: 'fun_bomb',      descKey: 'fun_bomb_desc' },
+];
+
 export const TRANSLATIONS = {
   en: {
     menu_online: "ONLINE BATTLE",
@@ -347,6 +356,35 @@ export const TRANSLATIONS = {
     solo_diff_start: "START",
     solo_diff_back: "Back",
     solo_diff_best: "Best:",
+
+    // Mode selector
+    online_mode_label: "GAME MODE",
+    std_mode: "STANDARD",
+    std_mode_desc: "Classic strategy — no power-ups.",
+    fun_mode: "FUN MODE",
+    fun_mode_desc: "Capture cells to earn random power-up cards!",
+
+    // Fun mode in-game
+    fun_mode_badge: "🎉 FUN",
+    fun_card_drawn: "Card Drawn!",
+    fun_card_use: "USE",
+    fun_blinded: "BLINDED!",
+    fun_flipped: "FLIPPED!",
+    fun_hard: "NIGHTMARE!",
+
+    // Fun card names / descriptions
+    fun_egg: "Blackout",
+    fun_egg_desc: "Blind opponent's grid for 5 seconds",
+    fun_shuffle: "Shuffle",
+    fun_shuffle_desc: "Randomize all unclaimed mini-games",
+    fun_zap: "Zap",
+    fun_zap_desc: "Knock opponent out of their current cell",
+    fun_hard_mode: "Nightmare",
+    fun_hard_mode_desc: "Force EXPERT difficulty on opponent for 15s",
+    fun_flip: "Flip",
+    fun_flip_desc: "Flip opponent's screen upside-down for 5s",
+    fun_bomb: "Bomb",
+    fun_bomb_desc: "Reset a random opponent-owned cell to neutral",
   },
   zh: {
     menu_online: "在线对战",
@@ -506,6 +544,35 @@ export const TRANSLATIONS = {
     solo_diff_start: "开始挑战",
     solo_diff_back: "返回",
     solo_diff_best: "最佳:",
+
+    // Mode selector
+    online_mode_label: "对战模式",
+    std_mode: "标准模式",
+    std_mode_desc: "经典策略对战，无技能道具。",
+    fun_mode: "娱乐模式",
+    fun_mode_desc: "每次插旗都能抽到随机道具卡！",
+
+    // Fun mode in-game
+    fun_mode_badge: "🎉 娱乐",
+    fun_card_drawn: "获得道具！",
+    fun_card_use: "使用",
+    fun_blinded: "视野被遮挡！",
+    fun_flipped: "画面翻转！",
+    fun_hard: "噩梦难度！",
+
+    // Fun card names / descriptions
+    fun_egg: "黑幕",
+    fun_egg_desc: "让对手的棋盘变暗5秒",
+    fun_shuffle: "混牌",
+    fun_shuffle_desc: "随机打乱所有无主格子的小游戏类型",
+    fun_zap: "弹射",
+    fun_zap_desc: "把对手踢出当前格子",
+    fun_hard_mode: "炼狱",
+    fun_hard_mode_desc: "强制对手遭遇专家难度，持续15秒",
+    fun_flip: "翻转",
+    fun_flip_desc: "让对手的画面翻转5秒",
+    fun_bomb: "炸弹",
+    fun_bomb_desc: "把对手随机一格夺回成无主格子",
   }
 };
 

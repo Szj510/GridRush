@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove } from './types';
-import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST } from './constants';
+import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove, GameMode, FunCardId } from './types';
+import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeGuestResumeSession, sanitizeHostResumeSession, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
@@ -27,6 +27,7 @@ const INITIAL_PLAYER_STATE = (id: PlayerId, name: string): PlayerState => ({
   freezesRemaining: 1,
   frozenUntil: 0,
   duelsRemaining: 1,
+  funCardInHand: null,
 });
 
 const DEFAULT_GAME_STATE: GameState = {
@@ -37,6 +38,7 @@ const DEFAULT_GAME_STATE: GameState = {
   winner: null,
   stealNotification: null,
   duelState: null,
+  funCardEffects: { blindP1Until: 0, blindP2Until: 0, hardModeP1Until: 0, hardModeP2Until: 0, flipP1Until: 0, flipP2Until: 0 },
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -648,6 +650,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
   const [rooms, setRooms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [lobbyError, setLobbyError] = useState(false);
+  const [gameMode, setGameMode] = useState<GameMode>('STANDARD');
 
   const addRoom  = (code: string) => setRooms(prev => prev.includes(code) ? prev : [...prev, code]);
   const dropRoom = (code: string) => setRooms(prev => prev.filter(c => c !== code));
@@ -719,19 +722,47 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
         </div>
       ) : (
         <div className="flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in">
+          {/* Mode Selector */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-200 dark:border-slate-700">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 text-center">{t.online_mode_label ?? 'GAME MODE'}</h3>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setGameMode('STANDARD')}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all active:scale-95 ${
+                  gameMode === 'STANDARD'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                ⚔️ {t.std_mode}
+              </button>
+              <button
+                onClick={() => setGameMode('FUN')}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all active:scale-95 ${
+                  gameMode === 'FUN'
+                    ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                🎉 {t.fun_mode}
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 text-center mt-2">{gameMode === 'FUN' ? t.fun_mode_desc : t.std_mode_desc}</p>
+          </div>
+
           {/* HOST / JOIN cards */}
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors">
               <h3 className="text-lg font-bold mb-2 text-blue-500 uppercase tracking-widest">{t.online_host}</h3>
               <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_host_desc}</p>
-              <button onClick={() => { audio.playClick(); onCreate(); }} className="w-full py-4 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-500/30 text-white transition-all active:scale-95">{t.online_create}</button>
+              <button onClick={() => { audio.playClick(); onCreate(gameMode); }} className="w-full py-4 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-blue-500/30 text-white transition-all active:scale-95">{t.online_create}</button>
             </div>
             <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-red-500 transition-colors">
               <h3 className="text-lg font-bold mb-2 text-red-500 uppercase tracking-widest">{t.online_join}</h3>
               <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_join_desc}</p>
               <div className="flex w-full gap-2">
                 <input value={joinId} onChange={(e) => setJoinId(e.target.value.toUpperCase().slice(0, 4))} placeholder="CODE" className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-red-500 rounded-xl px-4 text-center font-mono text-xl focus:outline-none uppercase text-slate-900 dark:text-white placeholder-slate-400 transition-colors" />
-                <button onClick={() => { audio.playClick(); onJoin(joinId); }} disabled={joinId.length !== 4} className="px-6 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-500/30 transition-all active:scale-95">{t.online_join_btn}</button>
+                <button onClick={() => { audio.playClick(); onJoin(joinId, gameMode); }} disabled={joinId.length !== 4} className="px-6 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold text-sm tracking-widest uppercase shadow-lg shadow-red-500/30 transition-all active:scale-95">{t.online_join_btn}</button>
               </div>
             </div>
           </div>
@@ -766,12 +797,12 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
                 {rooms.map(code => (
                   <div key={code} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700">
                     <span className="font-mono font-bold text-slate-700 dark:text-slate-200 tracking-widest">{code}</span>
-                    <button onClick={() => { audio.playClick(); onJoin(code); }} className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-lg transition-all active:scale-95">
+                    <button onClick={() => { audio.playClick(); onJoin(code, gameMode); }} className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-lg transition-all active:scale-95">
                       {t.lobby_join_room}
                     </button>
                   </div>
                 ))}
-                <button onClick={() => { audio.playClick(); onJoin(rooms[0]); }} className="mt-1 w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black text-sm tracking-widest uppercase rounded-xl shadow-lg shadow-yellow-400/30 transition-all active:scale-95">
+                <button onClick={() => { audio.playClick(); onJoin(rooms[0], gameMode); }} className="mt-1 w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black text-sm tracking-widest uppercase rounded-xl shadow-lg shadow-yellow-400/30 transition-all active:scale-95">
                   ⚡ {t.lobby_quick}
                 </button>
               </div>
@@ -813,9 +844,10 @@ const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic 
   </div>
 );
 
-const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame }: {
+const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame, onUseFunCard }: {
   player: PlayerState, isMe: boolean, opponent?: boolean, t: any,
-  onFreeze?: () => void, onDuel?: () => void, oppInGame?: boolean
+  onFreeze?: () => void, onDuel?: () => void, oppInGame?: boolean,
+  onUseFunCard?: (cardId: FunCardId) => void,
 }) => {
   const colorClass = player.id === 'P1' ? 'text-blue-500' : 'text-red-500';
   const borderClass = player.id === 'P1' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
@@ -877,9 +909,22 @@ const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame }:
             </button>
           )}
           {/* Fallback — only shown to self when all skills used */}
-          {isMe && player.stealsRemaining <= 0 && player.freezesRemaining <= 0 && player.duelsRemaining <= 0 && (
+          {isMe && player.stealsRemaining <= 0 && player.freezesRemaining <= 0 && player.duelsRemaining <= 0 && !player.funCardInHand && (
             <span className="text-xs text-slate-400 opacity-50">{t.game_no_steal}</span>
           )}
+          {/* Fun card in hand */}
+          {isMe && player.funCardInHand && onUseFunCard && (() => {
+            const card = FUN_CARDS.find(c => c.id === player.funCardInHand);
+            return card ? (
+              <button
+                onClick={() => onUseFunCard(player.funCardInHand!)}
+                title={t[card.descKey as keyof typeof t] as string ?? card.descKey}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 cursor-pointer active:scale-95 transition-all animate-pulse"
+              >
+                {card.icon} {t[card.nameKey as keyof typeof t] as string ?? card.nameKey}
+              </button>
+            ) : null;
+          })()}
         </div>
       </div>
     </div>
@@ -1324,6 +1369,7 @@ export default function App() {
   const lastPacketTime = useRef<number>(Date.now()); // Track last data from other peer
   const guestRateLimiter = useRef(new RateLimiter());
   const [, setTick] = useState(0);
+  const gameModeRef = useRef<GameMode>('STANDARD');
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
@@ -1823,6 +1869,29 @@ export default function App() {
             nextState.duelState = null; stateChanged = true;
           }
 
+          // Clear expired fun card effects
+          if (gameModeRef.current === 'FUN' && nextState.funCardEffects) {
+            const fe = nextState.funCardEffects;
+            if (
+              (fe.blindP1Until > 0 && now > fe.blindP1Until) ||
+              (fe.blindP2Until > 0 && now > fe.blindP2Until) ||
+              (fe.hardModeP1Until > 0 && now > fe.hardModeP1Until) ||
+              (fe.hardModeP2Until > 0 && now > fe.hardModeP2Until) ||
+              (fe.flipP1Until > 0 && now > fe.flipP1Until) ||
+              (fe.flipP2Until > 0 && now > fe.flipP2Until)
+            ) {
+              nextState.funCardEffects = {
+                blindP1Until:    fe.blindP1Until    > 0 && now > fe.blindP1Until    ? 0 : fe.blindP1Until,
+                blindP2Until:    fe.blindP2Until    > 0 && now > fe.blindP2Until    ? 0 : fe.blindP2Until,
+                hardModeP1Until: fe.hardModeP1Until > 0 && now > fe.hardModeP1Until ? 0 : fe.hardModeP1Until,
+                hardModeP2Until: fe.hardModeP2Until > 0 && now > fe.hardModeP2Until ? 0 : fe.hardModeP2Until,
+                flipP1Until:     fe.flipP1Until     > 0 && now > fe.flipP1Until     ? 0 : fe.flipP1Until,
+                flipP2Until:     fe.flipP2Until     > 0 && now > fe.flipP2Until     ? 0 : fe.flipP2Until,
+              };
+              stateChanged = true;
+            }
+          }
+
           if (stateChanged) {
               setGameState(nextState);
           }
@@ -1903,6 +1972,7 @@ export default function App() {
       winner: null,
       stealNotification: null,
       duelState: null,
+      funCardEffects: { blindP1Until: 0, blindP2Until: 0, hardModeP1Until: 0, hardModeP2Until: 0, flipP1Until: 0, flipP2Until: 0 },
     };
 
     // Apply 2-second input freeze to the RPS loser
@@ -2209,6 +2279,11 @@ export default function App() {
 
       if (winner) audio.playWin();
 
+      // In FUN mode, draw a random card for the capturing player (HOST only)
+      const drawnCard: FunCardId | null = (gameModeRef.current === 'FUN' && !winner)
+        ? FUN_CARDS[Math.floor(Math.random() * FUN_CARDS.length)].id
+        : prev[pKey].funCardInHand;
+
       return {
         ...prev,
         cells: newCells,
@@ -2218,7 +2293,8 @@ export default function App() {
             ...prev[pKey], 
             activeCell: null, 
             isDefending: false,
-            cellFailures: { ...prev[pKey].cellFailures, [cellIdx]: 0 } // Reset failures on success
+            cellFailures: { ...prev[pKey].cellFailures, [cellIdx]: 0 }, // Reset failures on success
+            funCardInHand: drawnCard,
         },
         [oppKey]: newOppState,
         stealNotification: prev.stealNotification?.cellId === cellIdx ? null : prev.stealNotification,
@@ -2283,8 +2359,89 @@ export default function App() {
     });
   };
 
-  const processDuelPickCell = (pid: PlayerId, cellIndex: number) => {
-    if (roleRef.current === 'SOLO') return;
+  const processUseFunCard = (pid: PlayerId, cardId: FunCardId) => {
+    if (gameModeRef.current !== 'FUN' || roleRef.current === 'SOLO') return;
+    setGameState(prev => {
+      const pKey  = pid === 'P1' ? 'p1' : 'p2';
+      const oppKey = pid === 'P1' ? 'p2' : 'p1';
+      if (prev[pKey].funCardInHand !== cardId) return prev; // Stale or already used
+
+      // Remove card from hand
+      let ns = { ...prev, [pKey]: { ...prev[pKey], funCardInHand: null as FunCardId | null } };
+      const now = Date.now();
+
+      switch (cardId) {
+        case 'EGG': {
+          // Blind the opponent's grid overview for 5 seconds
+          const key = oppKey === 'p1' ? 'blindP1Until' : 'blindP2Until';
+          ns = { ...ns, funCardEffects: { ...ns.funCardEffects, [key]: now + 5000 } };
+          break;
+        }
+        case 'SHUFFLE': {
+          // Randomize gameIds of all unowned cells
+          const unownedIdx = ns.cells.map((c, i) => c.owner === null ? i : -1).filter(i => i >= 0);
+          if (unownedIdx.length > 1) {
+            const shuffled = shuffleGames(unownedIdx.map(i => ns.cells[i].gameId));
+            const newCells = ns.cells.map((c, i) => {
+              const pos = unownedIdx.indexOf(i);
+              return pos >= 0 ? { ...c, gameId: shuffled[pos] } : c;
+            });
+            ns = { ...ns, cells: newCells };
+          }
+          break;
+        }
+        case 'ZAP': {
+          // Knock opponent out of their current cell instantly
+          const opp = prev[oppKey];
+          if (opp.activeCell !== null) {
+            const ci = opp.activeCell;
+            const newCells = ns.cells.map((c, i) =>
+              i === ci ? { ...c, activePlayers: c.activePlayers.filter(id => id !== prev[oppKey].id) } : c
+            );
+            ns = {
+              ...ns,
+              cells: newCells,
+              [oppKey]: { ...prev[oppKey], activeCell: null, isDefending: false, challengeStartTime: 0 },
+            };
+            if (ns.stealNotification?.challengerId === prev[oppKey].id || ns.stealNotification?.defenderId === prev[oppKey].id) {
+              ns = { ...ns, stealNotification: null };
+            }
+          }
+          break;
+        }
+        case 'HARD_MODE': {
+          // Force EXPERT difficulty on opponent for 15 seconds
+          const key = oppKey === 'p1' ? 'hardModeP1Until' : 'hardModeP2Until';
+          ns = { ...ns, funCardEffects: { ...ns.funCardEffects, [key]: now + 15000 } };
+          break;
+        }
+        case 'FLIP': {
+          // Flip opponent's screen upside-down for 5 seconds
+          const key = oppKey === 'p1' ? 'flipP1Until' : 'flipP2Until';
+          ns = { ...ns, funCardEffects: { ...ns.funCardEffects, [key]: now + 5000 } };
+          break;
+        }
+        case 'BOMB': {
+          // Reset a random opponent-owned cell to neutral
+          const oppCellIndices = ns.cells.map((c, i) => c.owner === prev[oppKey].id ? i : -1).filter(i => i >= 0);
+          if (oppCellIndices.length > 0) {
+            const target = oppCellIndices[Math.floor(Math.random() * oppCellIndices.length)];
+            const newCells = ns.cells.map((c, i) => i === target ? { ...c, owner: null, activePlayers: [] } : c);
+            if (prev[oppKey].activeCell === target) {
+              ns = { ...ns, [oppKey]: { ...prev[oppKey], activeCell: null, isDefending: false } };
+            }
+            ns = { ...ns, cells: newCells };
+          }
+          break;
+        }
+      }
+
+      audio.playTone(880, 'sine', 250);
+      return ns;
+    });
+  };
+
+  const processDuelPickCell = (pid: PlayerId, cellIndex: number) => {    if (roleRef.current === 'SOLO') return;
     setGameState(prev => {
       if (!prev.duelState || prev.duelState.phase !== 'PICKING') return prev;
       if (prev.duelState.initiatorId !== pid) return prev;
@@ -2321,6 +2478,7 @@ export default function App() {
       if (action.type === 'USE_SKILL' && action.skill === 'FREEZE') processUseFreeze('P1');
       if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P1');
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P1', action.cellIndex);
+      if (action.type === 'USE_FUN_CARD') processUseFunCard('P1', action.cardId);
     } else {
       if (matchPhaseRef.current !== 'PLAYING') return;
       if (connRef.current) {
@@ -2382,6 +2540,7 @@ export default function App() {
       phase: matchPhaseRef.current,
       revision: authorityRevisionRef.current,
       reason,
+      gameMode: gameModeRef.current,
     });
   };
 
@@ -2483,6 +2642,7 @@ export default function App() {
       if (action.type === 'USE_SKILL' && action.skill === 'FREEZE') processUseFreeze('P2');
       if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P2');
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P2', action.cellIndex);
+      if (action.type === 'USE_FUN_CARD') processUseFunCard('P2', action.cardId);
     }
     else if (msg.type === 'SKILL_PICK') {
       if (matchPhaseRef.current !== 'SKILL_PICK' || msg.phase !== 'SKILL_PICK') return;
@@ -2586,6 +2746,7 @@ export default function App() {
       setIsConnecting(false);
       setConnectionStatus('CONNECTED');
       setError(null);
+      gameModeRef.current = data.gameMode ?? 'STANDARD';
       setMatchPhaseAndUi(data.phase);
       persistGuestResumeSession(data.phase, data.revision);
       return;
@@ -2813,7 +2974,8 @@ export default function App() {
     setIsLobbyPublic(false);
   };
 
-  const setupHost = () => {
+  const setupHost = (gameMode: GameMode = 'STANDARD') => {
+    gameModeRef.current = gameMode;
     manualDisconnectRef.current = false;
     clearGuestResumeSession();
     clearHostResumeSession();
@@ -2822,8 +2984,9 @@ export default function App() {
     connectHostTransport(code, false);
   };
 
-  const joinGame = (code: string) => {
+  const joinGame = (code: string, gameMode: GameMode = 'STANDARD') => {
     if (!isValidRoomCode(code)) { setError('Invalid room code'); return; }
+    gameModeRef.current = gameMode; // Will be confirmed/overridden by HOST SESSION_SYNC
     manualDisconnectRef.current = false;
     clearHostResumeSession();
     resetOnlineProtocolState();
@@ -2886,7 +3049,6 @@ export default function App() {
   if (appMode === 'LOBBY') {
     return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} isConnecting={isConnecting} error={error} t={t} />;
   }
-
   if (appMode === 'SKILL_PICK') {
     const handleSkillConfirm = (picks: string[]) => {
       setMySkillPicks(picks);
@@ -2944,6 +3106,14 @@ export default function App() {
   const opponent = myId === 'P1' ? gameState.p2 : gameState.p1;
   const isSolo = roleRef.current === 'SOLO';
   const myActiveCellIdx = me.activeCell;
+
+  // Fun mode effect checks (evaluated at render time using tick-driven re-renders)
+  const isFunMode = gameModeRef.current === 'FUN';
+  const funEffects = gameState.funCardEffects ?? { blindP1Until: 0, blindP2Until: 0, hardModeP1Until: 0, hardModeP2Until: 0, flipP1Until: 0, flipP2Until: 0 };
+  const funNow = Date.now();
+  const isBlinded  = isFunMode && (myId === 'P1' ? funEffects.blindP1Until  > funNow : funEffects.blindP2Until  > funNow);
+  const isFlipped  = isFunMode && (myId === 'P1' ? funEffects.flipP1Until   > funNow : funEffects.flipP2Until   > funNow);
+  const isHardMode = isFunMode && (myId === 'P1' ? funEffects.hardModeP1Until > funNow : funEffects.hardModeP2Until > funNow);
   
   // Logic distinction: 
   // In Online, we play if activeCell is set.
@@ -3104,6 +3274,7 @@ export default function App() {
            onFreeze={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'FREEZE' }); }}
            onDuel={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'DUEL' }); }}
            oppInGame={opponent.activeCell !== null}
+           onUseFunCard={isFunMode && !isSolo ? (cardId) => { audio.playClick(); sendAction({ type: 'USE_FUN_CARD', cardId }); } : undefined}
          />
          <div className="flex flex-col items-center">
             {isSolo ? (
@@ -3117,6 +3288,7 @@ export default function App() {
                 <div className="flex items-center gap-2 mt-4 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
                         <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : connectionStatus === 'RECONNECTING' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
                         <div className="text-[10px] text-slate-400 font-mono">ROOM: {roomId}</div>
+                        {isFunMode && <div className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">{t.fun_mode_badge ?? '🎉 FUN'}</div>}
                     </div>
                 <NetworkQualityPanel
                   t={t}
@@ -3148,7 +3320,7 @@ export default function App() {
       </div>
 
       {/* Game Grid or Solo View */}
-      <div className="flex-1 flex items-center justify-center p-4 relative">
+      <div className="flex-1 flex items-center justify-center p-4 relative" style={isFlipped ? { transform: 'rotate(180deg)', transition: 'transform 0.3s' } : undefined}>
          <button onClick={() => { audio.playClick(); setShowRules(true); }} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white font-bold transition-all z-20">?</button>
 
          {isPlayingMiniGame && miniGameId ? (
@@ -3185,7 +3357,7 @@ export default function App() {
                        onComplete={(success) => sendAction({ type: 'COMPLETE_GAME', success })} 
                        onInteraction={() => sendAction({ type: 'INTERACTION' })}
                        language={settings.language} 
-                       difficulty={isSolo ? soloDifficultyRef.current : "HARD"}
+                       difficulty={isSolo ? soloDifficultyRef.current : (isHardMode ? 'EXPERT' : 'HARD')}
                        frozen={me.frozenUntil > Date.now()}
                      />
                   </div>
@@ -3194,7 +3366,17 @@ export default function App() {
          ) : (
             // This grid view only renders for ONLINE mode when no minigame is active
             !isSolo && (
-            <div className="grid grid-cols-3 gap-4 w-full max-w-md aspect-square z-10">
+            <div className="relative w-full max-w-md">
+              {/* Blind overlay — hides the grid from the affected player */}
+              {isBlinded && (
+                <div className="absolute inset-0 z-30 bg-slate-900/95 backdrop-blur-md flex items-center justify-center rounded-2xl">
+                  <div className="text-center select-none">
+                    <div className="text-6xl mb-3">🌑</div>
+                    <p className="text-white font-black text-xl uppercase tracking-widest">{t.fun_blinded ?? 'BLINDED!'}</p>
+                  </div>
+                </div>
+              )}
+            <div className="grid grid-cols-3 gap-4 w-full aspect-square z-10">
                {gameState.cells.map((cell) => {
                   const isOwnedByMe = cell.owner === myId;
                   const isOwnedByOpp = cell.owner && cell.owner !== myId;
@@ -3280,6 +3462,7 @@ export default function App() {
                      </div>
                   );
                })}
+            </div>
             </div>
             )
          )}

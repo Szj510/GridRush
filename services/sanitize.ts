@@ -6,7 +6,7 @@
  * and must be validated before use.
  */
 
-import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord, RpsMove, MatchPhase, GuestResumeSession, HostResumeSession } from '../types';
+import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord, RpsMove, MatchPhase, GuestResumeSession, HostResumeSession, GameMode, FunCardId } from '../types';
 
 // ─── Allow-lists ─────────────────────────────────────────────────────────────
 
@@ -14,8 +14,9 @@ const VALID_MSG_TYPES    = new Set(['JOIN_REQUEST', 'SESSION_SYNC', 'PING', 'PON
 const VALID_RPS_MOVES    = new Set(['R', 'P', 'S']);
 const VALID_MATCH_PHASES = new Set(['WAITING', 'SKILL_PICK', 'RPS', 'PLAYING', 'RESULT']);
 const VALID_SESSION_SYNC_REASONS = new Set(['OK', 'ROOM_BUSY', 'SESSION_EXPIRED']);
-const VALID_ACTION_TYPES = new Set(['CLICK_CELL', 'ABANDON_CHALLENGE', 'DEFEND', 'INTERACTION', 'COMPLETE_GAME', 'USE_SKILL', 'DUEL_PICK_CELL']);
+const VALID_ACTION_TYPES = new Set(['CLICK_CELL', 'ABANDON_CHALLENGE', 'DEFEND', 'INTERACTION', 'COMPLETE_GAME', 'USE_SKILL', 'DUEL_PICK_CELL', 'USE_FUN_CARD']);
 const VALID_SKILLS       = new Set(['STEAL', 'FREEZE', 'DUEL']);
+const VALID_FUN_CARD_IDS = new Set(['EGG', 'SHUFFLE', 'ZAP', 'HARD_MODE', 'FLIP', 'BOMB']);
 const VALID_LANGUAGES    = new Set(['en', 'zh']);
 const VALID_THEMES       = new Set(['light', 'dark']);
 const VALID_STATUSES     = new Set(['IDLE', 'PLAYING', 'FINISHED']);
@@ -58,6 +59,10 @@ function sanitizeAction(raw: Record<string, unknown>): GameAction | null {
     case 'DUEL_PICK_CELL':
       return { type: 'DUEL_PICK_CELL', cellIndex: clampInt(raw.cellIndex, 0, MAX_CELLS - 1, 0) };
 
+    case 'USE_FUN_CARD':
+      if (!isStr(raw.cardId) || !VALID_FUN_CARD_IDS.has(raw.cardId)) return null;
+      return { type: 'USE_FUN_CARD', cardId: raw.cardId as FunCardId };
+
     default: return null;
   }
 }
@@ -89,6 +94,7 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
       const guestSessionId = m.guestSessionId === null
         ? null
         : (isStr(m.guestSessionId) && m.guestSessionId.length <= 128 ? m.guestSessionId : null);
+      const gameMode: GameMode = m.gameMode === 'FUN' ? 'FUN' : 'STANDARD';
       return {
         type: 'SESSION_SYNC',
         accepted: m.accepted,
@@ -96,6 +102,7 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
         phase: m.phase,
         revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0),
         reason: m.reason as 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED',
+        gameMode,
       };
     }
 

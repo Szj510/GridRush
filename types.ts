@@ -59,6 +59,9 @@ export interface PlayerState {
   freezesRemaining: number; // Uses of the Freeze skill remaining this game
   frozenUntil: number;      // Timestamp: player cannot interact until this time
   duelsRemaining: number;   // Uses of the Duel skill remaining this game
+
+  // --- Fun Mode ---
+  funCardInHand: FunCardId | null; // Card currently held (null in standard mode)
 }
 
 export interface StealNotification {
@@ -76,6 +79,15 @@ export interface DuelState {
   pickDeadline: number;        // Timestamp by which initiator must pick a cell
 }
 
+export interface FunCardEffects {
+  blindP1Until: number;    // Timestamp: P1 grid is blinded until
+  blindP2Until: number;    // Timestamp: P2 grid is blinded until
+  hardModeP1Until: number; // Timestamp: P1 forced EXPERT difficulty until
+  hardModeP2Until: number; // Timestamp: P2 forced EXPERT difficulty until
+  flipP1Until: number;     // Timestamp: P1 screen is flipped until
+  flipP2Until: number;     // Timestamp: P2 screen is flipped until
+}
+
 export interface GameState {
   status: 'IDLE' | 'PLAYING' | 'FINISHED';
   cells: CellData[];
@@ -84,6 +96,7 @@ export interface GameState {
   winner: PlayerId | 'DRAW' | null;
   stealNotification: StealNotification | null;
   duelState: DuelState | null;
+  funCardEffects: FunCardEffects;
 }
 
 export type Language = 'en' | 'zh';
@@ -119,6 +132,17 @@ export interface UserStats {
   soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }
 
+export type GameMode = 'STANDARD' | 'FUN';
+
+export type FunCardId = 'EGG' | 'SHUFFLE' | 'ZAP' | 'HARD_MODE' | 'FLIP' | 'BOMB';
+
+export interface FunCard {
+  id: FunCardId;
+  icon: string;
+  nameKey: string;
+  descKey: string;
+}
+
 export type MatchPhase = 'WAITING' | 'SKILL_PICK' | 'RPS' | 'PLAYING' | 'RESULT';
 export type RpsMove = 'R' | 'P' | 'S';
 
@@ -149,7 +173,7 @@ export interface HostResumeSession {
 
 export type NetworkMessage = 
   | { type: 'JOIN_REQUEST'; guestSessionId: string | null; lastRevision: number }
-  | { type: 'SESSION_SYNC'; accepted: boolean; guestSessionId: string | null; phase: MatchPhase; revision: number; reason: 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED' }
+  | { type: 'SESSION_SYNC'; accepted: boolean; guestSessionId: string | null; phase: MatchPhase; revision: number; reason: 'OK' | 'ROOM_BUSY' | 'SESSION_EXPIRED'; gameMode: GameMode }
   | { type: 'PING'; pingId: string; sentAt: number }
   | { type: 'PONG'; pingId: string; sentAt: number }
   | { type: 'STATE_UPDATE'; state: GameState; phase: MatchPhase; revision: number; serverTime?: number }
@@ -169,4 +193,5 @@ export type GameAction =
   | { type: 'INTERACTION' }
   | { type: 'COMPLETE_GAME'; success: boolean }
   | { type: 'USE_SKILL'; skill: 'FREEZE' | 'DUEL' }
-  | { type: 'DUEL_PICK_CELL'; cellIndex: number };
+  | { type: 'DUEL_PICK_CELL'; cellIndex: number }
+  | { type: 'USE_FUN_CARD'; cardId: FunCardId };
