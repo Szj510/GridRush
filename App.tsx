@@ -1382,9 +1382,14 @@ export default function App() {
   const HOST_RESUME_MAX_AGE_MS = 15 * 60 * 1000;
 
   const setMatchPhaseLocal = (phase: MatchPhase) => {
+    const phaseChanged = matchPhaseRef.current !== phase;
     matchPhaseRef.current = phase;
     setMatchPhase(phase);
-    setNetworkQuality(prev => ({ ...prev, phase }));
+    setNetworkQuality(prev => ({
+      ...prev,
+      phase,
+      revision: phaseChanged ? prev.revision + 1 : prev.revision,
+    }));
   };
 
   const setMatchPhaseAndUi = (phase: MatchPhase) => {
@@ -1397,7 +1402,6 @@ export default function App() {
 
   const nextAuthorityRevision = () => {
     authorityRevisionRef.current += 1;
-    setNetworkQuality(prev => ({ ...prev, revision: authorityRevisionRef.current }));
     return authorityRevisionRef.current;
   };
 
@@ -1559,7 +1563,6 @@ export default function App() {
   const noteRemoteRevision = (revision: number) => {
     lastAppliedAuthorityRevisionRef.current = revision;
     authorityRevisionRef.current = Math.max(authorityRevisionRef.current, revision);
-    setNetworkQuality(prev => ({ ...prev, revision }));
   };
 
   const shouldApplyAuthoritativeMessage = (revision: number) => revision > lastAppliedAuthorityRevisionRef.current;
@@ -1666,7 +1669,6 @@ export default function App() {
       guestSessionIdRef.current = saved.guestSessionId;
       lastAppliedAuthorityRevisionRef.current = saved.lastRevision;
       authorityRevisionRef.current = saved.lastRevision;
-      setNetworkQuality(prev => ({ ...prev, revision: saved.lastRevision }));
       setConnectionStatus('RECONNECTING');
       setMatchPhaseAndUi(saved.phase);
       connectGuestTransport(saved.roomId, true);
@@ -2809,7 +2811,6 @@ export default function App() {
       }
       guestSessionIdRef.current = data.guestSessionId;
       authorityRevisionRef.current = Math.max(authorityRevisionRef.current, data.revision);
-      setNetworkQuality(prev => ({ ...prev, revision: data.revision }));
       reconnectAttemptRef.current = 0;
       setReconnectAttempt(0);
       clearReconnectTimer();
@@ -3418,6 +3419,14 @@ export default function App() {
       <div className="flex-1 flex items-center justify-center p-4 relative" style={isFlipped ? { transform: 'rotate(180deg)', transition: 'transform 0.3s' } : undefined}>
          <button onClick={() => { audio.playClick(); setShowRules(true); }} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white font-bold transition-all z-20">?</button>
 
+         {/* Blind overlay — affects the whole current gameplay view but keeps interactions enabled */}
+         {isBlinded && (
+           <div
+             className="absolute inset-0 z-40 pointer-events-none"
+             style={{ backdropFilter: 'blur(8px) brightness(0.55)', background: 'rgba(10,10,30,0.38)' }}
+           />
+         )}
+
          {isPlayingMiniGame && miniGameId ? (
             <div className="w-full max-w-lg aspect-square md:aspect-auto md:h-[600px] flex flex-col z-10">
                <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-2xl relative flex flex-col items-center justify-center flex-1 animate-in zoom-in duration-300 border border-slate-200 dark:border-slate-800">
@@ -3462,11 +3471,6 @@ export default function App() {
             // This grid view only renders for ONLINE mode when no minigame is active
             !isSolo && (
             <div className="relative w-full max-w-md">
-              {/* Blind overlay — hides the grid from the affected player */}
-              {isBlinded && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center rounded-2xl overflow-hidden" style={{ backdropFilter: 'blur(8px) brightness(0.55)', background: 'rgba(10,10,30,0.38)' }}>
-                </div>
-              )}
             <div className="grid grid-cols-3 gap-4 w-full aspect-square z-10">
                {gameState.cells.map((cell) => {
                   const isOwnedByMe = cell.owner === myId;
