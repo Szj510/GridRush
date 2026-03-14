@@ -179,7 +179,8 @@ export type NetworkMessage =
   | { type: 'STATE_UPDATE'; state: GameState; phase: MatchPhase; revision: number; serverTime?: number }
   | { type: 'ACTION'; action: GameAction; actionId: string; seq: number; phase: 'PLAYING' }
   | { type: 'HEARTBEAT'; id: PlayerId; timestamp: number }
-  | { type: 'RESTART' }
+  | { type: 'RESTART_REQUEST' }
+  | { type: 'RESTART_RESPONSE'; accepted: boolean }
   | { type: 'SKILL_PICK_PHASE'; revision: number }                // HOST → GUEST: enter skill pick screen
   | { type: 'SKILL_PICK'; skills: string[]; phase: 'SKILL_PICK' } // GUEST → HOST: submit chosen skill ids
   | { type: 'RPS_PHASE'; revision: number }                       // HOST → GUEST: enter RPS screen

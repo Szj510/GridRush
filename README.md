@@ -15,6 +15,7 @@
   - ⭐ **Steal** — Challenge an opponent's cell; they have 5 seconds to defend or lose it.
   - ❄️ **Freeze** — Lock the opponent's input for 2 seconds.
   - ⚔️ **Duel** — Force both players into a simultaneous race on an empty cell you choose.
+- **Fun Mode Cards** — Capture cells to draw chaos cards (10 total): Blackout, Shuffle, Zap, Nightmare, Flip, Bomb, Reroll, Leech, Ice, Swap.
 - **Achievements** — LocalStorage-based achievement tracking across sessions.
 - **Dual Language** — Full English and Chinese (Simplified) UI support.
 - **Dark Mode** — System-aware light/dark theme with manual override.

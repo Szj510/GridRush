@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove, GameMode, FunCardId } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
-import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeGuestResumeSession, sanitizeHostResumeSession, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
+import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
 import { audio } from './services/audio';
 
@@ -943,6 +943,7 @@ const SKILL_DEFS = [
 
 type RpsResult = 'WIN' | 'LOSE' | 'DRAW';
 type RpsSeriesWinner = 'ME' | 'OPP' | 'DRAW';
+type RematchUiStatus = 'NONE' | 'REQUEST_SENT' | 'WAIT_HOST' | 'DECLINED';
 
 interface RpsDisplayState {
   round: number;
@@ -1332,6 +1333,8 @@ export default function App() {
     round: 1, myScore: 0, oppScore: 0,
     myMove: null, oppMove: null, roundResult: null, seriesWinner: null,
   });
+  const [rematchInviteFrom, setRematchInviteFrom] = useState<PlayerId | null>(null);
+  const [rematchStatus, setRematchStatus] = useState<RematchUiStatus>('NONE');
 
   // Public lobby beacon (gridrush-pub-XXXX signals the room is open)
   const [isLobbyPublic, setIsLobbyPublic] = useState(false);
@@ -1377,9 +1380,7 @@ export default function App() {
   const MAX_GUEST_RECONNECT_ATTEMPTS = 6;
   const MAX_HOST_RECONNECT_ATTEMPTS = 8;
   const GUEST_RESUME_STORAGE_KEY = 'gridrush_guest_resume';
-  const GUEST_RESUME_MAX_AGE_MS = 15 * 60 * 1000;
   const HOST_RESUME_STORAGE_KEY = 'gridrush_host_resume';
-  const HOST_RESUME_MAX_AGE_MS = 15 * 60 * 1000;
 
   const setMatchPhaseLocal = (phase: MatchPhase) => {
     const phaseChanged = matchPhaseRef.current !== phase;
@@ -1622,59 +1623,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      const rawHost = localStorage.getItem(HOST_RESUME_STORAGE_KEY);
-      if (rawHost) {
-        const hostSaved = sanitizeHostResumeSession(JSON.parse(rawHost));
-        if (hostSaved && Date.now() - hostSaved.savedAt <= HOST_RESUME_MAX_AGE_MS) {
-          manualDisconnectRef.current = false;
-          clearGuestResumeSession();
-          roleRef.current = 'HOST';
-          setMyId('P1');
-          guestSessionIdRef.current = hostSaved.guestSessionId;
-          p2SkillPicksRef.current = hostSaved.p2SkillPicks;
-          setMySkillPicks(hostSaved.mySkillPicks);
-          mySkillPicksRef.current = hostSaved.mySkillPicks;
-          rpsRoundRef.current = hostSaved.rpsState.round;
-          rpsScoresRef.current = hostSaved.rpsState.scores;
-          rpsMyPickRef.current = hostSaved.rpsState.myMove;
-          rpsP2PickRef.current = hostSaved.rpsState.p2Move;
-          setRpsState(prev => ({
-            ...prev,
-            round: hostSaved.rpsState.round,
-            myScore: hostSaved.rpsState.scores.P1,
-            oppScore: hostSaved.rpsState.scores.P2,
-            myMove: hostSaved.rpsState.myMove,
-            oppMove: hostSaved.rpsState.p2Move,
-          }));
-
-          setGameState(hostSaved.gameState);
-          setConnectionStatus('RECONNECTING');
-          setMatchPhaseAndUi(hostSaved.phase);
-          noteRemoteRevision(hostSaved.revision);
-          connectHostTransport(hostSaved.roomId, true);
-          return;
-        }
-        clearHostResumeSession();
-      }
-
-      const raw = localStorage.getItem(GUEST_RESUME_STORAGE_KEY);
-      if (!raw) return;
-      const saved = sanitizeGuestResumeSession(JSON.parse(raw));
-      if (!saved || Date.now() - saved.savedAt > GUEST_RESUME_MAX_AGE_MS) {
-        clearGuestResumeSession();
-        return;
-      }
-
-      guestSessionIdRef.current = saved.guestSessionId;
-      lastAppliedAuthorityRevisionRef.current = saved.lastRevision;
-      authorityRevisionRef.current = saved.lastRevision;
-      setConnectionStatus('RECONNECTING');
-      setMatchPhaseAndUi(saved.phase);
-      connectGuestTransport(saved.roomId, true);
-    } catch {
-      clearGuestResumeSession();
-    }
+    // Product decision: cold start should always return to menu instead of auto-restoring sessions.
+    clearHostResumeSession();
+    clearGuestResumeSession();
   }, []);
 
   useEffect(() => () => {
@@ -1940,10 +1891,19 @@ export default function App() {
     }
   }, [gameState.winner]);
 
+  useEffect(() => {
+    if (!gameState.winner) {
+      setRematchInviteFrom(null);
+      setRematchStatus('NONE');
+    }
+  }, [gameState.winner]);
+
   // --- Game Logic ---
 
   const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }, soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT', headstartLoser?: 'P1' | 'P2' | null) => {
     audio.playClick();
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
     let gameIds: string[];
     let numCells = 9;
 
@@ -2725,19 +2685,21 @@ export default function App() {
         resolveRpsRound(rpsMyPickRef.current, msg.move);
       }
     }
-    else if (msg.type === 'RESTART') {
+    else if (msg.type === 'RESTART_REQUEST') {
       if (matchPhaseRef.current !== 'RESULT') return;
-      if (!rl.allow('restart', 2, 10000)) return;
-      p2SkillPicksRef.current = null;
-      rpsP2PickRef.current = null;
-      rpsMyPickRef.current = null;
-      rpsScoresRef.current = { P1: 0, P2: 0 };
-      rpsRoundRef.current = 1;
-      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
-      setMySkillPicks([]);
-      mySkillPicksRef.current = [];
-      setGameState(DEFAULT_GAME_STATE);
-      sendAuthoritativePhase('SKILL_PICK');
+      if (!rl.allow('restart_request', 2, 10000)) return;
+      setRematchInviteFrom('P2');
+      setRematchStatus('NONE');
+    }
+    else if (msg.type === 'RESTART_RESPONSE') {
+      if (matchPhaseRef.current !== 'RESULT') return;
+      if (!rl.allow('restart_response', 4, 10000)) return;
+      setRematchInviteFrom(null);
+      if (msg.accepted) {
+        startHostRematch();
+      } else {
+        setRematchStatus('DECLINED');
+      }
     }
   };
 
@@ -2755,6 +2717,8 @@ export default function App() {
       clearGuestResumeSession();
       setConnectionStatus('DISCONNECTED');
       setError('Reconnect failed');
+      setMatchPhaseLocal('WAITING');
+      setAppMode('LOBBY');
       return;
     }
 
@@ -2772,8 +2736,11 @@ export default function App() {
     if (manualDisconnectRef.current || roleRef.current !== 'HOST') return;
     if (hostReconnectTimerRef.current !== null) return;
     if (hostReconnectAttemptRef.current >= MAX_HOST_RECONNECT_ATTEMPTS) {
+      clearHostResumeSession();
       setConnectionStatus('DISCONNECTED');
       setError('Conn Error');
+      setMatchPhaseLocal('WAITING');
+      setAppMode('LOBBY');
       return;
     }
 
@@ -2807,6 +2774,8 @@ export default function App() {
         setIsConnecting(false);
         setConnectionStatus('DISCONNECTED');
         setError(data.reason === 'ROOM_BUSY' ? 'Room busy' : 'Session expired');
+        setMatchPhaseLocal('WAITING');
+        setAppMode('LOBBY');
         return;
       }
       guestSessionIdRef.current = data.guestSessionId;
@@ -2828,6 +2797,9 @@ export default function App() {
         const previousPhase = matchPhaseRef.current;
         noteRemoteRevision(data.revision);
         setGameState(data.state);
+        if (data.phase === 'SKILL_PICK' && previousPhase !== 'SKILL_PICK') {
+          resetLocalRoundStateForSkillPick();
+        }
         setMatchPhaseAndUi(data.phase);
         setConnectionStatus('CONNECTED');
         if (data.phase !== previousPhase) persistGuestResumeSession(data.phase, data.revision);
@@ -2839,6 +2811,7 @@ export default function App() {
     else if (data.type === 'SKILL_PICK_PHASE') {
       if (!shouldApplyAuthoritativeMessage(data.revision)) return;
       noteRemoteRevision(data.revision);
+      resetLocalRoundStateForSkillPick();
       setConnectionStatus('CONNECTED');
       setMatchPhaseAndUi('SKILL_PICK');
       persistGuestResumeSession('SKILL_PICK', data.revision);
@@ -2878,6 +2851,20 @@ export default function App() {
           rpsMyPickRef.current = null;
           setRpsState(prev => ({ ...prev, round: data.round + 1, myMove: null, oppMove: null, roundResult: null }));
         }, 1800);
+      }
+    }
+    else if (data.type === 'RESTART_REQUEST') {
+      if (matchPhaseRef.current !== 'RESULT') return;
+      setRematchInviteFrom('P1');
+      setRematchStatus('NONE');
+    }
+    else if (data.type === 'RESTART_RESPONSE') {
+      if (matchPhaseRef.current !== 'RESULT') return;
+      setRematchInviteFrom(null);
+      if (data.accepted) {
+        setRematchStatus('WAIT_HOST');
+      } else {
+        setRematchStatus('DECLINED');
       }
     }
   };
@@ -3051,6 +3038,8 @@ export default function App() {
     clearGuestResumeSession();
     clearHostResumeSession();
     resetOnlineProtocolState();
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
     const code = Math.floor(Math.random() * 9000 + 1000).toString();
     connectHostTransport(code, false);
   };
@@ -3061,7 +3050,54 @@ export default function App() {
     manualDisconnectRef.current = false;
     clearHostResumeSession();
     resetOnlineProtocolState();
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
     connectGuestTransport(code, false);
+  };
+
+  const resetRematchUiState = () => {
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
+  };
+
+  const resetLocalRoundStateForSkillPick = () => {
+    setMySkillPicks([]);
+    mySkillPicksRef.current = [];
+    rpsMyPickRef.current = null;
+    rpsP2PickRef.current = null;
+    rpsScoresRef.current = { P1: 0, P2: 0 };
+    rpsRoundRef.current = 1;
+    setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
+  };
+
+  const startHostRematch = () => {
+    p2SkillPicksRef.current = null;
+    resetLocalRoundStateForSkillPick();
+    resetRematchUiState();
+    setGameState(DEFAULT_GAME_STATE);
+    sendAuthoritativePhase('SKILL_PICK');
+  };
+
+  const respondRematchInvite = (accepted: boolean) => {
+    if (roleRef.current === 'SOLO' || !rematchInviteFrom) return;
+    if (!connRef.current?.open) return;
+
+    connRef.current.send({ type: 'RESTART_RESPONSE', accepted });
+    setRematchInviteFrom(null);
+
+    if (!accepted) {
+      setRematchStatus('NONE');
+      return;
+    }
+
+    if (roleRef.current === 'HOST') {
+      startHostRematch();
+    } else {
+      resetLocalRoundStateForSkillPick();
+      setRematchStatus('WAIT_HOST');
+    }
   };
 
   const handleRematch = () => {
@@ -3070,20 +3106,12 @@ export default function App() {
       startNewGame('SOLO', undefined, soloDifficultyRef.current);
       return;
     }
-    if (roleRef.current === 'HOST') {
-      p2SkillPicksRef.current = null;
-      rpsP2PickRef.current = null;
-      rpsMyPickRef.current = null;
-      rpsScoresRef.current = { P1: 0, P2: 0 };
-      rpsRoundRef.current = 1;
-      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
-      setMySkillPicks([]);
-      mySkillPicksRef.current = [];
-      setGameState(DEFAULT_GAME_STATE);
-      sendAuthoritativePhase('SKILL_PICK');
-    } else if (roleRef.current === 'GUEST') {
-      connRef.current?.send({ type: 'RESTART' });
-    }
+    if (matchPhaseRef.current !== 'RESULT') return;
+    if (!connRef.current?.open || rematchStatus === 'REQUEST_SENT') return;
+
+    resetRematchUiState();
+    setRematchStatus('REQUEST_SENT');
+    connRef.current.send({ type: 'RESTART_REQUEST' });
   };
 
   const resetGame = () => {
@@ -3101,6 +3129,7 @@ export default function App() {
     setConnectionStatus('CONNECTED');
     roleRef.current = 'NONE';
     setError(null);
+    resetRematchUiState();
     setAppMode('MENU');
     audio.playClick();
   };
@@ -3271,6 +3300,29 @@ export default function App() {
               <button onClick={handleRematch} className="px-8 py-3 bg-yellow-400 text-black hover:bg-yellow-300 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.game_rematch}</button>
               <button onClick={resetGame} className="px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.conn_exit_menu}</button>
             </div>
+            {!isSolo && (
+              <div className="mt-4 flex flex-col items-center gap-3">
+                {rematchStatus === 'REQUEST_SENT' && (
+                  <p className="text-sm font-bold uppercase tracking-widest text-yellow-300">{t.game_rematch_request_sent ?? 'REQUEST SENT...'}</p>
+                )}
+                {rematchStatus === 'WAIT_HOST' && (
+                  <p className="text-sm font-bold uppercase tracking-widest text-cyan-300">{t.game_rematch_wait_host ?? 'WAITING FOR HOST...'}</p>
+                )}
+                {rematchStatus === 'DECLINED' && (
+                  <p className="text-sm font-bold uppercase tracking-widest text-rose-300">{t.game_rematch_declined ?? 'REMATCH DECLINED'}</p>
+                )}
+
+                {rematchInviteFrom && (
+                  <div className="rounded-2xl border border-white/25 bg-black/40 px-5 py-4 shadow-xl">
+                    <p className="text-sm font-bold uppercase tracking-widest text-white mb-3">{t.game_rematch_invite ?? 'OPPONENT INVITED A REMATCH'}</p>
+                    <div className="flex items-center justify-center gap-3">
+                      <button onClick={() => respondRematchInvite(true)} className="px-5 py-2 rounded-full bg-green-400 text-slate-900 hover:bg-green-300 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_accept ?? 'ACCEPT'}</button>
+                      <button onClick={() => respondRematchInvite(false)} className="px-5 py-2 rounded-full bg-rose-500 text-white hover:bg-rose-400 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_decline ?? 'DECLINE'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
