@@ -134,7 +134,7 @@ export interface UserStats {
 
 export type GameMode = 'STANDARD' | 'FUN';
 
-export type FunCardId = 'EGG' | 'SHUFFLE' | 'ZAP' | 'HARD_MODE' | 'FLIP' | 'BOMB';
+export type FunCardId = 'EGG' | 'SHUFFLE' | 'ZAP' | 'HARD_MODE' | 'FLIP' | 'BOMB' | 'REROLL' | 'LEECH' | 'ICE' | 'SWAP';
 
 export interface FunCard {
   id: FunCardId;

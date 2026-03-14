@@ -195,6 +195,10 @@ export const FUN_CARDS: FunCard[] = [
   { id: 'HARD_MODE' as FunCardId, icon: '🔥', nameKey: 'fun_hard_mode', descKey: 'fun_hard_mode_desc' },
   { id: 'FLIP'      as FunCardId, icon: '🙃', nameKey: 'fun_flip',      descKey: 'fun_flip_desc' },
   { id: 'BOMB'      as FunCardId, icon: '💣', nameKey: 'fun_bomb',      descKey: 'fun_bomb_desc' },
+  { id: 'REROLL'    as FunCardId, icon: '🎲', nameKey: 'fun_reroll',    descKey: 'fun_reroll_desc' },
+  { id: 'LEECH'     as FunCardId, icon: '🧲', nameKey: 'fun_leech',     descKey: 'fun_leech_desc' },
+  { id: 'ICE'       as FunCardId, icon: '❄️', nameKey: 'fun_ice',       descKey: 'fun_ice_desc' },
+  { id: 'SWAP'      as FunCardId, icon: '🔄', nameKey: 'fun_swap',      descKey: 'fun_swap_desc' },
 ];
 
 export const TRANSLATIONS = {
@@ -240,6 +244,7 @@ export const TRANSLATIONS = {
     game_ready: "Steal Ready",
     game_no_steal: "No Steals",
     game_playing: "PLAYING CELL",
+    game_rematch: "PLAY AGAIN",
     
     msg_win: "YOU WIN!",
     msg_lose: "OPPONENT WINS!",
@@ -385,6 +390,14 @@ export const TRANSLATIONS = {
     fun_flip_desc: "Flip opponent's screen upside-down for 5s",
     fun_bomb: "Bomb",
     fun_bomb_desc: "Reset a random opponent-owned cell to neutral",
+    fun_reroll: "Reroll",
+    fun_reroll_desc: "Change opponent's active cell to a random different mini-game",
+    fun_leech: "Leech",
+    fun_leech_desc: "Instantly claim one random unclaimed cell",
+    fun_ice: "Ice",
+    fun_ice_desc: "Freeze opponent for 3.5 seconds",
+    fun_swap: "Swap",
+    fun_swap_desc: "Swap one of your cells with one of the opponent's",
   },
   zh: {
     menu_online: "在线对战",
@@ -428,6 +441,7 @@ export const TRANSLATIONS = {
     game_ready: "技能就绪",
     game_no_steal: "技能耗尽",
     game_playing: "正在攻克",
+    game_rematch: "再来一局",
 
     msg_win: "你赢了！",
     msg_lose: "对手获胜！",
@@ -573,6 +587,14 @@ export const TRANSLATIONS = {
     fun_flip_desc: "让对手的画面翻转5秒",
     fun_bomb: "炸弹",
     fun_bomb_desc: "把对手随机一格夺回成无主格子",
+    fun_reroll: "换牌",
+    fun_reroll_desc: "把对手当前正在挑战的格子换成随机另一个小游戏",
+    fun_leech: "吸附",
+    fun_leech_desc: "直接占领一个随机无主格子",
+    fun_ice: "冰冻",
+    fun_ice_desc: "冻结对手操作3.5秒",
+    fun_swap: "置换",
+    fun_swap_desc: "将你的一格与对手的一格互换归属",
   }
 };
 

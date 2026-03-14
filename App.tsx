@@ -1370,6 +1370,7 @@ export default function App() {
   const guestRateLimiter = useRef(new RateLimiter());
   const [, setTick] = useState(0);
   const gameModeRef = useRef<GameMode>('STANDARD');
+  const suppressNextSyncRef = useRef(false); // Suppresses STATE_UPDATE on heartbeat-only setGameState calls
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
@@ -1775,6 +1776,7 @@ export default function App() {
          }
          // Self update for Host
          if (roleRef.current === 'HOST') {
+             suppressNextSyncRef.current = true;
              setGameState(prev => ({
                  ...prev,
                  p1: { ...prev.p1, lastHeartbeat: Date.now() }
@@ -1917,6 +1919,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (suppressNextSyncRef.current) { suppressNextSyncRef.current = false; return; }
     if (roleRef.current === 'HOST' && gameState.status !== 'IDLE') {
       if (connRef.current && connRef.current.open) {
         syncState(gameState, gameState.winner ? 'RESULT' : matchPhaseRef.current);
@@ -2434,6 +2437,58 @@ export default function App() {
           }
           break;
         }
+        case 'REROLL': {
+          // Change opponent's active cell to a random different mini-game
+          const opp = prev[oppKey];
+          const targetIdx = opp.activeCell !== null
+            ? opp.activeCell
+            : (() => {
+                const unowned = ns.cells.map((c, i) => c.owner === null ? i : -1).filter(i => i >= 0);
+                return unowned.length > 0 ? unowned[Math.floor(Math.random() * unowned.length)] : -1;
+              })();
+          if (targetIdx >= 0) {
+            const currentGameId = ns.cells[targetIdx].gameId;
+            const otherGames = MINI_GAMES.map(g => g.id).filter(id => id !== currentGameId);
+            const newGameId = otherGames[Math.floor(Math.random() * otherGames.length)];
+            ns = { ...ns, cells: ns.cells.map((c, i) => i === targetIdx ? { ...c, gameId: newGameId } : c) };
+          }
+          break;
+        }
+        case 'LEECH': {
+          // Instantly claim a random unclaimed cell (skipping opponent's active cell)
+          const leechTargets = ns.cells.map((c, i) => (c.owner === null && prev[oppKey].activeCell !== i) ? i : -1).filter(i => i >= 0);
+          if (leechTargets.length > 0) {
+            const target = leechTargets[Math.floor(Math.random() * leechTargets.length)];
+            const myPlayerId = prev[pKey].id;
+            const newCells = ns.cells.map((c, i) => i === target ? { ...c, owner: myPlayerId, activePlayers: [] } : c);
+            ns = { ...ns, cells: newCells };
+            const leechWinner = checkWinner(ns.cells);
+            if (leechWinner) ns = { ...ns, winner: leechWinner, status: 'FINISHED' as const };
+          }
+          break;
+        }
+        case 'ICE': {
+          // Freeze opponent for 3.5 seconds
+          ns = { ...ns, [oppKey]: { ...prev[oppKey], frozenUntil: now + 3500 } };
+          break;
+        }
+        case 'SWAP': {
+          // Swap one random your-owned cell with one random opponent-owned cell
+          const myPlayerId = prev[pKey].id;
+          const oppPlayerId = prev[oppKey].id;
+          const myCells  = ns.cells.map((c, i) => c.owner === myPlayerId  ? i : -1).filter(i => i >= 0);
+          const oppCells = ns.cells.map((c, i) => c.owner === oppPlayerId ? i : -1).filter(i => i >= 0);
+          if (myCells.length > 0 && oppCells.length > 0) {
+            const myTarget  = myCells[Math.floor(Math.random() * myCells.length)];
+            const oppTarget = oppCells[Math.floor(Math.random() * oppCells.length)];
+            ns = { ...ns, cells: ns.cells.map((c, i) => {
+              if (i === myTarget)  return { ...c, owner: oppPlayerId, activePlayers: [] };
+              if (i === oppTarget) return { ...c, owner: myPlayerId,  activePlayers: [] };
+              return c;
+            })};
+          }
+          break;
+        }
       }
 
       audio.playTone(880, 'sine', 250);
@@ -2618,6 +2673,7 @@ export default function App() {
     const rl = guestRateLimiter.current;
     if (msg.type === 'HEARTBEAT') {
       if (!rl.allow('hb', 3, 1000)) return;
+      suppressNextSyncRef.current = true;
       setGameState(prev => ({
           ...prev,
           p2: { ...prev.p2, lastHeartbeat: Date.now() }
@@ -2666,6 +2722,20 @@ export default function App() {
       if (rpsMyPickRef.current) {
         resolveRpsRound(rpsMyPickRef.current, msg.move);
       }
+    }
+    else if (msg.type === 'RESTART') {
+      if (matchPhaseRef.current !== 'RESULT') return;
+      if (!rl.allow('restart', 2, 10000)) return;
+      p2SkillPicksRef.current = null;
+      rpsP2PickRef.current = null;
+      rpsMyPickRef.current = null;
+      rpsScoresRef.current = { P1: 0, P2: 0 };
+      rpsRoundRef.current = 1;
+      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+      setMySkillPicks([]);
+      mySkillPicksRef.current = [];
+      setGameState(DEFAULT_GAME_STATE);
+      sendAuthoritativePhase('SKILL_PICK');
     }
   };
 
@@ -2993,6 +3063,28 @@ export default function App() {
     connectGuestTransport(code, false);
   };
 
+  const handleRematch = () => {
+    audio.playClick();
+    if (roleRef.current === 'SOLO') {
+      startNewGame('SOLO', undefined, soloDifficultyRef.current);
+      return;
+    }
+    if (roleRef.current === 'HOST') {
+      p2SkillPicksRef.current = null;
+      rpsP2PickRef.current = null;
+      rpsMyPickRef.current = null;
+      rpsScoresRef.current = { P1: 0, P2: 0 };
+      rpsRoundRef.current = 1;
+      setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+      setMySkillPicks([]);
+      mySkillPicksRef.current = [];
+      setGameState(DEFAULT_GAME_STATE);
+      sendAuthoritativePhase('SKILL_PICK');
+    } else if (roleRef.current === 'GUEST') {
+      connRef.current?.send({ type: 'RESTART' });
+    }
+  };
+
   const resetGame = () => {
     manualDisconnectRef.current = true;
     clearReconnectTimer();
@@ -3174,7 +3266,10 @@ export default function App() {
               {isSolo ? t.msg_challenge_complete : (gameState.winner === 'DRAW' ? t.msg_draw : (gameState.winner === myId ? t.msg_win : t.msg_lose))}
             </h2>
             {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">TIME: {challengeTime}</div>}
-            <button onClick={resetGame} className="mt-8 px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">Back to Menu</button>
+            <div className="flex gap-4 mt-8 justify-center flex-wrap">
+              <button onClick={handleRematch} className="px-8 py-3 bg-yellow-400 text-black hover:bg-yellow-300 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.game_rematch}</button>
+              <button onClick={resetGame} className="px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.conn_exit_menu}</button>
+            </div>
           </div>
         </div>
       )}
@@ -3369,11 +3464,7 @@ export default function App() {
             <div className="relative w-full max-w-md">
               {/* Blind overlay — hides the grid from the affected player */}
               {isBlinded && (
-                <div className="absolute inset-0 z-30 bg-slate-900/95 backdrop-blur-md flex items-center justify-center rounded-2xl">
-                  <div className="text-center select-none">
-                    <div className="text-6xl mb-3">🌑</div>
-                    <p className="text-white font-black text-xl uppercase tracking-widest">{t.fun_blinded ?? 'BLINDED!'}</p>
-                  </div>
+                <div className="absolute inset-0 z-30 flex items-center justify-center rounded-2xl overflow-hidden" style={{ backdropFilter: 'blur(8px) brightness(0.55)', background: 'rgba(10,10,30,0.38)' }}>
                 </div>
               )}
             <div className="grid grid-cols-3 gap-4 w-full aspect-square z-10">
