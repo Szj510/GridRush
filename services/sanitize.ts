@@ -221,14 +221,37 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
     }
   }
 
+  const recentOnlineResults = Array.isArray(s.recentOnlineResults)
+    ? (s.recentOnlineResults as unknown[])
+        .filter((r): r is Record<string, unknown> => r !== null && typeof r === 'object' && !Array.isArray(r))
+        .map((r) => {
+          const result = r.result === 'WIN' || r.result === 'LOSE' || r.result === 'DRAW' ? r.result : null;
+          const mode = r.mode === 'FUN' ? 'FUN' : 'STANDARD';
+          const at = clampInt(r.at, 0, Number.MAX_SAFE_INTEGER, 0);
+          return result ? { at, result, mode } : null;
+        })
+        .filter((r): r is { at: number; result: 'WIN' | 'LOSE' | 'DRAW'; mode: 'STANDARD' | 'FUN' } => r !== null)
+        .slice(-50)
+    : defaults.recentOnlineResults;
+
   return {
     onlineWins:     clampInt(s.onlineWins,    0, 1_000_000, defaults.onlineWins),
+    onlineLosses:   clampInt(s.onlineLosses,  0, 1_000_000, defaults.onlineLosses),
+    onlineDraws:    clampInt(s.onlineDraws,   0, 1_000_000, defaults.onlineDraws),
     fastestSoloRun: clampInt(s.fastestSoloRun, 0, 86_400_000, defaults.fastestSoloRun),
     totalSteals:    clampInt(s.totalSteals,   0, 1_000_000, defaults.totalSteals),
     totalDefends:   clampInt(s.totalDefends,  0, 1_000_000, defaults.totalDefends),
     gamesPlayed:    clampInt(s.gamesPlayed,   0, 1_000_000, defaults.gamesPlayed),
     totalFreezes:   clampInt(s.totalFreezes,  0, 1_000_000, defaults.totalFreezes),
     totalDuelWins:  clampInt(s.totalDuelWins, 0, 1_000_000, defaults.totalDuelWins),
+    totalFunCardsUsed: clampInt(s.totalFunCardsUsed, 0, 1_000_000, defaults.totalFunCardsUsed),
+    rpsRoundsPlayed: clampInt(s.rpsRoundsPlayed, 0, 1_000_000, defaults.rpsRoundsPlayed),
+    rpsRoundsWon: clampInt(s.rpsRoundsWon, 0, 1_000_000, defaults.rpsRoundsWon),
+    rpsRoundsDraw: clampInt(s.rpsRoundsDraw, 0, 1_000_000, defaults.rpsRoundsDraw),
+    rpsSeriesPlayed: clampInt(s.rpsSeriesPlayed, 0, 1_000_000, defaults.rpsSeriesPlayed),
+    rpsSeriesWon: clampInt(s.rpsSeriesWon, 0, 1_000_000, defaults.rpsSeriesWon),
+    rpsSeriesDraw: clampInt(s.rpsSeriesDraw, 0, 1_000_000, defaults.rpsSeriesDraw),
+    recentOnlineResults,
     unlockedAchievements: Array.isArray(s.unlockedAchievements)
       ? (s.unlockedAchievements as unknown[])
           .filter((v): v is string => isStr(v) && v.length <= 64)

@@ -16,6 +16,7 @@
   - ❄️ **Freeze** — Lock the opponent's input for 2 seconds.
   - ⚔️ **Duel** — Force both players into a simultaneous race on an empty cell you choose.
 - **Fun Mode Cards** — Capture cells to draw chaos cards (10 total): Blackout, Shuffle, Zap, Nightmare, Flip, Bomb, Reroll, Leech, Ice, Swap.
+- **Stats Dashboard** — Visualize both recent and lifetime performance: online W/L/D, action totals, RPS win rates, solo bests, and recent match history.
 - **Achievements** — LocalStorage-based achievement tracking across sessions.
 - **Dual Language** — Full English and Chinese (Simplified) UI support.
 - **Dark Mode** — System-aware light/dark theme with manual override.

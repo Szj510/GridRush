@@ -50,6 +50,8 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const DEFAULT_STATS: UserStats = {
   onlineWins: 0,
+  onlineLosses: 0,
+  onlineDraws: 0,
   fastestSoloRun: 0,
   totalSteals: 0,
   totalDefends: 0,
@@ -58,6 +60,14 @@ const DEFAULT_STATS: UserStats = {
   practiceRecords: [],
   totalFreezes: 0,
   totalDuelWins: 0,
+  totalFunCardsUsed: 0,
+  rpsRoundsPlayed: 0,
+  rpsRoundsWon: 0,
+  rpsRoundsDraw: 0,
+  rpsSeriesPlayed: 0,
+  rpsSeriesWon: 0,
+  rpsSeriesDraw: 0,
+  recentOnlineResults: [],
   soloRunsByDiff: {},
 };
 
@@ -228,6 +238,194 @@ const AchievementsModal = ({ stats, language, onClose, t }: { stats: UserStats, 
   </div>
 );
 
+const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => void, t: any }) => {
+  const onlineWins = stats.onlineWins ?? 0;
+  const onlineLosses = stats.onlineLosses ?? 0;
+  const onlineDraws = stats.onlineDraws ?? 0;
+  const totalOnline = onlineWins + onlineLosses + onlineDraws;
+
+  const rpsRoundsPlayed = stats.rpsRoundsPlayed ?? 0;
+  const rpsRoundsWon = stats.rpsRoundsWon ?? 0;
+  const rpsRoundsDraw = stats.rpsRoundsDraw ?? 0;
+  const rpsSeriesPlayed = stats.rpsSeriesPlayed ?? 0;
+  const rpsSeriesWon = stats.rpsSeriesWon ?? 0;
+  const rpsSeriesDraw = stats.rpsSeriesDraw ?? 0;
+
+  const winRate = totalOnline > 0 ? (onlineWins / totalOnline) * 100 : 0;
+  const rpsRoundWinRate = rpsRoundsPlayed > 0 ? (rpsRoundsWon / rpsRoundsPlayed) * 100 : 0;
+  const rpsSeriesWinRate = rpsSeriesPlayed > 0 ? (rpsSeriesWon / rpsSeriesPlayed) * 100 : 0;
+
+  const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+  const fmtMs = (ms: number) => {
+    if (!ms) return '--';
+    const sec = Math.floor(ms / 1000);
+    const min = Math.floor(sec / 60);
+    return `${min}:${String(sec % 60).padStart(2, '0')}`;
+  };
+
+  const recent = [...(stats.recentOnlineResults ?? [])].slice(-10).reverse();
+
+  const actionRows = [
+    { key: t.stats_steals, value: stats.totalSteals ?? 0, bar: 'bg-amber-400' },
+    { key: t.stats_defends, value: stats.totalDefends ?? 0, bar: 'bg-green-400' },
+    { key: t.stats_freezes, value: stats.totalFreezes ?? 0, bar: 'bg-cyan-400' },
+    { key: t.stats_duel_wins, value: stats.totalDuelWins ?? 0, bar: 'bg-violet-400' },
+    { key: t.stats_fun_cards_used, value: stats.totalFunCardsUsed ?? 0, bar: 'bg-fuchsia-400' },
+  ];
+  const actionTotal = Math.max(1, actionRows.reduce((sum, row) => sum + row.value, 0));
+
+  const diffRows: { id: Difficulty; label: string; value: number }[] = [
+    { id: 'EASY', label: t.solo_diff_easy, value: stats.soloRunsByDiff?.EASY ?? 0 },
+    { id: 'NORMAL', label: t.solo_diff_normal, value: stats.soloRunsByDiff?.NORMAL ?? 0 },
+    { id: 'HARD', label: t.solo_diff_hard, value: stats.soloRunsByDiff?.HARD ?? 0 },
+    { id: 'EXPERT', label: t.solo_diff_expert, value: stats.soloRunsByDiff?.EXPERT ?? 0 },
+  ];
+
+  return (
+    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-5xl w-full flex flex-col max-h-[86vh] animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-cyan-50 via-sky-50 to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+          <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+            <Icons.Chart className="w-5 h-5 text-cyan-500" /> {t.stats_title}
+          </h2>
+          <button onClick={() => { audio.playClick(); onClose(); }} className="text-2xl text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
+        </div>
+
+        <div className="overflow-y-auto p-6 space-y-5 custom-scrollbar">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_online_overview}</div>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-20 h-20 rounded-full grid place-items-center"
+                  style={{ background: `conic-gradient(#22c55e ${winRate}%, rgba(148,163,184,0.25) 0)` }}
+                >
+                  <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-900 grid place-items-center text-xs font-black text-slate-700 dark:text-slate-200">
+                    {Math.round(winRate)}%
+                  </div>
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
+                  <div>{t.stats_online_matches}: <span className="font-bold text-slate-900 dark:text-white">{totalOnline}</span></div>
+                  <div>{t.stats_online_wins}: <span className="font-bold text-green-500">{onlineWins}</span></div>
+                  <div>{t.stats_online_losses}: <span className="font-bold text-rose-500">{onlineLosses}</span></div>
+                  <div>{t.stats_online_draws}: <span className="font-bold text-amber-500">{onlineDraws}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_rps_title}</div>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                    <span>{t.stats_rps_round_win_rate}</span>
+                    <span>{fmtPct(rpsRoundWinRate)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div className="h-full bg-cyan-400" style={{ width: `${rpsRoundWinRate}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                    <span>{t.stats_rps_series_win_rate}</span>
+                    <span>{fmtPct(rpsSeriesWinRate)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                    <div className="h-full bg-indigo-400" style={{ width: `${rpsSeriesWinRate}%` }} />
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-300 pt-1">
+                  {t.stats_rps_rounds}: {rpsRoundsWon}/{rpsRoundsPlayed} · {t.stats_rps_draws}: {rpsRoundsDraw}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-300">
+                  {t.stats_rps_series}: {rpsSeriesWon}/{rpsSeriesPlayed} · {t.stats_rps_draws}: {rpsSeriesDraw}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_global_title}</div>
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <div>{t.stats_games_played}: <span className="font-bold text-slate-900 dark:text-white">{stats.gamesPlayed}</span></div>
+                <div>{t.stats_best_solo}: <span className="font-bold text-slate-900 dark:text-white">{fmtMs(stats.fastestSoloRun)}</span></div>
+                <div>{t.stats_ach_unlocked}: <span className="font-bold text-slate-900 dark:text-white">{stats.unlockedAchievements.length}</span></div>
+                <div>{t.stats_practice_records}: <span className="font-bold text-slate-900 dark:text-white">{stats.practiceRecords.length}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_action_breakdown}</div>
+              <div className="space-y-2">
+                {actionRows.map(row => {
+                  const width = (row.value / actionTotal) * 100;
+                  return (
+                    <div key={row.key}>
+                      <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                        <span>{row.key}</span>
+                        <span>{row.value}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div className={`h-full ${row.bar}`} style={{ width: `${width}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_solo_bests}</div>
+              <div className="space-y-2">
+                {diffRows.map(row => (
+                  <div key={row.id} className="flex justify-between items-center rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-sm">
+                    <span className="text-slate-600 dark:text-slate-300">{row.label}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{fmtMs(row.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+            <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_recent_matches}</div>
+            {recent.length === 0 ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400">{t.stats_recent_empty}</div>
+            ) : (
+              <div className="space-y-2">
+                {recent.map((item, idx) => {
+                  const resultText = item.result === 'WIN'
+                    ? t.stats_result_win
+                    : item.result === 'LOSE'
+                      ? t.stats_result_lose
+                      : t.stats_result_draw;
+                  const resultClass = item.result === 'WIN'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                    : item.result === 'LOSE'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+                  const modeText = item.mode === 'FUN' ? t.stats_mode_fun : t.stats_mode_standard;
+
+                  return (
+                    <div key={`${item.at}-${idx}`} className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${resultClass}`}>{resultText}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{modeText}</span>
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(item.at).toLocaleString()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Components ---
 
 const MainMenu = ({ 
@@ -237,10 +435,17 @@ const MainMenu = ({
   onShowRules,
   onShowSettings,
   onShowAchievements,
+  onShowStats,
   t
 }: any) => (
   <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
     <div className="absolute top-6 right-6 flex gap-3">
+      <button 
+        onClick={() => { audio.playClick(); onShowStats(); }}
+        className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-cyan-500 transition-all"
+      >
+        <Icons.Chart className="w-5 h-5" />
+      </button>
       <button 
         onClick={() => { audio.playClick(); onShowAchievements(); }}
         className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-yellow-500 transition-all"
@@ -287,6 +492,11 @@ const MainMenu = ({
       <button onClick={() => { audio.playClick(); onShowAchievements(); }} className="md:hidden w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl border border-slate-100 dark:border-slate-700">
         <Icons.Trophy className="w-5 h-5 text-yellow-500" /> 
         <span className="font-bold tracking-widest text-lg">{t.menu_achievements}</span>
+      </button>
+
+      <button onClick={() => { audio.playClick(); onShowStats(); }} className="md:hidden w-full py-5 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center gap-4 text-slate-900 dark:text-white shadow-xl border border-slate-100 dark:border-slate-700">
+        <Icons.Chart className="w-5 h-5 text-cyan-500" /> 
+        <span className="font-bold tracking-widest text-lg">{t.menu_stats}</span>
       </button>
     </div>
   </div>
@@ -1316,6 +1526,7 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [newAchievement, setNewAchievement] = useState<string | null>(null);
 
   // Skill pick phase (online only)
@@ -1671,10 +1882,15 @@ export default function App() {
       }
   }, [settings.theme]);
 
-  const saveStats = (newStats: UserStats) => {
-    setStats(newStats);
-    localStorage.setItem('gridrush_stats', JSON.stringify(newStats));
-    checkAchievements(newStats);
+  const saveStats = (next: UserStats | ((prev: UserStats) => UserStats)) => {
+    setStats(prev => {
+      const newStats = typeof next === 'function'
+        ? (next as (p: UserStats) => UserStats)(prev)
+        : next;
+      localStorage.setItem('gridrush_stats', JSON.stringify(newStats));
+      checkAchievements(newStats);
+      return newStats;
+    });
   };
 
   const saveSettings = (newSettings: AppSettings) => {
@@ -1693,8 +1909,7 @@ export default function App() {
   };
 
   const handlePracticeRecord = (record: PracticeRecord) => {
-      const newStats = { ...stats, practiceRecords: [...stats.practiceRecords, record] };
-      saveStats(newStats);
+      saveStats(prev => ({ ...prev, practiceRecords: [...prev.practiceRecords, record] }));
   };
 
   // --- Achievements Logic ---
@@ -1892,6 +2107,27 @@ export default function App() {
   }, [gameState.winner]);
 
   useEffect(() => {
+    if (!gameState.winner || !myId || roleRef.current === 'SOLO') return;
+
+    const myResult: 'WIN' | 'LOSE' | 'DRAW' = gameState.winner === 'DRAW'
+      ? 'DRAW'
+      : gameState.winner === myId
+        ? 'WIN'
+        : 'LOSE';
+
+    saveStats(prevStats => ({
+      ...prevStats,
+      onlineWins: prevStats.onlineWins + (myResult === 'WIN' ? 1 : 0),
+      onlineLosses: (prevStats.onlineLosses ?? 0) + (myResult === 'LOSE' ? 1 : 0),
+      onlineDraws: (prevStats.onlineDraws ?? 0) + (myResult === 'DRAW' ? 1 : 0),
+      recentOnlineResults: [
+        ...(prevStats.recentOnlineResults ?? []),
+        { at: Date.now(), result: myResult, mode: gameModeRef.current },
+      ].slice(-50),
+    }));
+  }, [gameState.winner, myId]);
+
+  useEffect(() => {
     if (!gameState.winner) {
       setRematchInviteFrom(null);
       setRematchStatus('NONE');
@@ -1956,7 +2192,7 @@ export default function App() {
        setGameState(newGame);
        setConnectionStatus('CONNECTED');
        lastPacketTime.current = Date.now(); // Reset timestamp
-       saveStats({ ...stats, gamesPlayed: stats.gamesPlayed + 1 });
+      saveStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
     } else {
        // Setup Solo State
        // In Solo, activeCell acts as the "Current Level Index"
@@ -1970,7 +2206,7 @@ export default function App() {
        // Reset offset for solo
        timeOffsetRef.current = 0;
        setAppMode('GAME');
-       saveStats({ ...stats, gamesPlayed: stats.gamesPlayed + 1 });
+      saveStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
     }
   };
 
@@ -2004,7 +2240,7 @@ export default function App() {
         
         if (roleRef.current === 'HOST') {
           const isMe = pid === 'P1';
-          if (isMe) saveStats({ ...stats, totalSteals: stats.totalSteals + 1 });
+          if (isMe) saveStats(prev => ({ ...prev, totalSteals: prev.totalSteals + 1 }));
         }
 
         const pStateKey = pid === 'P1' ? 'p1' : 'p2';
@@ -2098,7 +2334,7 @@ export default function App() {
       if (!prev.stealNotification || prev.stealNotification.defenderId !== pid) return prev;
       
       if (roleRef.current === 'HOST' && pid === 'P1') {
-         saveStats({ ...stats, totalDefends: stats.totalDefends + 1 });
+         saveStats(prev => ({ ...prev, totalDefends: prev.totalDefends + 1 }));
       }
 
       const targetCell = prev.stealNotification.cellId;
@@ -2154,14 +2390,16 @@ export default function App() {
 
         if (finished) {
            const timeTaken = Date.now() - challengeStartTime;
-           const newFastest = (stats.fastestSoloRun === 0 || timeTaken < stats.fastestSoloRun) ? timeTaken : stats.fastestSoloRun;
            const diff = soloDifficultyRef.current;
-           const prevDiffBest = stats.soloRunsByDiff?.[diff] ?? 0;
-           const newDiffBest = prevDiffBest === 0 || timeTaken < prevDiffBest ? timeTaken : prevDiffBest;
-           saveStats({
-             ...stats,
-             fastestSoloRun: newFastest,
-             soloRunsByDiff: { ...stats.soloRunsByDiff, [diff]: newDiffBest },
+           saveStats(prevStats => {
+             const newFastest = (prevStats.fastestSoloRun === 0 || timeTaken < prevStats.fastestSoloRun) ? timeTaken : prevStats.fastestSoloRun;
+             const prevDiffBest = prevStats.soloRunsByDiff?.[diff] ?? 0;
+             const newDiffBest = prevDiffBest === 0 || timeTaken < prevDiffBest ? timeTaken : prevDiffBest;
+             return {
+               ...prevStats,
+               fastestSoloRun: newFastest,
+               soloRunsByDiff: { ...prevStats.soloRunsByDiff, [diff]: newDiffBest },
+             };
            });
            audio.playWin();
            
@@ -2234,12 +2472,9 @@ export default function App() {
       
       const winner = checkWinner(newCells);
       
-      if (roleRef.current === 'HOST' && winner) {
-          if (winner === 'P1') saveStats({ ...stats, onlineWins: stats.onlineWins + 1 });
-      }
       // Track duel win for P1 (when the won cell was the duel cell)
       if (roleRef.current === 'HOST' && pid === 'P1' && prev.duelState?.phase === 'RACING' && prev.duelState?.cellId === cellIdx) {
-        saveStats({ ...stats, totalDuelWins: (stats.totalDuelWins ?? 0) + 1 });
+        saveStats(prevStats => ({ ...prevStats, totalDuelWins: (prevStats.totalDuelWins ?? 0) + 1 }));
       }
 
       if (winner) audio.playWin();
@@ -2278,7 +2513,7 @@ export default function App() {
       if (attacker.freezesRemaining <= 0) return prev;
       // Track freeze usage for P1 (HOST)
       if (roleRef.current === 'HOST' && pid === 'P1') {
-        saveStats({ ...stats, totalFreezes: (stats.totalFreezes ?? 0) + 1 });
+        saveStats(prevStats => ({ ...prevStats, totalFreezes: (prevStats.totalFreezes ?? 0) + 1 }));
       }
       audio.playTone(220, 'sine', 400);
       return {
@@ -2326,6 +2561,9 @@ export default function App() {
 
   const processUseFunCard = (pid: PlayerId, cardId: FunCardId) => {
     if (gameModeRef.current !== 'FUN' || roleRef.current === 'SOLO') return;
+    if (roleRef.current === 'HOST' && pid === 'P1') {
+      saveStats(prevStats => ({ ...prevStats, totalFunCardsUsed: (prevStats.totalFunCardsUsed ?? 0) + 1 }));
+    }
     setGameState(prev => {
       const pKey  = pid === 'P1' ? 'p1' : 'p2';
       const oppKey = pid === 'P1' ? 'p2' : 'p1';
@@ -2498,6 +2736,9 @@ export default function App() {
       if (action.type === 'USE_FUN_CARD') processUseFunCard('P1', action.cardId);
     } else {
       if (matchPhaseRef.current !== 'PLAYING') return;
+      if (action.type === 'USE_FUN_CARD') {
+        saveStats(prevStats => ({ ...prevStats, totalFunCardsUsed: (prevStats.totalFunCardsUsed ?? 0) + 1 }));
+      }
       if (connRef.current) {
         guestActionSeqRef.current += 1;
         const seq = guestActionSeqRef.current;
@@ -2532,6 +2773,15 @@ export default function App() {
 
     const myRoundResult: RpsResult = roundWinner === 'P1' ? 'WIN' : roundWinner === 'P2' ? 'LOSE' : 'DRAW';
     const mySeriesWinner: RpsSeriesWinner | null = hw === null ? null : hw === 'P1' ? 'ME' : hw === 'P2' ? 'OPP' : 'DRAW';
+    saveStats(prevStats => ({
+      ...prevStats,
+      rpsRoundsPlayed: (prevStats.rpsRoundsPlayed ?? 0) + 1,
+      rpsRoundsWon: (prevStats.rpsRoundsWon ?? 0) + (myRoundResult === 'WIN' ? 1 : 0),
+      rpsRoundsDraw: (prevStats.rpsRoundsDraw ?? 0) + (myRoundResult === 'DRAW' ? 1 : 0),
+      rpsSeriesPlayed: (prevStats.rpsSeriesPlayed ?? 0) + (mySeriesWinner ? 1 : 0),
+      rpsSeriesWon: (prevStats.rpsSeriesWon ?? 0) + (mySeriesWinner === 'ME' ? 1 : 0),
+      rpsSeriesDraw: (prevStats.rpsSeriesDraw ?? 0) + (mySeriesWinner === 'DRAW' ? 1 : 0),
+    }));
     setRpsState(prev => ({ ...prev, oppMove: p2Move, roundResult: myRoundResult, myScore: newScores.P1, oppScore: newScores.P2, seriesWinner: mySeriesWinner }));
 
     setTimeout(() => {
@@ -2837,6 +3087,15 @@ export default function App() {
         : data.headstartWinner === 'P2' ? 'ME'
         : data.headstartWinner === 'P1' ? 'OPP'
         : 'DRAW';
+      saveStats(prevStats => ({
+        ...prevStats,
+        rpsRoundsPlayed: (prevStats.rpsRoundsPlayed ?? 0) + 1,
+        rpsRoundsWon: (prevStats.rpsRoundsWon ?? 0) + (myRoundResult === 'WIN' ? 1 : 0),
+        rpsRoundsDraw: (prevStats.rpsRoundsDraw ?? 0) + (myRoundResult === 'DRAW' ? 1 : 0),
+        rpsSeriesPlayed: (prevStats.rpsSeriesPlayed ?? 0) + (mySeriesWinner ? 1 : 0),
+        rpsSeriesWon: (prevStats.rpsSeriesWon ?? 0) + (mySeriesWinner === 'ME' ? 1 : 0),
+        rpsSeriesDraw: (prevStats.rpsSeriesDraw ?? 0) + (mySeriesWinner === 'DRAW' ? 1 : 0),
+      }));
       setRpsState(prev => ({
         ...prev,
         round: data.round,
@@ -3142,6 +3401,7 @@ export default function App() {
         {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
+        {showStats && <StatsModal stats={stats} onClose={() => setShowStats(false)} t={t} />}
         <MainMenu 
           onOnline={() => setAppMode('LOBBY')}
           onChallenge={() => setAppMode('SOLO_DIFFICULTY')}
@@ -3149,6 +3409,7 @@ export default function App() {
           onShowRules={() => setShowRules(true)}
           onShowSettings={() => setShowSettings(true)}
           onShowAchievements={() => setShowAchievements(true)}
+          onShowStats={() => setShowStats(true)}
           t={t}
         />
       </div>

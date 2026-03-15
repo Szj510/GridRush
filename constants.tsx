@@ -64,6 +64,12 @@ export const Icons = {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
     </svg>
+  ),
+  Chart: ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path fillRule="evenodd" d="M3 3.75A.75.75 0 013.75 3h16.5a.75.75 0 010 1.5H4.5v15h15.75a.75.75 0 010 1.5H3.75A.75.75 0 013 20.25V3.75z" clipRule="evenodd" />
+      <path d="M8.25 16.5a.75.75 0 01-.75-.75v-4.5a.75.75 0 011.5 0v4.5a.75.75 0 01-.75.75zm4.5 0a.75.75 0 01-.75-.75v-7.5a.75.75 0 011.5 0v7.5a.75.75 0 01-.75.75zm4.5 0a.75.75 0 01-.75-.75V9a.75.75 0 011.5 0v6.75a.75.75 0 01-.75.75z" />
+    </svg>
   )
 };
 
@@ -207,6 +213,7 @@ export const TRANSLATIONS = {
     menu_solo: "TIME ATTACK",
     menu_practice: "PRACTICE GYM",
     menu_achievements: "ACHIEVEMENTS",
+    menu_stats: "STATISTICS",
     menu_subtitle: "COMPETITIVE ARENA",
     
     online_host: "Host Game",
@@ -281,6 +288,39 @@ export const TRANSLATIONS = {
     ach_title: "ACHIEVEMENTS",
     ach_locked: "Locked",
     ach_progress: "Progress",
+
+    // Stats dashboard
+    stats_title: "STATISTICS",
+    stats_online_overview: "ONLINE OVERVIEW",
+    stats_online_matches: "Matches",
+    stats_online_wins: "Wins",
+    stats_online_losses: "Losses",
+    stats_online_draws: "Draws",
+    stats_rps_title: "RPS ANALYTICS",
+    stats_rps_round_win_rate: "Round Win Rate",
+    stats_rps_series_win_rate: "Series Win Rate",
+    stats_rps_rounds: "Rounds Won",
+    stats_rps_series: "Series Won",
+    stats_rps_draws: "Draws",
+    stats_global_title: "CAREER",
+    stats_games_played: "Games Played",
+    stats_best_solo: "Best Solo",
+    stats_ach_unlocked: "Achievements",
+    stats_practice_records: "Practice Records",
+    stats_action_breakdown: "ACTION BREAKDOWN",
+    stats_steals: "Steals",
+    stats_defends: "Defends",
+    stats_freezes: "Freezes",
+    stats_duel_wins: "Duel Wins",
+    stats_fun_cards_used: "Fun Cards Used",
+    stats_solo_bests: "SOLO BESTS",
+    stats_recent_matches: "RECENT ONLINE MATCHES",
+    stats_recent_empty: "No online match data yet.",
+    stats_result_win: "WIN",
+    stats_result_lose: "LOSE",
+    stats_result_draw: "DRAW",
+    stats_mode_standard: "STANDARD",
+    stats_mode_fun: "FUN",
 
     exit_game: "Quit",
     level_progress: "Level",
@@ -410,6 +450,7 @@ export const TRANSLATIONS = {
     menu_solo: "竞速模式",
     menu_practice: "练习道场",
     menu_achievements: "挑战成就",
+    menu_stats: "数据统计",
     menu_subtitle: "竞技场",
 
     online_host: "创建房间",
@@ -484,6 +525,39 @@ export const TRANSLATIONS = {
     ach_title: "挑战成就",
     ach_locked: "未解锁",
     ach_progress: "进度",
+
+    // 数据面板
+    stats_title: "数据统计",
+    stats_online_overview: "在线总览",
+    stats_online_matches: "在线总场次",
+    stats_online_wins: "胜场",
+    stats_online_losses: "负场",
+    stats_online_draws: "平局",
+    stats_rps_title: "猜拳分析",
+    stats_rps_round_win_rate: "回合胜率",
+    stats_rps_series_win_rate: "整场胜率",
+    stats_rps_rounds: "回合胜出",
+    stats_rps_series: "整场胜出",
+    stats_rps_draws: "平局",
+    stats_global_title: "生涯数据",
+    stats_games_played: "总对局数",
+    stats_best_solo: "竞速最佳",
+    stats_ach_unlocked: "已解锁成就",
+    stats_practice_records: "练习记录数",
+    stats_action_breakdown: "动作分布",
+    stats_steals: "抢夺",
+    stats_defends: "防守",
+    stats_freezes: "冻结",
+    stats_duel_wins: "决斗胜利",
+    stats_fun_cards_used: "娱乐卡牌使用",
+    stats_solo_bests: "竞速难度最佳",
+    stats_recent_matches: "最近在线对局",
+    stats_recent_empty: "还没有在线对局数据。",
+    stats_result_win: "胜",
+    stats_result_lose: "负",
+    stats_result_draw: "平",
+    stats_mode_standard: "标准",
+    stats_mode_fun: "娱乐",
 
     exit_game: "退出",
     level_progress: "关卡",

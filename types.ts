@@ -119,8 +119,16 @@ export interface Achievement {
   condition: (stats: UserStats) => boolean;
 }
 
+export interface RecentOnlineResult {
+  at: number;
+  result: 'WIN' | 'LOSE' | 'DRAW';
+  mode: 'STANDARD' | 'FUN';
+}
+
 export interface UserStats {
   onlineWins: number;
+  onlineLosses: number;
+  onlineDraws: number;
   fastestSoloRun: number; 
   totalSteals: number;
   totalDefends: number;
@@ -129,6 +137,14 @@ export interface UserStats {
   practiceRecords: PracticeRecord[];
   totalFreezes: number;
   totalDuelWins: number;
+  totalFunCardsUsed: number;
+  rpsRoundsPlayed: number;
+  rpsRoundsWon: number;
+  rpsRoundsDraw: number;
+  rpsSeriesPlayed: number;
+  rpsSeriesWon: number;
+  rpsSeriesDraw: number;
+  recentOnlineResults: RecentOnlineResult[];
   soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }
 
