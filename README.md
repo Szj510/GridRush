@@ -9,6 +9,7 @@
 ## 🎮 Features
 
 - **Online Multiplayer** — Real-time 1v1 battles over WebRTC (PeerJS P2P, no server required).
+- **Reliable Relay Mode** — When Supabase env is configured, online messages default to Supabase Realtime relay to avoid fragile P2P hole-punching.
 - **Invite via Link** — Host a room and click **Copy Invite Link** to get a shareable URL. Your friend opens the link and lands directly in your room — no code typing needed.
 - **Time Attack Mode** — Solo speed-run through all 13 mini-games in sequence, as fast as possible.
 - **Practice Gym** — Train individual mini-games with adjustable difficulty.
@@ -21,6 +22,20 @@
 - **Achievements** — LocalStorage-based achievement tracking across sessions.
 - **Dual Language** — Full English and Chinese (Simplified) UI support.
 - **Dark Mode** — System-aware light/dark theme with manual override.
+
+## ⚡ First Match in 30 Seconds
+
+1. In online mode, both players secretly pick 2 skills out of Steal, Freeze, and Duel.
+2. A best-of-3 Rock-Paper-Scissors decides who starts unfrozen. The loser begins the board phase frozen for 2 seconds.
+3. Click any `?` cell to enter its mini-game. The first player to clear it captures that cell.
+4. Entering an enemy-owned cell spends your Steal and creates a 5-second defend window for the owner.
+5. Win instantly by getting 3 in a row, or own more cells when the 9-cell board is full.
+
+### Important Penalties
+
+- Failing the same cell 3 times in a row locks you out of that cell for 10 seconds.
+- Canceling a steal attempt triggers a 20-second Steal cooldown.
+- Going AFK or disconnecting too long kicks you out of the cell you were contesting.
 
 ## 🧩 Mini-Games
 
@@ -49,6 +64,12 @@ The game features **13** distinct skill-based mini-games. Each online battle ran
 - **PeerJS** — WebRTC wrapper for P2P networking
 - **Vite** — Build tool and dev server
 - **Supabase** (optional) — Account system and cloud stats sync (requires `.env.local`)
+
+## 🌐 Online Reliability
+
+- `VITE_NET_USE_SUPABASE_RELAY=1` (default when Supabase env exists) routes match messages through Supabase Realtime.
+- `VITE_NET_USE_SUPABASE_RELAY=0` forces legacy PeerJS P2P mode.
+- If you still prefer PeerJS and your network blocks `0.peerjs.com`, configure your own signaling host with `VITE_PEERJS_HOST` and related variables in `.env.local`.
 
 ## 🔒 Security Design
 

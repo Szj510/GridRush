@@ -92,41 +92,166 @@ const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   tutorialEnabled: false
 };
 
+const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
+  if (value === undefined) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true' || normalized === 'yes') return true;
+  if (normalized === '0' || normalized === 'false' || normalized === 'no') return false;
+  return fallback;
+};
+
+const normalizePeerPath = (value?: string) => {
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) return '/peerjs';
+  const prefixed = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return prefixed.replace(/\/$/, '');
+};
+
+const peerHostEnv = import.meta.env.VITE_PEERJS_HOST?.trim();
+const peerPortEnv = Number.parseInt(import.meta.env.VITE_PEERJS_PORT ?? '', 10);
+const peerSecureEnv = parseBooleanEnv(import.meta.env.VITE_PEERJS_SECURE, true);
+const peerPathEnv = normalizePeerPath(import.meta.env.VITE_PEERJS_PATH);
+const peerKeyEnv = import.meta.env.VITE_PEERJS_KEY?.trim();
+const peerDiscoveryEnabled = parseBooleanEnv(import.meta.env.VITE_PEERJS_ENABLE_DISCOVERY, false);
+const useSupabaseRelay = parseBooleanEnv(import.meta.env.VITE_NET_USE_SUPABASE_RELAY, hasSupabaseConfig);
+const relayChannelPrefix = 'gridrush-relay-';
+const relayBroadcastEvent = 'net-msg';
+const createRelayClientId = () =>
+  `relay-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+
+const peerOptions: Record<string, unknown> | null = (() => {
+  if (!peerHostEnv) return null;
+  const options: Record<string, unknown> = {
+    host: peerHostEnv,
+    secure: peerSecureEnv,
+    path: peerPathEnv,
+  };
+  if (Number.isFinite(peerPortEnv)) options.port = peerPortEnv;
+  if (peerKeyEnv) options.key = peerKeyEnv;
+  return options;
+})();
+
+const peerDiscoveryUrl = (() => {
+  if (!peerDiscoveryEnabled) return null;
+  const host = peerHostEnv || '0.peerjs.com';
+  const secure = peerSecureEnv;
+  const port = Number.isFinite(peerPortEnv) ? peerPortEnv : (secure ? 443 : 80);
+  const defaultPort = secure ? 443 : 80;
+  const portSegment = port === defaultPort ? '' : `:${port}`;
+  const protocol = secure ? 'https' : 'http';
+  return `${protocol}://${host}${portSegment}${peerPathEnv}/peers`;
+})();
+
+const createPeerClient = (id?: string) => {
+  if (!peerOptions) {
+    return id ? new window.Peer(id) : new window.Peer();
+  }
+  return id ? new window.Peer(id, peerOptions) : new window.Peer(peerOptions);
+};
+
 // --- Modals ---
 
-const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => (
-  <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-lg w-full relative animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
-      <button onClick={() => { audio.playClick(); onClose(); }} className="absolute top-6 right-6 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
-      <h2 className="text-2xl font-bold mb-6 text-center text-slate-900 dark:text-white tracking-widest uppercase">
-        {t.rules_title}
-      </h2>
-      <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed overflow-y-auto max-h-[60vh] pr-1">
-        <p><strong className="text-slate-900 dark:text-white font-semibold">Goal:</strong> {t.rules_goal}</p>
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-          <strong className="block text-blue-600 dark:text-blue-400 mb-1 font-semibold">🏁 Racing</strong>
-          {t.rules_race}
+const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
+  const quickStartItems = [t.rules_quick_1, t.rules_quick_2, t.rules_quick_3, t.rules_quick_4];
+  const flowItems = [t.rules_flow_1, t.rules_flow_2, t.rules_flow_3, t.rules_flow_4];
+  const penaltyItems = [t.rules_penalty_1, t.rules_penalty_2];
+  const tipItems = [t.rules_tip_1, t.rules_tip_2, t.rules_tip_3];
+
+  return (
+    <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 md:p-8 max-w-2xl w-full relative animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
+        <button onClick={() => { audio.playClick(); onClose(); }} className="absolute top-5 right-5 text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
+        <h2 className="text-2xl font-bold mb-3 text-center text-slate-900 dark:text-white tracking-widest uppercase">
+          {t.rules_title}
+        </h2>
+        <p className="text-center text-sm md:text-base text-slate-500 dark:text-slate-400 mb-6 max-w-xl mx-auto leading-relaxed">
+          {t.rules_intro}
+        </p>
+
+        <div className="space-y-5 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed overflow-y-auto max-h-[65vh] pr-1">
+          <div className="bg-slate-100 dark:bg-slate-800/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">{t.rules_goal}</p>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/50">
+            <h3 className="text-amber-700 dark:text-amber-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_quick_title}</h3>
+            <ul className="space-y-2.5">
+              {quickStartItems.map((item: string, index: number) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200 dark:bg-amber-800 text-[11px] font-black text-amber-800 dark:text-amber-100">{index + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50">
+            <h3 className="text-blue-700 dark:text-blue-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_flow_title}</h3>
+            <ol className="space-y-2.5">
+              {flowItems.map((item: string, index: number) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-200 dark:bg-blue-800 text-[11px] font-black text-blue-800 dark:text-blue-100">{index + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="bg-rose-50 dark:bg-rose-950/30 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/50">
+            <h3 className="text-rose-700 dark:text-rose-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_penalty_title}</h3>
+            <ul className="space-y-2.5">
+              {penaltyItems.map((item: string, index: number) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-rose-400 dark:bg-rose-300" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold mb-3">{t.rules_skills_intro}</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl border border-red-100 dark:border-red-800">
+                <strong className="block text-red-600 dark:text-red-400 mb-2 font-semibold">⭐ {t.skill_steal}</strong>
+                {t.rules_steal}
+              </div>
+              <div className="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-2xl border border-cyan-100 dark:border-cyan-800">
+                <strong className="block text-cyan-600 dark:text-cyan-400 mb-2 font-semibold">❄️ {t.skill_freeze}</strong>
+                {t.rules_freeze}
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-2xl border border-purple-100 dark:border-purple-800">
+                <strong className="block text-purple-600 dark:text-purple-400 mb-2 font-semibold">⚔️ {t.skill_duel}</strong>
+                {t.rules_duel}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-fuchsia-50 dark:bg-fuchsia-950/30 p-4 rounded-2xl border border-fuchsia-100 dark:border-fuchsia-900/50">
+            <h3 className="text-fuchsia-700 dark:text-fuchsia-300 font-bold uppercase tracking-widest text-xs mb-2">{t.rules_fun_title}</h3>
+            <p>{t.rules_fun_desc}</p>
+          </div>
+
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
+            <h3 className="text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_tips_title}</h3>
+            <ul className="space-y-2.5">
+              {tipItems.map((item: string, index: number) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400 dark:bg-emerald-300" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold pt-1">{t.rules_skills_intro}</p>
-        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
-          <strong className="block text-red-600 dark:text-red-400 mb-1 font-semibold">⭐ {t.skill_steal}</strong>
-          {t.rules_steal}
-        </div>
-        <div className="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-xl border border-cyan-100 dark:border-cyan-800">
-          <strong className="block text-cyan-600 dark:text-cyan-400 mb-1 font-semibold">❄️ {t.skill_freeze}</strong>
-          {t.rules_freeze}
-        </div>
-        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl border border-purple-100 dark:border-purple-800">
-          <strong className="block text-purple-600 dark:text-purple-400 mb-1 font-semibold">⚔️ {t.skill_duel}</strong>
-          {t.rules_duel}
-        </div>
+
+        <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-6 bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 font-bold py-3 rounded-xl transition-all shadow-lg">
+          OK
+        </button>
       </div>
-      <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-8 bg-slate-900 dark:bg-white hover:opacity-90 text-white dark:text-slate-900 font-bold py-3 rounded-xl transition-all shadow-lg">
-        OK
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 const SettingsModal = ({ 
   settings, 
@@ -1025,22 +1150,149 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
 
 // --- Online Lobby ---
 
+const OnlineGuideOverlay = ({
+  step,
+  totalSteps,
+  onBack,
+  onNext,
+  onSkip,
+  t,
+}: {
+  step: number;
+  totalSteps: number;
+  onBack: () => void;
+  onNext: () => void;
+  onSkip: () => void;
+  t: any;
+}) => {
+  const steps = [
+    {
+      title: t.online_guide_1_title,
+      body: t.online_guide_1_body,
+      hint: t.online_guide_1_hint,
+    },
+    {
+      title: t.online_guide_2_title,
+      body: t.online_guide_2_body,
+      hint: t.online_guide_2_hint,
+    },
+    {
+      title: t.online_guide_3_title,
+      body: t.online_guide_3_body,
+      hint: t.online_guide_3_hint,
+    },
+    {
+      title: t.online_guide_4_title,
+      body: t.online_guide_4_body,
+      hint: t.online_guide_4_hint,
+    },
+  ];
+
+  const currentStep = steps[step];
+  const isLastStep = step === totalSteps - 1;
+
+  return (
+    <div className="absolute inset-0 z-40 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-xl rounded-3xl border border-slate-200/20 bg-white/95 dark:bg-slate-900/95 shadow-2xl p-6 md:p-7 text-slate-900 dark:text-white">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.35em] text-blue-500 mb-2">
+              {t.online_guide_step} {step + 1} / {totalSteps}
+            </p>
+            <h3 className="text-2xl font-black tracking-tight">{currentStep.title}</h3>
+          </div>
+          <button
+            onClick={() => { audio.playClick(); onSkip(); }}
+            className="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          >
+            {t.online_guide_skip}
+          </button>
+        </div>
+
+        <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+          {t.online_guide_intro}
+        </p>
+
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-4 md:p-5">
+          <p className="text-base leading-relaxed text-slate-700 dark:text-slate-200">{currentStep.body}</p>
+          <p className="mt-4 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+            {currentStep.hint}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mt-5 mb-6">
+          {steps.map((_, index) => (
+            <span
+              key={index}
+              className={`h-2.5 rounded-full transition-all ${index === step ? 'w-8 bg-blue-500' : 'w-2.5 bg-slate-300 dark:bg-slate-700'}`}
+            />
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => { audio.playClick(); onBack(); }}
+            disabled={step === 0}
+            className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {t.online_guide_back}
+          </button>
+          <button
+            onClick={() => { audio.playClick(); onNext(); }}
+            className="flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/30 transition-all active:scale-95"
+          >
+            {isLastStep ? t.online_guide_done : t.online_guide_next}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) => {
+  const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen';
+  const GUIDE_STEPS = 4;
   const [joinId, setJoinId] = useState('');
   const [rooms, setRooms] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [lobbyError, setLobbyError] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('STANDARD');
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
 
   const addRoom  = (code: string) => setRooms(prev => prev.includes(code) ? prev : [...prev, code]);
   const dropRoom = (code: string) => setRooms(prev => prev.filter(c => c !== code));
 
+  const markGuideSeen = () => {
+    try {
+      localStorage.setItem(ONLINE_GUIDE_SEEN_KEY, '1');
+    } catch {
+      // Ignore storage failures; guide just shows again next time.
+    }
+  };
+
+  const closeGuide = (remember = true) => {
+    if (remember) markGuideSeen();
+    setShowGuide(false);
+    setGuideStep(0);
+  };
+
+  const openGuide = () => {
+    setGuideStep(0);
+    setShowGuide(true);
+  };
+
   const fetchFromServer = async () => {
+    if (!peerDiscoveryUrl) {
+      setLobbyError(false);
+      setLoading(false);
+      return;
+    }
+
     try {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 6000);
-      // Correct PeerJS REST endpoint — key is part of the path, no query param
-      const res = await fetch('https://0.peerjs.com/peerjs/peers', { signal: ac.signal });
+      const res = await fetch(peerDiscoveryUrl, { signal: ac.signal });
       clearTimeout(timer);
       if (!res.ok) throw new Error();
       const peers: string[] = await res.json();
@@ -1057,6 +1309,14 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
   };
 
   useEffect(() => {
+    try {
+      if (localStorage.getItem(ONLINE_GUIDE_SEEN_KEY) !== '1') {
+        setShowGuide(true);
+      }
+    } catch {
+      setShowGuide(true);
+    }
+
     // 1. Read localStorage: rooms registered in this browser (any tab)
     const now = Date.now();
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -1082,16 +1342,32 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
     // Ask any host tab that is already open to re-announce
     setTimeout(() => bc.postMessage({ type: 'ROOM_QUERY' }), 150);
 
-    // 3. Try PeerJS server as a best-effort supplement
-    fetchFromServer();
-    const interval = setInterval(fetchFromServer, 15000);
+    // 3. Optional discovery endpoint (disabled by default because public PeerJS cloud does not expose /peers)
+    let interval: number | null = null;
+    if (peerDiscoveryUrl) {
+      fetchFromServer();
+      interval = window.setInterval(fetchFromServer, 15000);
+    } else {
+      setLoading(false);
+    }
 
-    return () => { bc.close(); clearInterval(interval); };
+    return () => {
+      bc.close();
+      if (interval !== null) window.clearInterval(interval);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const modeGuideActive = showGuide && guideStep === 0;
+  const createJoinGuideActive = showGuide && guideStep === 1;
+  const lobbyGuideActive = showGuide && guideStep === 2;
+  const summaryGuideActive = showGuide && guideStep === 3;
 
   return (
     <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 overflow-y-auto">
       <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-6 left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
+      <button onClick={() => { audio.playClick(); openGuide(); }} className="absolute top-6 right-6 px-4 py-2 rounded-full bg-white dark:bg-slate-800 shadow-lg text-slate-600 dark:text-slate-200 hover:scale-105 transition-all text-xs font-bold uppercase tracking-widest">
+        ? {t.online_guide_open}
+      </button>
       
       <h2 className="text-4xl font-black mb-10 text-slate-900 dark:text-white uppercase tracking-tighter">{t.menu_online}</h2>
       
@@ -1101,9 +1377,9 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
           <p className="text-slate-500 dark:text-slate-400 font-mono text-sm tracking-widest animate-pulse">{t.online_connecting}</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in">
+        <div className={`flex flex-col gap-6 w-full max-w-2xl items-stretch animate-fade-in ${summaryGuideActive ? 'rounded-3xl ring-4 ring-emerald-400/70 shadow-2xl shadow-emerald-500/10' : ''}`}>
           {/* Mode Selector */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-200 dark:border-slate-700">
+          <div className={`bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-200 dark:border-slate-700 transition-all ${modeGuideActive ? 'ring-4 ring-blue-400/70 shadow-2xl shadow-blue-500/20' : ''}`}>
             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 text-center">{t.online_mode_label ?? 'GAME MODE'}</h3>
             <div className="flex gap-3">
               <button
@@ -1131,7 +1407,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
           </div>
 
           {/* HOST / JOIN cards */}
-          <div className="flex flex-col md:flex-row gap-6">
+          <div className={`flex flex-col md:flex-row gap-6 transition-all ${createJoinGuideActive ? 'rounded-3xl ring-4 ring-amber-400/70 shadow-2xl shadow-amber-500/20' : ''}`}>
             <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors">
               <h3 className="text-lg font-bold mb-2 text-blue-500 uppercase tracking-widest">{t.online_host}</h3>
               <p className="text-xs text-slate-400 text-center mb-8 h-8">{t.online_host_desc}</p>
@@ -1148,7 +1424,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
           </div>
 
           {/* Public Lobby */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
+          <div className={`bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700 transition-all ${lobbyGuideActive ? 'ring-4 ring-violet-400/70 shadow-2xl shadow-violet-500/20' : ''}`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 🏛️ {t.lobby_rooms}
@@ -1189,10 +1465,26 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
             )}
           </div>
 
-          <p className="text-[10px] text-slate-400 text-center max-w-md mx-auto">{t.online_instruction}</p>
+          <p className={`text-[10px] text-slate-400 text-center max-w-md mx-auto transition-all ${summaryGuideActive ? 'text-emerald-500 dark:text-emerald-300 font-bold' : ''}`}>{t.online_instruction}</p>
         </div>
       )}
       {error && <div className="mt-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 px-6 py-3 rounded-lg text-sm border border-red-200 dark:border-red-800">{error}</div>}
+      {showGuide && !isConnecting && (
+        <OnlineGuideOverlay
+          step={guideStep}
+          totalSteps={GUIDE_STEPS}
+          onBack={() => setGuideStep(prev => Math.max(0, prev - 1))}
+          onNext={() => {
+            if (guideStep >= GUIDE_STEPS - 1) {
+              closeGuide(true);
+              return;
+            }
+            setGuideStep(prev => prev + 1);
+          }}
+          onSkip={() => closeGuide(true)}
+          t={t}
+        />
+      )}
     </div>
   );
 };
@@ -1765,6 +2057,11 @@ export default function App() {
   // Refs
   const peerRef = useRef<any>(null);
   const connRef = useRef<any>(null);
+  const transportRef = useRef<'NONE' | 'PEER' | 'SUPABASE'>('NONE');
+  const relayChannelRef = useRef<any>(null);
+  const relayConnMapRef = useRef<Record<string, any>>({});
+  const relayClientIdRef = useRef<string>(createRelayClientId());
+  const relayGuestIdRef = useRef<string | null>(null);
   const roleRef = useRef<'HOST' | 'GUEST' | 'SOLO' | 'NONE'>('NONE');
   const roomIdRef = useRef<string | null>(null);
   const guestSessionIdRef = useRef<string | null>(null);
@@ -1908,6 +2205,52 @@ export default function App() {
     });
   };
 
+  const teardownRelayChannel = () => {
+    const activeChannel = relayChannelRef.current;
+    relayChannelRef.current = null;
+    relayGuestIdRef.current = null;
+    relayConnMapRef.current = {};
+    if (!activeChannel || !supabase) return;
+    try {
+      supabase.removeChannel(activeChannel);
+    } catch {
+      // ignore teardown failures
+    }
+  };
+
+  const sendRelayPacket = (to: string | null, message: unknown) => {
+    const channel = relayChannelRef.current;
+    if (!channel) return;
+    channel.send({
+      type: 'broadcast',
+      event: relayBroadcastEvent,
+      payload: {
+        from: relayClientIdRef.current,
+        to,
+        message,
+      },
+    });
+  };
+
+  const getRelayConnectionForGuest = (guestId: string) => {
+    const existing = relayConnMapRef.current[guestId];
+    if (existing) return existing;
+
+    const connection = {
+      open: true,
+      send: (payload: unknown) => {
+        relayGuestIdRef.current = guestId;
+        sendRelayPacket(guestId, payload);
+      },
+      close: () => {
+        if (relayGuestIdRef.current === guestId) relayGuestIdRef.current = null;
+      },
+    };
+
+    relayConnMapRef.current[guestId] = connection;
+    return connection;
+  };
+
   const clearGuestResumeSession = () => {
     try {
       localStorage.removeItem(GUEST_RESUME_STORAGE_KEY);
@@ -2001,6 +2344,9 @@ export default function App() {
     clearReconnectTimer();
     clearHostReconnectTimer();
     clearPendingPing();
+    teardownRelayChannel();
+    transportRef.current = 'NONE';
+    connRef.current = null;
     guestSessionIdRef.current = null;
     authorityRevisionRef.current = 0;
     lastAppliedAuthorityRevisionRef.current = 0;
@@ -2071,6 +2417,7 @@ export default function App() {
     clearReconnectTimer();
     clearHostReconnectTimer();
     clearPendingPing();
+    teardownRelayChannel();
     if (cloudSyncTimerRef.current !== null) {
       window.clearTimeout(cloudSyncTimerRef.current);
       cloudSyncTimerRef.current = null;
@@ -3481,6 +3828,192 @@ export default function App() {
     }
   };
 
+  const connectHostRelayTransport = (code: string, isResume: boolean) => {
+    clearPendingPing();
+    clearHostReconnectTimer();
+    teardownRelayChannel();
+
+    const previousPeer = peerRef.current;
+    if (previousPeer && !previousPeer.destroyed) previousPeer.destroy();
+    peerRef.current = null;
+    connRef.current = null;
+
+    if (!supabase) {
+      setIsConnecting(false);
+      setConnectionStatus('DISCONNECTED');
+      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      return;
+    }
+
+    transportRef.current = 'SUPABASE';
+    relayClientIdRef.current = createRelayClientId();
+    relayGuestIdRef.current = null;
+    timeOffsetRef.current = 0;
+    lastPacketTime.current = Date.now();
+
+    roleRef.current = 'HOST';
+    setMyId('P1');
+    setRoomIdLocal(code);
+    setError(null);
+    setIsConnecting(!isResume);
+
+    const channel = supabase.channel(`${relayChannelPrefix}${code}`, {
+      config: { broadcast: { self: false } },
+    });
+    relayChannelRef.current = channel;
+
+    channel.on('broadcast', { event: relayBroadcastEvent }, (event: any) => {
+      if (relayChannelRef.current !== channel) return;
+      const payload = event?.payload;
+      if (!payload || typeof payload !== 'object') return;
+
+      const from = typeof payload.from === 'string' ? payload.from : '';
+      if (!from || from === relayClientIdRef.current) return;
+
+      const to = typeof payload.to === 'string' || payload.to === null ? payload.to : null;
+      if (to && to !== 'HOST' && to !== relayClientIdRef.current) return;
+
+      const connection = getRelayConnectionForGuest(from);
+      handleGuestMessage(connection, payload.message);
+    });
+
+    channel.subscribe((status: string) => {
+      if (relayChannelRef.current !== channel) return;
+
+      if (status === 'SUBSCRIBED') {
+        hostReconnectAttemptRef.current = 0;
+        setIsConnecting(false);
+        setConnectionStatus(guestSessionIdRef.current ? 'RECONNECTING' : 'CONNECTED');
+        if (!isResume) setMatchPhaseAndUi('WAITING');
+        persistHostResumeSession();
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (manualDisconnectRef.current) return;
+        setIsConnecting(false);
+        setConnectionStatus('RECONNECTING');
+        scheduleHostReconnect(code);
+      }
+    });
+  };
+
+  const connectGuestRelayTransport = (code: string, isResume: boolean) => {
+    const INITIAL_CONNECT_TIMEOUT_MS = 12000;
+
+    clearPendingPing();
+    teardownRelayChannel();
+
+    const previousPeer = peerRef.current;
+    if (previousPeer && !previousPeer.destroyed) previousPeer.destroy();
+    peerRef.current = null;
+
+    if (!supabase) {
+      setIsConnecting(false);
+      setConnectionStatus('DISCONNECTED');
+      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      return;
+    }
+
+    transportRef.current = 'SUPABASE';
+    relayClientIdRef.current = createRelayClientId();
+    relayGuestIdRef.current = null;
+
+    roleRef.current = 'GUEST';
+    setMyId('P2');
+    setRoomIdLocal(code);
+    lastPacketTime.current = Date.now();
+
+    let initialConnectTimerId: number | null = null;
+    const clearInitialConnectTimer = () => {
+      if (initialConnectTimerId !== null) {
+        window.clearTimeout(initialConnectTimerId);
+        initialConnectTimerId = null;
+      }
+    };
+
+    if (!isResume) {
+      clearGuestResumeSession();
+      setIsConnecting(true);
+      setError(null);
+      setMySkillPicks([]);
+      initialConnectTimerId = window.setTimeout(() => {
+        setIsConnecting(false);
+        setConnectionStatus('DISCONNECTED');
+        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      }, INITIAL_CONNECT_TIMEOUT_MS);
+    } else {
+      setIsConnecting(false);
+      setConnectionStatus('RECONNECTING');
+    }
+
+    const channel = supabase.channel(`${relayChannelPrefix}${code}`, {
+      config: { broadcast: { self: false } },
+    });
+    relayChannelRef.current = channel;
+
+    connRef.current = {
+      open: true,
+      send: (payload: unknown) => sendRelayPacket('HOST', payload),
+      close: () => {
+        if (relayChannelRef.current === channel) teardownRelayChannel();
+      },
+    };
+
+    channel.on('broadcast', { event: relayBroadcastEvent }, (event: any) => {
+      if (relayChannelRef.current !== channel) return;
+      const payload = event?.payload;
+      if (!payload || typeof payload !== 'object') return;
+
+      const from = typeof payload.from === 'string' ? payload.from : '';
+      if (!from || from === relayClientIdRef.current) return;
+
+      const to = typeof payload.to === 'string' || payload.to === null ? payload.to : null;
+      if (to && to !== relayClientIdRef.current) return;
+
+      clearInitialConnectTimer();
+      handleGuestServerMessage(payload.message);
+    });
+
+    channel.subscribe((status: string) => {
+      if (relayChannelRef.current !== channel) return;
+
+      if (status === 'SUBSCRIBED') {
+        if (!isResume) {
+          connRef.current.send({
+            type: 'JOIN_REQUEST',
+            guestSessionId: guestSessionIdRef.current,
+            lastRevision: lastAppliedAuthorityRevisionRef.current,
+          });
+        }
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (manualDisconnectRef.current) return;
+        clearInitialConnectTimer();
+        setIsConnecting(false);
+        scheduleGuestReconnect();
+      }
+    });
+  };
+
+  const connectHostTransportByMode = (code: string, isResume: boolean) => {
+    if (useSupabaseRelay && supabase) {
+      connectHostRelayTransport(code, isResume);
+      return;
+    }
+    connectHostTransport(code, isResume);
+  };
+
+  const connectGuestTransportByMode = (code: string, isResume: boolean) => {
+    if (useSupabaseRelay && supabase) {
+      connectGuestRelayTransport(code, isResume);
+      return;
+    }
+    connectGuestTransport(code, isResume);
+  };
+
   const scheduleGuestReconnect = () => {
     if (manualDisconnectRef.current || roleRef.current !== 'GUEST') return;
     clearPendingPing();
@@ -3506,7 +4039,7 @@ export default function App() {
     const delay = Math.min(1500 * reconnectAttemptRef.current, 5000);
     reconnectTimerRef.current = window.setTimeout(() => {
       reconnectTimerRef.current = null;
-      connectGuestTransport(code, true);
+      connectGuestTransportByMode(code, true);
     }, delay);
   };
 
@@ -3526,7 +4059,7 @@ export default function App() {
     const delay = Math.min(1000 * hostReconnectAttemptRef.current, 5000);
     hostReconnectTimerRef.current = window.setTimeout(() => {
       hostReconnectTimerRef.current = null;
-      connectHostTransport(code, true);
+      connectHostTransportByMode(code, true);
     }, delay);
   };
 
@@ -3659,8 +4192,9 @@ export default function App() {
   const connectHostTransport = (code: string, isResume: boolean) => {
     clearPendingPing();
     clearHostReconnectTimer();
+    transportRef.current = 'PEER';
     const previousPeer = peerRef.current;
-    const peer = new window.Peer(`gridrush-${code}`);
+    const peer = createPeerClient(`gridrush-${code}`);
     peerRef.current = peer;
     if (previousPeer && previousPeer !== peer && !previousPeer.destroyed) previousPeer.destroy();
 
@@ -3715,14 +4249,24 @@ export default function App() {
   };
 
   const connectGuestTransport = (code: string, isResume: boolean) => {
+    const INITIAL_CONNECT_TIMEOUT_MS = 12000;
     clearPendingPing();
+    transportRef.current = 'PEER';
     const previousConn = connRef.current;
     connRef.current = null;
     const previousPeer = peerRef.current;
-    const peer = new window.Peer();
+    const peer = createPeerClient();
     peerRef.current = peer;
     if (previousConn && previousConn.open) previousConn.close();
     if (previousPeer && previousPeer !== peer && !previousPeer.destroyed) previousPeer.destroy();
+
+    let initialConnectTimerId: number | null = null;
+    const clearInitialConnectTimer = () => {
+      if (initialConnectTimerId !== null) {
+        window.clearTimeout(initialConnectTimerId);
+        initialConnectTimerId = null;
+      }
+    };
 
     roleRef.current = 'GUEST';
     setMyId('P2');
@@ -3734,7 +4278,14 @@ export default function App() {
       setIsConnecting(true);
       setError(null);
       setMySkillPicks([]);
+      initialConnectTimerId = window.setTimeout(() => {
+        if (peer !== peerRef.current || manualDisconnectRef.current) return;
+        setIsConnecting(false);
+        setConnectionStatus('DISCONNECTED');
+        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      }, INITIAL_CONNECT_TIMEOUT_MS);
     } else {
+      setIsConnecting(false);
       setConnectionStatus('RECONNECTING');
     }
 
@@ -3745,6 +4296,7 @@ export default function App() {
 
       conn.on('open', () => {
         if (conn !== connRef.current) return;
+        clearInitialConnectTimer();
         setIsConnecting(false);
         lastPacketTime.current = Date.now();
         conn.send({
@@ -3759,8 +4311,17 @@ export default function App() {
         handleGuestServerMessage(raw);
       });
 
+      conn.on('error', () => {
+        if (conn !== connRef.current || manualDisconnectRef.current) return;
+        clearInitialConnectTimer();
+        setIsConnecting(false);
+        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+        scheduleGuestReconnect();
+      });
+
       conn.on('close', () => {
         if (conn !== connRef.current || manualDisconnectRef.current) return;
+        clearInitialConnectTimer();
         connRef.current = null;
         scheduleGuestReconnect();
       });
@@ -3768,12 +4329,21 @@ export default function App() {
 
     peer.on('error', () => {
       if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      clearInitialConnectTimer();
       setIsConnecting(false);
+      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
       scheduleGuestReconnect();
     });
 
     peer.on('disconnected', () => {
       if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      clearInitialConnectTimer();
+      scheduleGuestReconnect();
+    });
+
+    peer.on('close', () => {
+      if (peer !== peerRef.current || manualDisconnectRef.current) return;
+      clearInitialConnectTimer();
       scheduleGuestReconnect();
     });
   };
@@ -3781,7 +4351,7 @@ export default function App() {
   // --- Network Setup ---
   const setupLobbyBeacon = (code: string) => {
     if (beaconPeerRef.current) return; // already running
-    const beacon = new window.Peer(`gridrush-pub-${code}`);
+    const beacon = createPeerClient(`gridrush-pub-${code}`);
     beaconPeerRef.current = beacon;
     beaconCodeRef.current = code;
     setIsLobbyPublic(true);
@@ -3828,7 +4398,7 @@ export default function App() {
     setRematchInviteFrom(null);
     setRematchStatus('NONE');
     const code = Math.floor(Math.random() * 9000 + 1000).toString();
-    connectHostTransport(code, false);
+    connectHostTransportByMode(code, false);
   };
 
   const joinGame = (code: string, gameMode: GameMode = 'STANDARD') => {
@@ -3839,7 +4409,7 @@ export default function App() {
     resetOnlineProtocolState();
     setRematchInviteFrom(null);
     setRematchStatus('NONE');
-    connectGuestTransport(code, false);
+    connectGuestTransportByMode(code, false);
   };
 
   const resetRematchUiState = () => {
@@ -3908,6 +4478,7 @@ export default function App() {
     clearHostResumeSession();
     teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
+    teardownRelayChannel();
     resetOnlineProtocolState();
     setGameState(DEFAULT_GAME_STATE);
     setMyId(null);
