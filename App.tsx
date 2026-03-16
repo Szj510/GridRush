@@ -1156,6 +1156,7 @@ const OnlineGuideOverlay = ({
   onBack,
   onNext,
   onSkip,
+  onStartTutorial,
   t,
 }: {
   step: number;
@@ -1163,6 +1164,7 @@ const OnlineGuideOverlay = ({
   onBack: () => void;
   onNext: () => void;
   onSkip: () => void;
+  onStartTutorial: () => void;
   t: any;
 }) => {
   const steps = [
@@ -1229,7 +1231,14 @@ const OnlineGuideOverlay = ({
           ))}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => { audio.playClick(); onStartTutorial(); }}
+            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
+          >
+            {t.online_tutorial_button}
+          </button>
+          <div className="flex gap-3">
           <button
             onClick={() => { audio.playClick(); onBack(); }}
             disabled={step === 0}
@@ -1243,13 +1252,45 @@ const OnlineGuideOverlay = ({
           >
             {isLastStep ? t.online_guide_done : t.online_guide_next}
           </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) => {
+const OnlineTutorialCoach = ({ step, t, onExit }: { step: TutorialMatchStep; t: any; onExit: () => void }) => {
+  const steps: Record<Exclude<TutorialMatchStep, 'NONE'>, { title: string; body: string }> = {
+    CLICK_CENTER: { title: t.online_tutorial_step_1_title, body: t.online_tutorial_step_1_body },
+    CENTER_MINIGAME: { title: t.online_tutorial_step_2_title, body: t.online_tutorial_step_2_body },
+    WATCH_BOT_CAPTURE: { title: t.online_tutorial_step_3_title, body: t.online_tutorial_step_3_body },
+    USE_FREEZE: { title: t.online_tutorial_step_4_title, body: t.online_tutorial_step_4_body },
+    RACE_TOP_RIGHT: { title: t.online_tutorial_step_5_title, body: t.online_tutorial_step_5_body },
+    STEAL_TOP_LEFT: { title: t.online_tutorial_step_6_title, body: t.online_tutorial_step_6_body },
+    STEAL_CONTEST: { title: t.online_tutorial_step_7_title, body: t.online_tutorial_step_7_body },
+    VICTORY: { title: t.online_tutorial_step_8_title, body: t.online_tutorial_step_8_body },
+  };
+
+  if (step === 'NONE') return null;
+  const current = steps[step];
+
+  return (
+    <div className="absolute top-24 left-4 z-[55] max-w-sm w-[calc(100%-2rem)] md:w-96 rounded-3xl border border-emerald-200 dark:border-emerald-900/60 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur px-5 py-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.35em] text-emerald-500 mb-1">{t.online_tutorial_label}</p>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{current.title}</h3>
+        </div>
+        <button onClick={() => { audio.playClick(); onExit(); }} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+          {t.online_tutorial_exit}
+        </button>
+      </div>
+      <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{current.body}</p>
+    </div>
+  );
+};
+
+const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, error, t }: any) => {
   const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen';
   const GUIDE_STEPS = 4;
   const [joinId, setJoinId] = useState('');
@@ -1406,6 +1447,15 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
             <p className="text-xs text-slate-400 text-center mt-2">{gameMode === 'FUN' ? t.fun_mode_desc : t.std_mode_desc}</p>
           </div>
 
+          <button
+            onClick={() => { audio.playClick(); onStartTutorial(); }}
+            className={`w-full rounded-2xl px-5 py-4 text-left bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-xl transition-all active:scale-[0.99] ${modeGuideActive ? 'ring-4 ring-emerald-300/80 shadow-2xl shadow-emerald-500/30' : 'hover:shadow-2xl hover:scale-[1.01]'}`}
+          >
+            <div className="text-xs font-black uppercase tracking-[0.35em] opacity-90 mb-2">{t.online_tutorial_label}</div>
+            <div className="text-lg font-black tracking-wide mb-1">{t.online_tutorial_button}</div>
+            <p className="text-sm text-white/90 leading-relaxed">{t.online_tutorial_desc}</p>
+          </button>
+
           {/* HOST / JOIN cards */}
           <div className={`flex flex-col md:flex-row gap-6 transition-all ${createJoinGuideActive ? 'rounded-3xl ring-4 ring-amber-400/70 shadow-2xl shadow-amber-500/20' : ''}`}>
             <div className="flex-1 bg-white dark:bg-slate-800 p-8 rounded-2xl flex flex-col items-center shadow-lg border-2 border-transparent hover:border-blue-500 transition-colors">
@@ -1482,6 +1532,10 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
             setGuideStep(prev => prev + 1);
           }}
           onSkip={() => closeGuide(true)}
+          onStartTutorial={() => {
+            closeGuide(true);
+            onStartTutorial();
+          }}
           t={t}
         />
       )}
@@ -1538,10 +1592,11 @@ const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic 
   );
 };
 
-const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame, onUseFunCard }: {
+const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame, onUseFunCard, highlightFreeze }: {
   player: PlayerState, isMe: boolean, opponent?: boolean, t: any,
   onFreeze?: () => void, onDuel?: () => void, oppInGame?: boolean,
   onUseFunCard?: (cardId: FunCardId) => void,
+  highlightFreeze?: boolean,
 }) => {
   const colorClass = player.id === 'P1' ? 'text-blue-500' : 'text-red-500';
   const borderClass = player.id === 'P1' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20';
@@ -1585,7 +1640,7 @@ const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame, o
               title={!oppInGame ? 'Opponent not in game' : 'Freeze opponent for 2s'}
               className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold transition-all ${
                 oppInGame
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer active:scale-95'
+                  ? `bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer active:scale-95 ${highlightFreeze ? 'ring-4 ring-emerald-400 animate-pulse' : ''}`
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-40'
               }`}
             >
@@ -1639,6 +1694,16 @@ type RpsResult = 'WIN' | 'LOSE' | 'DRAW';
 type RpsSeriesWinner = 'ME' | 'OPP' | 'DRAW';
 type RematchUiStatus = 'NONE' | 'REQUEST_SENT' | 'WAIT_HOST' | 'DECLINED';
 type AuthMode = 'SIGN_IN' | 'SIGN_UP';
+type TutorialMatchStep =
+  | 'NONE'
+  | 'CLICK_CENTER'
+  | 'CENTER_MINIGAME'
+  | 'WATCH_BOT_CAPTURE'
+  | 'USE_FREEZE'
+  | 'RACE_TOP_RIGHT'
+  | 'STEAL_TOP_LEFT'
+  | 'STEAL_CONTEST'
+  | 'VICTORY';
 
 interface RpsDisplayState {
   round: number;
@@ -2024,6 +2089,8 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('LOCAL_ONLY');
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
+  const [tutorialActive, setTutorialActive] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState<TutorialMatchStep>('NONE');
 
   // Skill pick phase (online only)
   const [mySkillPicks, setMySkillPicks] = useState<string[]>([]);
@@ -2091,6 +2158,15 @@ export default function App() {
   const statsRef = useRef<UserStats>(DEFAULT_STATS);
   statsRef.current = stats;
   const pendingInviteCodeRef = useRef<string | null>(null);
+  const tutorialActiveRef = useRef(false);
+  tutorialActiveRef.current = tutorialActive;
+  const tutorialBotTimersRef = useRef<number[]>([]);
+  const tutorialScriptRef = useRef({
+    leftCaptureQueued: false,
+    topRightRaceQueued: false,
+    stealDefendQueued: false,
+    completed: false,
+  });
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
@@ -2098,6 +2174,8 @@ export default function App() {
   const MAX_HOST_RECONNECT_ATTEMPTS = 8;
   const GUEST_RESUME_STORAGE_KEY = 'gridrush_guest_resume';
   const HOST_RESUME_STORAGE_KEY = 'gridrush_host_resume';
+  const ONLINE_TUTORIAL_DONE_KEY = 'gridrush_online_tutorial_done';
+  const RULES_MODAL_SEEN_KEY = 'gridrush_rules_modal_seen';
 
   const setMatchPhaseLocal = (phase: MatchPhase) => {
     const phaseChanged = matchPhaseRef.current !== phase;
@@ -2141,6 +2219,51 @@ export default function App() {
     if (pendingPingRef.current) {
       window.clearTimeout(pendingPingRef.current.timeoutId);
       pendingPingRef.current = null;
+    }
+  };
+
+  const clearTutorialBotTimers = () => {
+    tutorialBotTimersRef.current.forEach(timerId => window.clearTimeout(timerId));
+    tutorialBotTimersRef.current = [];
+  };
+
+  const queueTutorialBotAction = (delayMs: number, action: () => void) => {
+    const timerId = window.setTimeout(() => {
+      tutorialBotTimersRef.current = tutorialBotTimersRef.current.filter(id => id !== timerId);
+      if (!tutorialActiveRef.current) return;
+      action();
+    }, delayMs);
+    tutorialBotTimersRef.current.push(timerId);
+  };
+
+  const markTutorialCompleted = () => {
+    try {
+      localStorage.setItem(ONLINE_TUTORIAL_DONE_KEY, '1');
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const clearTutorialMode = (markComplete = false) => {
+    clearTutorialBotTimers();
+    tutorialScriptRef.current = {
+      leftCaptureQueued: false,
+      topRightRaceQueued: false,
+      stealDefendQueued: false,
+      completed: markComplete ? true : false,
+    };
+    tutorialActiveRef.current = false;
+    setTutorialActive(false);
+    setTutorialStep('NONE');
+    if (markComplete) markTutorialCompleted();
+  };
+
+  const closeRulesModal = () => {
+    setShowRules(false);
+    try {
+      localStorage.setItem(RULES_MODAL_SEEN_KEY, '1');
+    } catch {
+      // ignore storage failures
     }
   };
 
@@ -2283,6 +2406,7 @@ export default function App() {
   };
 
   const persistHostResumeSession = (stateOverride?: GameState, phaseOverride?: MatchPhase, revisionOverride?: number) => {
+    if (tutorialActiveRef.current) return;
     if (roleRef.current !== 'HOST' || !roomIdRef.current) return;
     try {
       localStorage.setItem(HOST_RESUME_STORAGE_KEY, JSON.stringify({
@@ -2396,6 +2520,11 @@ export default function App() {
       const savedStats = localStorage.getItem('gridrush_stats');
       if (savedStats) {
         try { setStats(sanitizeStats(JSON.parse(savedStats), DEFAULT_STATS)); } catch { /* bad JSON */ }
+      }
+
+      if (localStorage.getItem(RULES_MODAL_SEEN_KEY) !== '1') {
+        setShowRules(true);
+        localStorage.setItem(RULES_MODAL_SEEN_KEY, '1');
       }
     } catch (e) { console.error('Load failed', e); }
     setLocalPersistenceReady(true);
@@ -2512,6 +2641,7 @@ export default function App() {
   const clearData = () => {
     localStorage.removeItem('gridrush_stats');
     localStorage.removeItem('gridrush_settings');
+    localStorage.removeItem(RULES_MODAL_SEEN_KEY);
     clearGuestResumeSession();
     clearHostResumeSession();
     setStats(DEFAULT_STATS);
@@ -2974,7 +3104,81 @@ export default function App() {
   }, [gameState.winner]);
 
   useEffect(() => {
+    if (!tutorialActive) return;
+
+    const interval = window.setInterval(() => {
+      setGameState(prev => ({
+        ...prev,
+        p2: {
+          ...prev.p2,
+          lastHeartbeat: Date.now(),
+          lastInputTime: prev.p2.activeCell !== null ? Date.now() : prev.p2.lastInputTime,
+        },
+      }));
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [tutorialActive]);
+
+  useEffect(() => {
+    if (!tutorialActive) return;
+
+    if (gameState.winner === 'P1') {
+      if (!tutorialScriptRef.current.completed) {
+        tutorialScriptRef.current.completed = true;
+        setTutorialStep('VICTORY');
+        markTutorialCompleted();
+      }
+      return;
+    }
+
+    if (tutorialStep === 'CLICK_CENTER' && gameState.p1.activeCell === 4) {
+      setTutorialStep('CENTER_MINIGAME');
+      return;
+    }
+
+    if (tutorialStep === 'CENTER_MINIGAME' && gameState.cells[4]?.owner === 'P1' && !tutorialScriptRef.current.leftCaptureQueued) {
+      tutorialScriptRef.current.leftCaptureQueued = true;
+      setTutorialStep('WATCH_BOT_CAPTURE');
+      queueTutorialBotAction(1400, () => processCellClick('P2', 0));
+      queueTutorialBotAction(3600, () => processGameComplete('P2', true));
+      return;
+    }
+
+    if (tutorialStep === 'WATCH_BOT_CAPTURE' && gameState.cells[0]?.owner === 'P2' && !tutorialScriptRef.current.topRightRaceQueued) {
+      tutorialScriptRef.current.topRightRaceQueued = true;
+      queueTutorialBotAction(1200, () => {
+        processCellClick('P2', 2);
+        setTutorialStep('USE_FREEZE');
+      });
+      return;
+    }
+
+    if (tutorialStep === 'USE_FREEZE' && gameState.p1.freezesRemaining === 0) {
+      setTutorialStep('RACE_TOP_RIGHT');
+      return;
+    }
+
+    if (tutorialStep === 'RACE_TOP_RIGHT' && gameState.cells[2]?.owner === 'P1') {
+      setTutorialStep('STEAL_TOP_LEFT');
+      return;
+    }
+
+    if (
+      tutorialStep === 'STEAL_TOP_LEFT' &&
+      gameState.p1.activeCell === 0 &&
+      gameState.stealNotification?.challengerId === 'P1' &&
+      !tutorialScriptRef.current.stealDefendQueued
+    ) {
+      tutorialScriptRef.current.stealDefendQueued = true;
+      setTutorialStep('STEAL_CONTEST');
+      queueTutorialBotAction(900, () => processDefend('P2'));
+    }
+  }, [tutorialActive, tutorialStep, gameState]);
+
+  useEffect(() => {
     if (!gameState.winner || !myId || roleRef.current === 'SOLO') return;
+    if (tutorialActiveRef.current) return;
 
     const myResult: 'WIN' | 'LOSE' | 'DRAW' = gameState.winner === 'DRAW'
       ? 'DRAW'
@@ -3011,7 +3215,13 @@ export default function App() {
 
   // --- Game Logic ---
 
-  const startNewGame = (mode: 'ONLINE' | 'SOLO', skillOverrides?: { p1: string[]; p2: string[] }, soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT', headstartLoser?: 'P1' | 'P2' | null) => {
+  const startNewGame = (
+    mode: 'ONLINE' | 'SOLO',
+    skillOverrides?: { p1: string[]; p2: string[] },
+    soloDifficulty?: 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT',
+    headstartLoser?: 'P1' | 'P2' | null,
+    options?: { customGameIds?: string[]; customNames?: { p1?: string; p2?: string } }
+  ) => {
     audio.playClick();
     setRematchInviteFrom(null);
     setRematchStatus('NONE');
@@ -3019,10 +3229,10 @@ export default function App() {
     let numCells = 9;
 
     if (mode === 'SOLO') {
-       gameIds = shuffleGames(MINI_GAMES.map(g => g.id));
+       gameIds = options?.customGameIds?.length ? [...options.customGameIds] : shuffleGames(MINI_GAMES.map(g => g.id));
        numCells = gameIds.length;
     } else {
-       gameIds = shuffleGames(MINI_GAMES.map(g => g.id)).slice(0, 9);
+       gameIds = options?.customGameIds?.length ? [...options.customGameIds].slice(0, 9) : shuffleGames(MINI_GAMES.map(g => g.id)).slice(0, 9);
     }
 
     const cells: CellData[] = Array(numCells).fill(null).map((_, i) => ({
@@ -3043,8 +3253,8 @@ export default function App() {
     let newGame: GameState = {
       status: 'PLAYING',
       cells,
-      p1: makePlayer('P1', 'Player Blue', skillOverrides?.p1),
-      p2: makePlayer('P2', 'Player Red',  skillOverrides?.p2),
+      p1: makePlayer('P1', options?.customNames?.p1 ?? 'Player Blue', skillOverrides?.p1),
+      p2: makePlayer('P2', options?.customNames?.p2 ?? 'Player Red',  skillOverrides?.p2),
       winner: null,
       stealNotification: null,
       duelState: null,
@@ -3067,7 +3277,9 @@ export default function App() {
        setGameState(newGame);
        setConnectionStatus('CONNECTED');
        lastPacketTime.current = Date.now(); // Reset timestamp
-      saveStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
+      if (!tutorialActiveRef.current) {
+        saveStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
+      }
     } else {
        // Setup Solo State
        // In Solo, activeCell acts as the "Current Level Index"
@@ -3083,6 +3295,59 @@ export default function App() {
        setAppMode('GAME');
       saveStats(prev => ({ ...prev, gamesPlayed: prev.gamesPlayed + 1 }));
     }
+  };
+
+  const startOnlineTutorialMatch = () => {
+    manualDisconnectRef.current = true;
+    clearReconnectTimer();
+    clearGuestResumeSession();
+    clearHostResumeSession();
+    teardownLobbyBeacon();
+    if (peerRef.current) peerRef.current.destroy();
+    teardownRelayChannel();
+    resetOnlineProtocolState();
+
+    clearTutorialBotTimers();
+    tutorialScriptRef.current = {
+      leftCaptureQueued: false,
+      topRightRaceQueued: false,
+      stealDefendQueued: false,
+      completed: false,
+    };
+
+    tutorialActiveRef.current = true;
+    setTutorialActive(true);
+    setTutorialStep('CLICK_CENTER');
+
+    transportRef.current = 'NONE';
+    connRef.current = null;
+    roleRef.current = 'HOST';
+    gameModeRef.current = 'STANDARD';
+    manualDisconnectRef.current = false;
+    setMyId('P1');
+    setRoomIdLocal('TUTOR');
+    setIsConnecting(false);
+    setConnectionStatus('CONNECTED');
+    setError(null);
+    setRematchInviteFrom(null);
+    setRematchStatus('NONE');
+    setMySkillPicks(['STEAL', 'FREEZE']);
+    mySkillPicksRef.current = ['STEAL', 'FREEZE'];
+    p2SkillPicksRef.current = ['STEAL'];
+
+    startNewGame(
+      'ONLINE',
+      { p1: ['STEAL', 'FREEZE'], p2: ['STEAL'] },
+      undefined,
+      'P2',
+      {
+        customGameIds: ['math', 'stroop', 'reaction', 'sequence', 'mash', 'memory', 'lockpick', 'password', 'burst'],
+        customNames: {
+          p1: t.online_tutorial_player_name,
+          p2: t.online_tutorial_bot_name,
+        },
+      }
+    );
   };
 
   const processCellClick = (pid: PlayerId, cellIndex: number) => {
@@ -4459,6 +4724,10 @@ export default function App() {
 
   const handleRematch = () => {
     audio.playClick();
+    if (tutorialActiveRef.current) {
+      startOnlineTutorialMatch();
+      return;
+    }
     if (roleRef.current === 'SOLO') {
       startNewGame('SOLO', undefined, soloDifficultyRef.current);
       return;
@@ -4472,6 +4741,7 @@ export default function App() {
   };
 
   const resetGame = () => {
+    const returnToLobby = tutorialActiveRef.current;
     manualDisconnectRef.current = true;
     clearReconnectTimer();
     clearGuestResumeSession();
@@ -4479,6 +4749,7 @@ export default function App() {
     teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
     teardownRelayChannel();
+    clearTutorialMode(false);
     resetOnlineProtocolState();
     setGameState(DEFAULT_GAME_STATE);
     setMyId(null);
@@ -4488,7 +4759,7 @@ export default function App() {
     roleRef.current = 'NONE';
     setError(null);
     resetRematchUiState();
-    setAppMode('MENU');
+    setAppMode(returnToLobby ? 'LOBBY' : 'MENU');
     audio.playClick();
   };
 
@@ -4497,7 +4768,7 @@ export default function App() {
   if (appMode === 'MENU') {
     return (
       <div className="w-full h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300">
-        {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
+        {showRules && <RulesModal onClose={closeRulesModal} t={t} />}
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
         {showStats && <StatsModal stats={stats} onClose={() => setShowStats(false)} t={t} />}
@@ -4529,7 +4800,10 @@ export default function App() {
           onOnline={() => setAppMode('LOBBY')}
           onChallenge={() => setAppMode('SOLO_DIFFICULTY')}
           onPractice={() => setAppMode('PRACTICE')}
-          onShowRules={() => setShowRules(true)}
+          onShowRules={() => {
+            try { localStorage.setItem(RULES_MODAL_SEEN_KEY, '1'); } catch { /* ignore storage failures */ }
+            setShowRules(true);
+          }}
           onShowSettings={() => setShowSettings(true)}
           onShowAchievements={() => setShowAchievements(true)}
           onShowStats={() => setShowStats(true)}
@@ -4555,7 +4829,7 @@ export default function App() {
   }
   
   if (appMode === 'LOBBY') {
-    return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} isConnecting={isConnecting} error={error} t={t} />;
+    return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} onStartTutorial={startOnlineTutorialMatch} isConnecting={isConnecting} error={error} t={t} />;
   }
   if (appMode === 'SKILL_PICK') {
     const handleSkillConfirm = (picks: string[]) => {
@@ -4619,7 +4893,17 @@ export default function App() {
   const me = myId === 'P1' ? gameState.p1 : gameState.p2;
   const opponent = myId === 'P1' ? gameState.p2 : gameState.p1;
   const isSolo = roleRef.current === 'SOLO';
+  const isTutorialMatch = tutorialActive;
   const myActiveCellIdx = me.activeCell;
+  const tutorialForcedCell = tutorialStep === 'CLICK_CENTER'
+    ? 4
+    : tutorialStep === 'RACE_TOP_RIGHT'
+      ? 2
+      : tutorialStep === 'STEAL_TOP_LEFT'
+        ? 0
+        : null;
+  const tutorialGridLocked = isTutorialMatch && (tutorialStep === 'WATCH_BOT_CAPTURE' || tutorialStep === 'USE_FREEZE');
+  const freezeTutorialActive = isTutorialMatch && tutorialStep === 'USE_FREEZE';
 
   // Fun mode effect checks (evaluated at render time using tick-driven re-renders)
   const isFunMode = gameModeRef.current === 'FUN';
@@ -4638,10 +4922,11 @@ export default function App() {
   return (
     <div className="h-screen w-screen flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
-      {showRules && <RulesModal onClose={() => setShowRules(false)} t={t} />}
+      {showRules && <RulesModal onClose={closeRulesModal} t={t} />}
+      {isTutorialMatch && <OnlineTutorialCoach step={tutorialStep} t={t} onExit={resetGame} />}
 
       {/* Disconnection / Reconnect Modal */}
-      {connectionStatus !== 'CONNECTED' && (
+      {connectionStatus !== 'CONNECTED' && !isTutorialMatch && (
           <div className="absolute inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-bounce-sm">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${connectionStatus === 'RECONNECTING' ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
@@ -4689,7 +4974,7 @@ export default function App() {
             </h2>
             {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">TIME: {challengeTime}</div>}
             <div className="flex gap-4 mt-8 justify-center flex-wrap">
-              <button onClick={handleRematch} className="px-8 py-3 bg-yellow-400 text-black hover:bg-yellow-300 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.game_rematch}</button>
+              <button onClick={handleRematch} className="px-8 py-3 bg-yellow-400 text-black hover:bg-yellow-300 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{isTutorialMatch ? t.online_tutorial_replay : t.game_rematch}</button>
               <button onClick={resetGame} className="px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.conn_exit_menu}</button>
             </div>
             {!isSolo && (
@@ -4731,12 +5016,16 @@ export default function App() {
             const isDefender = myId === defenderId;
             const bgClass = isDefender ? 'bg-red-500 shadow-red-500/50' : 'bg-blue-500 shadow-blue-500/50';
             const showDefendBtn = isDefender && me.activeCell !== cellId;
+            const descTemplate = isDefender
+              ? (t.msg_steal_attack_desc ?? 'Opponent is stealing Cell {cell}! Tap DEFEND to contest, or ignore if your current race matters more.')
+              : (t.msg_steal_doing_desc ?? 'Stealing Cell {cell} from opponent!');
+            const desc = descTemplate.replace('{cell}', String(cellId + 1));
 
             return (
               <div className={`mx-4 p-5 rounded-2xl ${bgClass} shadow-xl text-white flex justify-between items-center animate-pulse-fast pointer-events-auto`}>
                 <div>
                    <h3 className="font-bold uppercase text-lg tracking-wider">{isDefender ? t.msg_steal_attack : t.msg_steal_doing}</h3>
-                   <div className="text-sm opacity-90">{isDefender ? `Opponent is stealing Cell ${cellId + 1}!` : `Stealing Cell ${cellId + 1} from opponent!`}</div>
+                   <div className="text-sm opacity-90">{desc}</div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-4xl font-mono font-black">{remaining}s</span>
@@ -4811,10 +5100,11 @@ export default function App() {
       {/* HUD */}
       <div className="h-20 md:h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center px-4 md:px-12 z-10 shrink-0 relative shadow-sm">
          <PlayerBadge player={me} isMe={true} t={t}
-           onFreeze={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'FREEZE' }); }}
-           onDuel={isSolo ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'DUEL' }); }}
+           onFreeze={isSolo || (isTutorialMatch && tutorialStep !== 'USE_FREEZE') ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'FREEZE' }); }}
+           onDuel={isSolo || isTutorialMatch ? undefined : () => { audio.playClick(); sendAction({ type: 'USE_SKILL', skill: 'DUEL' }); }}
            oppInGame={opponent.activeCell !== null}
            onUseFunCard={isFunMode && !isSolo ? (cardId) => { audio.playClick(); sendAction({ type: 'USE_FUN_CARD', cardId }); } : undefined}
+           highlightFreeze={freezeTutorialActive}
          />
          <div className="flex flex-col items-center">
             {isSolo ? (
@@ -4827,7 +5117,7 @@ export default function App() {
                     <div className="text-3xl font-black italic text-slate-100 dark:text-slate-800 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
                 <div className="flex items-center gap-2 mt-4 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
                         <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : connectionStatus === 'RECONNECTING' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
-                        <div className="text-[10px] text-slate-400 font-mono">ROOM: {roomId}</div>
+                  <div className="text-[10px] text-slate-400 font-mono">{isTutorialMatch ? `${t.online_tutorial_label}: BOT` : `ROOM: ${roomId}`}</div>
                         {isFunMode && <div className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">{t.fun_mode_badge ?? '🎉 FUN'}</div>}
                     </div>
                 <NetworkQualityPanel
@@ -4861,7 +5151,11 @@ export default function App() {
 
       {/* Game Grid or Solo View */}
       <div className="flex-1 flex items-center justify-center p-4 relative" style={isFlipped ? { transform: 'rotate(180deg)', transition: 'transform 0.3s' } : undefined}>
-         <button onClick={() => { audio.playClick(); setShowRules(true); }} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white font-bold transition-all z-20">?</button>
+         <button onClick={() => {
+           audio.playClick();
+           try { localStorage.setItem(RULES_MODAL_SEEN_KEY, '1'); } catch { /* ignore storage failures */ }
+           setShowRules(true);
+         }} className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-slate-400 hover:text-slate-900 dark:text-slate-500 dark:hover:text-white font-bold transition-all z-20">?</button>
 
          {/* Blind overlay — affects the whole current gameplay view but keeps interactions enabled */}
          {isBlinded && (
@@ -4879,7 +5173,7 @@ export default function App() {
                   </div>
                   
                   {/* Abandon Button for Online Mode */}
-                  {!isSolo && (
+                  {!isSolo && !isTutorialMatch && (
                       <button 
                         onClick={() => { audio.playClick(); sendAction({ type: 'ABANDON_CHALLENGE' }); }}
                         className="absolute top-6 right-6 text-xs font-bold text-red-500 hover:text-red-600 hover:underline uppercase tracking-widest transition-colors"
@@ -4906,6 +5200,7 @@ export default function App() {
                        onInteraction={() => sendAction({ type: 'INTERACTION' })}
                        language={settings.language} 
                        difficulty={isSolo ? soloDifficultyRef.current : (isHardMode ? 'EXPERT' : 'HARD')}
+                       tutorialEnabled={isTutorialMatch}
                        frozen={me.frozenUntil > Date.now()}
                      />
                   </div>
@@ -4960,8 +5255,20 @@ export default function App() {
                   const p1Time = isP1Active ? getTimer(gameState.p1.challengeStartTime) : 0;
                   const p2Time = isP2Active ? getTimer(gameState.p2.challengeStartTime) : 0;
 
+                  const tutorialCellAllowed = !isTutorialMatch || (!tutorialGridLocked && (tutorialForcedCell === null || tutorialForcedCell === cell.id));
+                  if (isTutorialMatch && tutorialForcedCell === cell.id) {
+                    baseClass += ' ring-4 ring-emerald-400 shadow-2xl shadow-emerald-400/20 animate-pulse';
+                  } else if (isTutorialMatch && tutorialForcedCell !== null) {
+                    baseClass += ' opacity-50';
+                  } else if (tutorialGridLocked) {
+                    baseClass += ' opacity-50';
+                  }
+
                   return (
-                     <div key={cell.id} onClick={() => { if(!isCellCooldown) { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); } }} className={baseClass}>
+                     <div key={cell.id} onClick={() => {
+                       if (isTutorialMatch && !tutorialCellAllowed) return;
+                       if(!isCellCooldown) { audio.playClick(); sendAction({ type: 'CLICK_CELL', cellIndex: cell.id }); }
+                     }} className={baseClass}>
                         {cell.owner === 'P1' && <Icons.Flag className="w-12 h-12 text-blue-500 drop-shadow-sm animate-fade-in" />}
                         {cell.owner === 'P2' && <Icons.Flag className="w-12 h-12 text-red-500 drop-shadow-sm animate-fade-in" />}
                         {!cell.owner && <Icons.Question className="w-8 h-8 text-slate-200 dark:text-slate-700 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors" />}

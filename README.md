@@ -10,6 +10,7 @@
 
 - **Online Multiplayer** — Real-time 1v1 battles over WebRTC (PeerJS P2P, no server required).
 - **Reliable Relay Mode** — When Supabase env is configured, online messages default to Supabase Realtime relay to avoid fragile P2P hole-punching.
+- **Guided Bot Tutorial** — First-time online players can launch a scripted tutorial match that teaches capture, freeze, and steal flow against a slowed-down bot.
 - **Invite via Link** — Host a room and click **Copy Invite Link** to get a shareable URL. Your friend opens the link and lands directly in your room — no code typing needed.
 - **Time Attack Mode** — Solo speed-run through all 13 mini-games in sequence, as fast as possible.
 - **Practice Gym** — Train individual mini-games with adjustable difficulty.
@@ -30,6 +31,8 @@
 3. Click any `?` cell to enter its mini-game. The first player to clear it captures that cell.
 4. Entering an enemy-owned cell spends your Steal and creates a 5-second defend window for the owner.
 5. Win instantly by getting 3 in a row, or own more cells when the 9-cell board is full.
+
+If you are brand new to online mode, open the guided bot tutorial from the online lobby first. It walks through the board with step-by-step prompts during a real match.
 
 ### Important Penalties
 

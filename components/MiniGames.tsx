@@ -132,7 +132,7 @@ const MathGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
           </Button>
         ))}
       </div>
-      {tutorialEnabled && <div className="text-xs text-green-600 dark:text-green-400 font-bold animate-bounce">HINT: Correct answer highlighted</div>}
+      {tutorialEnabled && <div className="text-xs text-green-600 dark:text-green-400 font-bold animate-bounce">{t.tutorial_hint_math}</div>}
     </div>
   );
 };
@@ -191,7 +191,7 @@ const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
            style={{ width: `${progress}%` }}
         />
         {tutorialEnabled && (
-            <div className="absolute top-0 bottom-0 right-10 border-l-2 border-red-500 border-dashed opacity-50 text-[10px] pl-1 pt-1 text-red-500">GOAL</div>
+            <div className="absolute top-0 bottom-0 right-10 border-l-2 border-red-500 border-dashed opacity-50 text-[10px] pl-1 pt-1 text-red-500">{t.tutorial_hint_goal}</div>
         )}
       </div>
       <Button 
@@ -265,7 +265,7 @@ const StroopGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL'
           </div>
           {tutorialEnabled && (
                 <div className="mt-2 text-xs bg-slate-800 text-white px-3 py-1 rounded-full animate-bounce z-20">
-                    Match this color!
+                  {t.tutorial_hint_stroop}
                 </div>
           )}
       </div>
@@ -359,7 +359,7 @@ const ReactionGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
             `${t.too_slow}\n(${resultMs}ms)`}
         </span>
         {tutorialEnabled && status === 'WAIT' && (
-            <div className="absolute bottom-4 text-white/70 text-sm animate-pulse">Wait for Green...</div>
+            <div className="absolute bottom-4 text-white/70 text-sm animate-pulse">{t.tutorial_hint_reaction}</div>
         )}
         </div>
         {(status === 'EARLY' || status === 'SLOW') && (
@@ -632,7 +632,7 @@ const LockPickGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
          
          {tutorialEnabled && (
             <div className="absolute bottom-[-40px] left-0 right-0 text-center text-xs text-blue-500 animate-bounce">
-                Tap when needle hits green!
+              {t.tutorial_hint_lockpick}
             </div>
          )}
       </div>
@@ -801,7 +801,7 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
               <div className="w-1 h-1 bg-white rounded-full" />
            </div>
            {tutorialEnabled && (
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-red-600 font-bold whitespace-nowrap">CLICK!</div>
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-red-600 font-bold whitespace-nowrap">{t.tutorial_hint_burst}</div>
            )}
          </button>
        )}
@@ -1165,7 +1165,7 @@ const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NO
           {tutorialEnabled && !started && !dead && (
             <text x={W / 2} y={H / 2 + 6} textAnchor="middle" fontSize="11" fill="#60a5fa"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              Click = flip gravity
+              {t.tutorial_hint_gravity}
             </text>
           )}
         </svg>
