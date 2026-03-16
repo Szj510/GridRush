@@ -52,6 +52,12 @@ const DEFAULT_STATS: UserStats = {
   onlineWins: 0,
   onlineLosses: 0,
   onlineDraws: 0,
+  modeStandardWins: 0,
+  modeStandardLosses: 0,
+  modeStandardDraws: 0,
+  modeFunWins: 0,
+  modeFunLosses: 0,
+  modeFunDraws: 0,
   fastestSoloRun: 0,
   totalSteals: 0,
   totalDefends: 0,
@@ -67,6 +73,9 @@ const DEFAULT_STATS: UserStats = {
   rpsSeriesPlayed: 0,
   rpsSeriesWon: 0,
   rpsSeriesDraw: 0,
+  rpsPickRock: 0,
+  rpsPickPaper: 0,
+  rpsPickScissors: 0,
   recentOnlineResults: [],
   soloRunsByDiff: {},
 };
@@ -239,10 +248,21 @@ const AchievementsModal = ({ stats, language, onClose, t }: { stats: UserStats, 
 );
 
 const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => void, t: any }) => {
+  const [recentLimit, setRecentLimit] = React.useState<10 | 20 | 50>(20);
+
   const onlineWins = stats.onlineWins ?? 0;
   const onlineLosses = stats.onlineLosses ?? 0;
   const onlineDraws = stats.onlineDraws ?? 0;
   const totalOnline = onlineWins + onlineLosses + onlineDraws;
+
+  const stdWins = stats.modeStandardWins ?? 0;
+  const stdLosses = stats.modeStandardLosses ?? 0;
+  const stdDraws = stats.modeStandardDraws ?? 0;
+  const funWins = stats.modeFunWins ?? 0;
+  const funLosses = stats.modeFunLosses ?? 0;
+  const funDraws = stats.modeFunDraws ?? 0;
+  const stdTotal = stdWins + stdLosses + stdDraws;
+  const funTotal = funWins + funLosses + funDraws;
 
   const rpsRoundsPlayed = stats.rpsRoundsPlayed ?? 0;
   const rpsRoundsWon = stats.rpsRoundsWon ?? 0;
@@ -250,8 +270,13 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
   const rpsSeriesPlayed = stats.rpsSeriesPlayed ?? 0;
   const rpsSeriesWon = stats.rpsSeriesWon ?? 0;
   const rpsSeriesDraw = stats.rpsSeriesDraw ?? 0;
+  const rpsPickRock = stats.rpsPickRock ?? 0;
+  const rpsPickPaper = stats.rpsPickPaper ?? 0;
+  const rpsPickScissors = stats.rpsPickScissors ?? 0;
 
   const winRate = totalOnline > 0 ? (onlineWins / totalOnline) * 100 : 0;
+  const stdWinRate = stdTotal > 0 ? (stdWins / stdTotal) * 100 : 0;
+  const funWinRate = funTotal > 0 ? (funWins / funTotal) * 100 : 0;
   const rpsRoundWinRate = rpsRoundsPlayed > 0 ? (rpsRoundsWon / rpsRoundsPlayed) * 100 : 0;
   const rpsSeriesWinRate = rpsSeriesPlayed > 0 ? (rpsSeriesWon / rpsSeriesPlayed) * 100 : 0;
 
@@ -263,7 +288,25 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
     return `${min}:${String(sec % 60).padStart(2, '0')}`;
   };
 
-  const recent = [...(stats.recentOnlineResults ?? [])].slice(-10).reverse();
+  const recentAll = [...(stats.recentOnlineResults ?? [])];
+  const recent = recentAll.slice(-recentLimit).reverse();
+  const trend = recentAll.slice(-20);
+
+  let currentWinStreak = 0;
+  for (let i = recentAll.length - 1; i >= 0; i--) {
+    if (recentAll[i].result !== 'WIN') break;
+    currentWinStreak += 1;
+  }
+  let bestWinStreak = 0;
+  let tmpStreak = 0;
+  for (const item of recentAll) {
+    if (item.result === 'WIN') {
+      tmpStreak += 1;
+      if (tmpStreak > bestWinStreak) bestWinStreak = tmpStreak;
+    } else {
+      tmpStreak = 0;
+    }
+  }
 
   const actionRows = [
     { key: t.stats_steals, value: stats.totalSteals ?? 0, bar: 'bg-amber-400' },
@@ -273,6 +316,14 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
     { key: t.stats_fun_cards_used, value: stats.totalFunCardsUsed ?? 0, bar: 'bg-fuchsia-400' },
   ];
   const actionTotal = Math.max(1, actionRows.reduce((sum, row) => sum + row.value, 0));
+  const actionsPerMatch = totalOnline > 0 ? actionTotal / totalOnline : 0;
+
+  const rpsPickRows = [
+    { key: t.stats_pick_rock ?? 'Rock', icon: '✊', value: rpsPickRock, bar: 'bg-slate-500' },
+    { key: t.stats_pick_paper ?? 'Paper', icon: '✋', value: rpsPickPaper, bar: 'bg-blue-400' },
+    { key: t.stats_pick_scissors ?? 'Scissors', icon: '✌️', value: rpsPickScissors, bar: 'bg-rose-400' },
+  ];
+  const totalPicks = Math.max(1, rpsPickRock + rpsPickPaper + rpsPickScissors);
 
   const diffRows: { id: Difficulty; label: string; value: number }[] = [
     { id: 'EASY', label: t.solo_diff_easy, value: stats.soloRunsByDiff?.EASY ?? 0 },
@@ -282,38 +333,119 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
   ];
 
   return (
-    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-5xl w-full flex flex-col max-h-[86vh] animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-cyan-50 via-sky-50 to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
-          <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
-            <Icons.Chart className="w-5 h-5 text-cyan-500" /> {t.stats_title}
-          </h2>
+    <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-4">
+      <div className="relative bg-white dark:bg-slate-900 rounded-3xl max-w-6xl w-full flex flex-col max-h-[88vh] animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="pointer-events-none absolute -top-16 -left-12 w-48 h-48 rounded-full bg-cyan-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 right-0 w-64 h-64 rounded-full bg-indigo-300/20 blur-3xl" />
+
+        <div className="relative px-5 md:px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-cyan-50 via-sky-50 to-indigo-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-widest">
+              <Icons.Chart className="w-5 h-5 text-cyan-500" /> {t.stats_title}
+            </h2>
+            <p className="text-xs mt-1 text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.stats_online_overview}</p>
+          </div>
           <button onClick={() => { audio.playClick(); onClose(); }} className="text-2xl text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
         </div>
 
-        <div className="overflow-y-auto p-6 space-y-5 custom-scrollbar">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
-              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_online_overview}</div>
-              <div className="flex items-center gap-4">
+        <div className="relative overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="xl:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50 via-white to-cyan-50/70 dark:from-slate-800/70 dark:via-slate-900 dark:to-slate-800/60 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-widest text-slate-400 mb-2">{t.stats_online_overview}</div>
+                  <div className="text-3xl font-black text-slate-900 dark:text-white">{fmtPct(winRate)}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{t.stats_online_matches}: {totalOnline}</div>
+                </div>
                 <div
-                  className="w-20 h-20 rounded-full grid place-items-center"
-                  style={{ background: `conic-gradient(#22c55e ${winRate}%, rgba(148,163,184,0.25) 0)` }}
+                  className="w-24 h-24 rounded-full grid place-items-center"
+                  style={{ background: `conic-gradient(#22c55e ${winRate}%, rgba(148,163,184,0.2) 0)` }}
                 >
-                  <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-900 grid place-items-center text-xs font-black text-slate-700 dark:text-slate-200">
+                  <div className="w-16 h-16 rounded-full bg-white dark:bg-slate-900 grid place-items-center text-sm font-black text-slate-700 dark:text-slate-200">
                     {Math.round(winRate)}%
                   </div>
                 </div>
-                <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                  <div>{t.stats_online_matches}: <span className="font-bold text-slate-900 dark:text-white">{totalOnline}</span></div>
-                  <div>{t.stats_online_wins}: <span className="font-bold text-green-500">{onlineWins}</span></div>
-                  <div>{t.stats_online_losses}: <span className="font-bold text-rose-500">{onlineLosses}</span></div>
-                  <div>{t.stats_online_draws}: <span className="font-bold text-amber-500">{onlineDraws}</span></div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                <div className="rounded-xl bg-green-100/70 dark:bg-green-900/20 px-3 py-2">
+                  <div className="text-[11px] text-green-700 dark:text-green-300 uppercase tracking-wider">{t.stats_online_wins}</div>
+                  <div className="text-lg font-black text-green-700 dark:text-green-300">{onlineWins}</div>
                 </div>
+                <div className="rounded-xl bg-rose-100/70 dark:bg-rose-900/20 px-3 py-2">
+                  <div className="text-[11px] text-rose-700 dark:text-rose-300 uppercase tracking-wider">{t.stats_online_losses}</div>
+                  <div className="text-lg font-black text-rose-700 dark:text-rose-300">{onlineLosses}</div>
+                </div>
+                <div className="rounded-xl bg-amber-100/70 dark:bg-amber-900/20 px-3 py-2">
+                  <div className="text-[11px] text-amber-700 dark:text-amber-300 uppercase tracking-wider">{t.stats_online_draws}</div>
+                  <div className="text-lg font-black text-amber-700 dark:text-amber-300">{onlineDraws}</div>
+                </div>
+                <div className="rounded-xl bg-sky-100/70 dark:bg-sky-900/20 px-3 py-2">
+                  <div className="text-[11px] text-sky-700 dark:text-sky-300 uppercase tracking-wider">{t.stats_current_streak ?? 'Current Streak'}</div>
+                  <div className="text-lg font-black text-sky-700 dark:text-sky-300">{currentWinStreak}</div>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_recent_trend ?? 'Recent Form'}</div>
+                {trend.length === 0 ? (
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{t.stats_recent_empty}</div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {trend.map((item, idx) => {
+                      const cls = item.result === 'WIN'
+                        ? 'bg-green-400'
+                        : item.result === 'LOSE'
+                          ? 'bg-rose-400'
+                          : 'bg-amber-400';
+                      return <span key={`${item.at}-${idx}`} className={`w-3 h-3 rounded-full ${cls}`} title={new Date(item.at).toLocaleString()} />;
+                    })}
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.stats_best_streak ?? 'Best Win Streak'}: {bestWinStreak}</div>
               </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_global_title}</div>
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <div>{t.stats_games_played}: <span className="font-bold text-slate-900 dark:text-white">{stats.gamesPlayed}</span></div>
+                <div>{t.stats_best_solo}: <span className="font-bold text-slate-900 dark:text-white">{fmtMs(stats.fastestSoloRun)}</span></div>
+                <div>{t.stats_ach_unlocked}: <span className="font-bold text-slate-900 dark:text-white">{stats.unlockedAchievements.length}</span></div>
+                <div>{t.stats_practice_records}: <span className="font-bold text-slate-900 dark:text-white">{stats.practiceRecords.length}</span></div>
+                <div>{t.stats_actions_per_match ?? 'Actions per Match'}: <span className="font-bold text-slate-900 dark:text-white">{actionsPerMatch.toFixed(2)}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_mode_split ?? 'MODE SPLIT'}</div>
+              <div className="space-y-3">
+                <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                    <span>{t.stats_mode_standard}</span>
+                    <span>{fmtPct(stdWinRate)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mb-2">
+                    <div className="h-full bg-sky-400" style={{ width: `${stdWinRate}%` }} />
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{stdWins}-{stdLosses}-{stdDraws} ({stdTotal})</div>
+                </div>
+                <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                    <span>{t.stats_mode_fun}</span>
+                    <span>{fmtPct(funWinRate)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mb-2">
+                    <div className="h-full bg-fuchsia-400" style={{ width: `${funWinRate}%` }} />
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{funWins}-{funLosses}-{funDraws} ({funTotal})</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
               <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_rps_title}</div>
               <div className="space-y-3">
                 <div>
@@ -340,21 +472,28 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
                 <div className="text-xs text-slate-500 dark:text-slate-300">
                   {t.stats_rps_series}: {rpsSeriesWon}/{rpsSeriesPlayed} · {t.stats_rps_draws}: {rpsSeriesDraw}
                 </div>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
-              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_global_title}</div>
-              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <div>{t.stats_games_played}: <span className="font-bold text-slate-900 dark:text-white">{stats.gamesPlayed}</span></div>
-                <div>{t.stats_best_solo}: <span className="font-bold text-slate-900 dark:text-white">{fmtMs(stats.fastestSoloRun)}</span></div>
-                <div>{t.stats_ach_unlocked}: <span className="font-bold text-slate-900 dark:text-white">{stats.unlockedAchievements.length}</span></div>
-                <div>{t.stats_practice_records}: <span className="font-bold text-slate-900 dark:text-white">{stats.practiceRecords.length}</span></div>
+                <div className="pt-1">
+                  <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_pick_distribution ?? 'Pick Distribution'}</div>
+                  <div className="space-y-2">
+                    {rpsPickRows.map(row => (
+                      <div key={row.key}>
+                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
+                          <span>{row.icon} {row.key}</span>
+                          <span>{row.value} ({fmtPct((row.value / totalPicks) * 100)})</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                          <div className={`h-full ${row.bar}`} style={{ width: `${(row.value / totalPicks) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
               <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_action_breakdown}</div>
               <div className="space-y-2">
@@ -389,7 +528,20 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
           </div>
 
           <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-            <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_recent_matches}</div>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="text-xs uppercase tracking-widest text-slate-400">{t.stats_recent_matches}</div>
+              <div className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-1">
+                {[10, 20, 50].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => { audio.playClick(); setRecentLimit(n as 10 | 20 | 50); }}
+                    className={`px-3 py-1 text-xs rounded-full font-bold transition-colors ${recentLimit === n ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-300'}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
             {recent.length === 0 ? (
               <div className="text-sm text-slate-500 dark:text-slate-400">{t.stats_recent_empty}</div>
             ) : (
@@ -2114,12 +2266,20 @@ export default function App() {
       : gameState.winner === myId
         ? 'WIN'
         : 'LOSE';
+    const mode = gameModeRef.current;
+    const isStandard = mode === 'STANDARD';
 
     saveStats(prevStats => ({
       ...prevStats,
       onlineWins: prevStats.onlineWins + (myResult === 'WIN' ? 1 : 0),
       onlineLosses: (prevStats.onlineLosses ?? 0) + (myResult === 'LOSE' ? 1 : 0),
       onlineDraws: (prevStats.onlineDraws ?? 0) + (myResult === 'DRAW' ? 1 : 0),
+      modeStandardWins: (prevStats.modeStandardWins ?? 0) + (isStandard && myResult === 'WIN' ? 1 : 0),
+      modeStandardLosses: (prevStats.modeStandardLosses ?? 0) + (isStandard && myResult === 'LOSE' ? 1 : 0),
+      modeStandardDraws: (prevStats.modeStandardDraws ?? 0) + (isStandard && myResult === 'DRAW' ? 1 : 0),
+      modeFunWins: (prevStats.modeFunWins ?? 0) + (!isStandard && myResult === 'WIN' ? 1 : 0),
+      modeFunLosses: (prevStats.modeFunLosses ?? 0) + (!isStandard && myResult === 'LOSE' ? 1 : 0),
+      modeFunDraws: (prevStats.modeFunDraws ?? 0) + (!isStandard && myResult === 'DRAW' ? 1 : 0),
       recentOnlineResults: [
         ...(prevStats.recentOnlineResults ?? []),
         { at: Date.now(), result: myResult, mode: gameModeRef.current },
@@ -3467,6 +3627,12 @@ export default function App() {
       if (rpsState.myMove !== null || rpsState.seriesWinner !== null) return; // already picked
       rpsMyPickRef.current = move;
       setRpsState(prev => ({ ...prev, myMove: move }));
+      saveStats(prevStats => ({
+        ...prevStats,
+        rpsPickRock: (prevStats.rpsPickRock ?? 0) + (move === 'R' ? 1 : 0),
+        rpsPickPaper: (prevStats.rpsPickPaper ?? 0) + (move === 'P' ? 1 : 0),
+        rpsPickScissors: (prevStats.rpsPickScissors ?? 0) + (move === 'S' ? 1 : 0),
+      }));
       if (roleRef.current === 'GUEST' && connRef.current) {
         connRef.current.send({ type: 'RPS_PICK', move, phase: 'RPS' });
       } else if (roleRef.current === 'HOST') {

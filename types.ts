@@ -129,6 +129,12 @@ export interface UserStats {
   onlineWins: number;
   onlineLosses: number;
   onlineDraws: number;
+  modeStandardWins: number;
+  modeStandardLosses: number;
+  modeStandardDraws: number;
+  modeFunWins: number;
+  modeFunLosses: number;
+  modeFunDraws: number;
   fastestSoloRun: number; 
   totalSteals: number;
   totalDefends: number;
@@ -144,6 +150,9 @@ export interface UserStats {
   rpsSeriesPlayed: number;
   rpsSeriesWon: number;
   rpsSeriesDraw: number;
+  rpsPickRock: number;
+  rpsPickPaper: number;
+  rpsPickScissors: number;
   recentOnlineResults: RecentOnlineResult[];
   soloRunsByDiff: Partial<Record<Difficulty, number>>; // per-difficulty fastest run (ms)
 }

@@ -238,6 +238,12 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
     onlineWins:     clampInt(s.onlineWins,    0, 1_000_000, defaults.onlineWins),
     onlineLosses:   clampInt(s.onlineLosses,  0, 1_000_000, defaults.onlineLosses),
     onlineDraws:    clampInt(s.onlineDraws,   0, 1_000_000, defaults.onlineDraws),
+    modeStandardWins: clampInt(s.modeStandardWins, 0, 1_000_000, defaults.modeStandardWins),
+    modeStandardLosses: clampInt(s.modeStandardLosses, 0, 1_000_000, defaults.modeStandardLosses),
+    modeStandardDraws: clampInt(s.modeStandardDraws, 0, 1_000_000, defaults.modeStandardDraws),
+    modeFunWins: clampInt(s.modeFunWins, 0, 1_000_000, defaults.modeFunWins),
+    modeFunLosses: clampInt(s.modeFunLosses, 0, 1_000_000, defaults.modeFunLosses),
+    modeFunDraws: clampInt(s.modeFunDraws, 0, 1_000_000, defaults.modeFunDraws),
     fastestSoloRun: clampInt(s.fastestSoloRun, 0, 86_400_000, defaults.fastestSoloRun),
     totalSteals:    clampInt(s.totalSteals,   0, 1_000_000, defaults.totalSteals),
     totalDefends:   clampInt(s.totalDefends,  0, 1_000_000, defaults.totalDefends),
@@ -251,6 +257,9 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
     rpsSeriesPlayed: clampInt(s.rpsSeriesPlayed, 0, 1_000_000, defaults.rpsSeriesPlayed),
     rpsSeriesWon: clampInt(s.rpsSeriesWon, 0, 1_000_000, defaults.rpsSeriesWon),
     rpsSeriesDraw: clampInt(s.rpsSeriesDraw, 0, 1_000_000, defaults.rpsSeriesDraw),
+    rpsPickRock: clampInt(s.rpsPickRock, 0, 1_000_000, defaults.rpsPickRock),
+    rpsPickPaper: clampInt(s.rpsPickPaper, 0, 1_000_000, defaults.rpsPickPaper),
+    rpsPickScissors: clampInt(s.rpsPickScissors, 0, 1_000_000, defaults.rpsPickScissors),
     recentOnlineResults,
     unlockedAchievements: Array.isArray(s.unlockedAchievements)
       ? (s.unlockedAchievements as unknown[])
