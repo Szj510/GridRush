@@ -67,7 +67,7 @@ GridRush runs entirely in the browser with no backend. All game state lives on t
 
 ## 🚀 Running Locally
 
-**Prerequisites:** [Node.js](https://nodejs.org/) v16 or higher.
+**Prerequisites:** [Node.js](https://nodejs.org/) v20 or higher.
 
 ```bash
 # Clone the repo

@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { Session, User } from '@supabase/supabase-js';
 import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove, GameMode, FunCardId } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
+import { AuthModal } from './components/AuthModal';
+import type { CloudSyncStatus } from './components/AuthModal';
 import { audio } from './services/audio';
+import { getDefaultNickname, isValidNickname, mergeUserStats, normalizeNickname } from './services/account';
+import { hasSupabaseConfig, supabase } from './services/supabase';
+import type { ProfileRow } from './services/supabase';
 
 declare global {
   interface Window {
@@ -581,6 +587,7 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
 // --- Main Components ---
 
 const MainMenu = ({ 
+  onShowAccount,
   onOnline, 
   onChallenge, 
   onPractice,
@@ -588,10 +595,21 @@ const MainMenu = ({
   onShowSettings,
   onShowAchievements,
   onShowStats,
+  accountLabel,
+  accountConnected,
   t
 }: any) => (
   <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
     <div className="absolute top-6 right-6 flex gap-3">
+      <button 
+        onClick={() => { audio.playClick(); onShowAccount(); }}
+        className="h-12 px-3 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center gap-2 text-slate-700 dark:text-slate-100 transition-all max-w-[14rem]"
+      >
+        <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-black uppercase ${accountConnected ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-200'}`}>
+          {String(accountLabel || '?').slice(0, 1)}
+        </span>
+        <span className="hidden lg:block text-xs font-bold uppercase tracking-widest truncate">{accountLabel}</span>
+      </button>
       <button 
         onClick={() => { audio.playClick(); onShowStats(); }}
         className="w-12 h-12 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center justify-center text-cyan-500 transition-all"
@@ -1306,6 +1324,7 @@ const SKILL_DEFS = [
 type RpsResult = 'WIN' | 'LOSE' | 'DRAW';
 type RpsSeriesWinner = 'ME' | 'OPP' | 'DRAW';
 type RematchUiStatus = 'NONE' | 'REQUEST_SENT' | 'WAIT_HOST' | 'DECLINED';
+type AuthMode = 'SIGN_IN' | 'SIGN_UP';
 
 interface RpsDisplayState {
   round: number;
@@ -1653,6 +1672,7 @@ export default function App() {
   // Persisted State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [stats, setStats] = useState<UserStats>(DEFAULT_STATS);
+  const [localPersistenceReady, setLocalPersistenceReady] = useState(false);
 
   // Game State
   const [gameState, setGameState] = useState<GameState>(DEFAULT_GAME_STATE);
@@ -1679,7 +1699,17 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const [newAchievement, setNewAchievement] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>('SIGN_IN');
+  const [authSession, setAuthSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [authLoading, setAuthLoading] = useState(hasSupabaseConfig);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('LOCAL_ONLY');
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
 
   // Skill pick phase (online only)
   const [mySkillPicks, setMySkillPicks] = useState<string[]>([]);
@@ -1737,6 +1767,10 @@ export default function App() {
   const [, setTick] = useState(0);
   const gameModeRef = useRef<GameMode>('STANDARD');
   const suppressNextSyncRef = useRef(false); // Suppresses STATE_UPDATE on heartbeat-only setGameState calls
+  const cloudHydratedRef = useRef(false);
+  const cloudSyncTimerRef = useRef<number | null>(null);
+  const statsRef = useRef<UserStats>(DEFAULT_STATS);
+  statsRef.current = stats;
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
@@ -1983,6 +2017,7 @@ export default function App() {
         try { setStats(sanitizeStats(JSON.parse(savedStats), DEFAULT_STATS)); } catch { /* bad JSON */ }
       }
     } catch (e) { console.error('Load failed', e); }
+    setLocalPersistenceReady(true);
   }, []);
 
   useEffect(() => {
@@ -1995,6 +2030,10 @@ export default function App() {
     clearReconnectTimer();
     clearHostReconnectTimer();
     clearPendingPing();
+    if (cloudSyncTimerRef.current !== null) {
+      window.clearTimeout(cloudSyncTimerRef.current);
+      cloudSyncTimerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -2034,14 +2073,46 @@ export default function App() {
       }
   }, [settings.theme]);
 
+  const resolveAchievements = (currentStats: UserStats) => {
+    const unlocked = [...currentStats.unlockedAchievements];
+    let changed = false;
+    const newlyUnlocked: string[] = [];
+
+    ACHIEVEMENTS_LIST.forEach(ach => {
+      if (!unlocked.includes(ach.id) && ach.condition(currentStats)) {
+        unlocked.push(ach.id);
+        newlyUnlocked.push(ach.titleEn);
+        changed = true;
+      }
+    });
+
+    return {
+      stats: changed ? { ...currentStats, unlockedAchievements: unlocked } : currentStats,
+      newlyUnlocked,
+    };
+  };
+
+  const finalizeStats = (rawStats: UserStats) => {
+    const resolved = resolveAchievements(rawStats);
+    try {
+      localStorage.setItem('gridrush_stats', JSON.stringify(resolved.stats));
+    } catch {
+      // ignore storage failures
+    }
+    if (resolved.newlyUnlocked.length > 0) {
+      setNewAchievement(resolved.newlyUnlocked[resolved.newlyUnlocked.length - 1]);
+      audio.playWin();
+      window.setTimeout(() => setNewAchievement(null), 4000);
+    }
+    return resolved.stats;
+  };
+
   const saveStats = (next: UserStats | ((prev: UserStats) => UserStats)) => {
     setStats(prev => {
       const newStats = typeof next === 'function'
         ? (next as (p: UserStats) => UserStats)(prev)
         : next;
-      localStorage.setItem('gridrush_stats', JSON.stringify(newStats));
-      checkAchievements(newStats);
-      return newStats;
+      return finalizeStats(newStats);
     });
   };
 
@@ -2064,27 +2135,283 @@ export default function App() {
       saveStats(prev => ({ ...prev, practiceRecords: [...prev.practiceRecords, record] }));
   };
 
-  // --- Achievements Logic ---
-  const checkAchievements = (currentStats: UserStats) => {
-    let unlocked = [...currentStats.unlockedAchievements];
-    let changed = false;
+  const formatLocaleDateTime = (value: string | number | Date) =>
+    new Date(value).toLocaleString(settings.language === 'zh' ? 'zh-CN' : 'en-US');
 
-    ACHIEVEMENTS_LIST.forEach(ach => {
-      if (!unlocked.includes(ach.id) && ach.condition(currentStats)) {
-        unlocked.push(ach.id);
-        setNewAchievement(ach.titleEn); // Show toast
-        audio.playWin(); // Achievement sound
-        changed = true;
-        setTimeout(() => setNewAchievement(null), 4000);
-      }
-    });
+  const clearAuthFeedback = () => {
+    setAuthError(null);
+    setAuthNotice(null);
+  };
 
-    if (changed) {
-      const updated = { ...currentStats, unlockedAchievements: unlocked };
-      setStats(updated);
-      localStorage.setItem('gridrush_stats', JSON.stringify(updated));
+  const hydrateCloudAccount = async (user: User) => {
+    const supabaseClient = supabase;
+    if (!supabaseClient) {
+      setAuthLoading(false);
+      setCloudSyncStatus('LOCAL_ONLY');
+      return;
+    }
+
+    setAuthLoading(true);
+    setCloudSyncStatus('SYNCING');
+    setAuthError(null);
+
+    try {
+      const fallbackNickname = getDefaultNickname(
+        typeof user.user_metadata?.nickname === 'string' ? user.user_metadata.nickname : user.email,
+      );
+
+      const { data: profileRow, error: profileFetchError } = await supabaseClient
+        .from('profiles')
+        .select('id, email, nickname, created_at, updated_at')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profileFetchError) throw profileFetchError;
+
+      const profilePayload = {
+        id: user.id,
+        email: user.email ?? profileRow?.email ?? null,
+        nickname: (profileRow?.nickname?.trim() || fallbackNickname).slice(0, 24),
+      };
+
+      const nextProfile: ProfileRow = {
+        ...profilePayload,
+        created_at: profileRow?.created_at ?? null,
+        updated_at: profileRow?.updated_at ?? null,
+      };
+
+      const { error: profileUpsertError } = await supabaseClient.from('profiles').upsert(profilePayload);
+      if (profileUpsertError) throw profileUpsertError;
+
+      const { data: statsRow, error: statsFetchError } = await supabaseClient
+        .from('user_stats')
+        .select('user_id, stats_json, created_at, updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (statsFetchError) throw statsFetchError;
+
+      const mergedStats = mergeUserStats(statsRef.current, statsRow?.stats_json ?? DEFAULT_STATS, DEFAULT_STATS);
+      const finalizedStats = finalizeStats(mergedStats);
+
+      cloudHydratedRef.current = false;
+      setProfile(nextProfile);
+      setStats(finalizedStats);
+
+      const { error: statsUpsertError } = await supabaseClient.from('user_stats').upsert({
+        user_id: user.id,
+        stats_json: finalizedStats,
+      });
+      if (statsUpsertError) throw statsUpsertError;
+
+      cloudHydratedRef.current = true;
+      setCloudSyncStatus('SYNCED');
+      setLastCloudSyncAt(formatLocaleDateTime(Date.now()));
+    } catch (err) {
+      cloudHydratedRef.current = false;
+      setCloudSyncStatus('ERROR');
+      setAuthError(err instanceof Error ? err.message : 'Supabase request failed');
+      console.error(err);
+    } finally {
+      setAuthLoading(false);
     }
   };
+
+  const pushStatsToCloud = async (statsToUpload: UserStats, exposeError = false) => {
+    if (!supabase || !authSession?.user) {
+      setCloudSyncStatus('LOCAL_ONLY');
+      return;
+    }
+
+    setCloudSyncStatus('SYNCING');
+    try {
+      const { error: statsUpsertError } = await supabase.from('user_stats').upsert({
+        user_id: authSession.user.id,
+        stats_json: statsToUpload,
+      });
+      if (statsUpsertError) throw statsUpsertError;
+      setCloudSyncStatus('SYNCED');
+      setLastCloudSyncAt(formatLocaleDateTime(Date.now()));
+      if (exposeError) setAuthNotice(t.account_synced);
+    } catch (err) {
+      setCloudSyncStatus('ERROR');
+      if (exposeError) {
+        setAuthError(err instanceof Error ? err.message : 'Supabase request failed');
+      }
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!localPersistenceReady) return;
+    const supabaseClient = supabase;
+    if (!supabaseClient) {
+      setAuthLoading(false);
+      setCloudSyncStatus('LOCAL_ONLY');
+      return;
+    }
+
+    let disposed = false;
+
+    const initializeSession = async () => {
+      setAuthLoading(true);
+      const { data } = await supabaseClient.auth.getSession();
+      if (disposed) return;
+      setAuthSession(data.session);
+      if (data.session?.user) {
+        await hydrateCloudAccount(data.session.user);
+        return;
+      }
+      setProfile(null);
+      setCloudSyncStatus('LOCAL_ONLY');
+      setLastCloudSyncAt(null);
+      setAuthLoading(false);
+    };
+
+    void initializeSession();
+
+    const { data: authSubscription } = supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
+      if (disposed) return;
+      setAuthSession(nextSession);
+      if (!nextSession?.user) {
+        cloudHydratedRef.current = false;
+        setProfile(null);
+        setCloudSyncStatus('LOCAL_ONLY');
+        setLastCloudSyncAt(null);
+        setAuthLoading(false);
+        return;
+      }
+      void hydrateCloudAccount(nextSession.user);
+    });
+
+    return () => {
+      disposed = true;
+      authSubscription.subscription.unsubscribe();
+    };
+  }, [localPersistenceReady]);
+
+  useEffect(() => {
+    if (!supabase || !authSession?.user || !cloudHydratedRef.current) return;
+
+    if (cloudSyncTimerRef.current !== null) {
+      window.clearTimeout(cloudSyncTimerRef.current);
+    }
+
+    cloudSyncTimerRef.current = window.setTimeout(() => {
+      void pushStatsToCloud(statsRef.current);
+    }, 900);
+
+    return () => {
+      if (cloudSyncTimerRef.current !== null) {
+        window.clearTimeout(cloudSyncTimerRef.current);
+        cloudSyncTimerRef.current = null;
+      }
+    };
+  }, [stats, authSession?.user?.id]);
+
+  const handleSignIn = async ({ email, password }: { email: string; password: string }) => {
+    clearAuthFeedback();
+    if (!supabase) {
+      setAuthError(t.account_env_missing_desc);
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) throw signInError;
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to sign in');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignUp = async ({ email, password, nickname }: { email: string; password: string; nickname: string }) => {
+    clearAuthFeedback();
+    const normalizedNickname = normalizeNickname(nickname);
+    if (!isValidNickname(normalizedNickname)) {
+      setAuthError(t.account_nickname_too_short);
+      return;
+    }
+    if (!supabase) {
+      setAuthError(t.account_env_missing_desc);
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { nickname: normalizedNickname },
+        },
+      });
+      if (signUpError) throw signUpError;
+      if (!data.session) {
+        setAuthNotice(t.account_verify_email);
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to create account');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    clearAuthFeedback();
+    if (!supabase) {
+      setAuthError(t.account_env_missing_desc);
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      setAuthNotice(t.account_signed_out);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to sign out');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSaveNickname = async (nickname: string) => {
+    clearAuthFeedback();
+    const normalizedNickname = normalizeNickname(nickname);
+    if (!isValidNickname(normalizedNickname)) {
+      setAuthError(t.account_nickname_too_short);
+      return;
+    }
+    if (!supabase || !authSession?.user) {
+      setAuthError(t.account_env_missing_desc);
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const nextProfile: ProfileRow = {
+        id: authSession.user.id,
+        email: authSession.user.email ?? null,
+        nickname: normalizedNickname,
+      };
+      const { error: profileUpsertError } = await supabase.from('profiles').upsert(nextProfile);
+      if (profileUpsertError) throw profileUpsertError;
+      setProfile(prev => ({ ...prev, ...nextProfile }));
+      setAuthNotice(t.account_synced);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Unable to save profile');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const accountLabel = authSession?.user
+    ? (profile?.nickname?.trim() || getDefaultNickname(authSession.user.email))
+    : t.account_sign_in;
 
   // --- Heartbeat System ---
   useEffect(() => {
@@ -3562,7 +3889,31 @@ export default function App() {
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
         {showStats && <StatsModal stats={stats} onClose={() => setShowStats(false)} t={t} />}
+        {showAccount && (
+          <AuthModal
+            t={t}
+            onClose={() => setShowAccount(false)}
+            isSupabaseConfigured={hasSupabaseConfig}
+            isAuthenticated={Boolean(authSession?.user)}
+            authLoading={authLoading}
+            busy={authBusy}
+            mode={authMode}
+            onModeChange={setAuthMode}
+            email={authSession?.user?.email ?? null}
+            nickname={profile?.nickname ?? ''}
+            syncStatus={cloudSyncStatus}
+            lastSyncedAt={lastCloudSyncAt}
+            error={authError}
+            notice={authNotice}
+            onSignIn={handleSignIn}
+            onSignUp={handleSignUp}
+            onSignOut={handleSignOut}
+            onSaveNickname={handleSaveNickname}
+            onSyncNow={() => pushStatsToCloud(statsRef.current, true)}
+          />
+        )}
         <MainMenu 
+          onShowAccount={() => setShowAccount(true)}
           onOnline={() => setAppMode('LOBBY')}
           onChallenge={() => setAppMode('SOLO_DIFFICULTY')}
           onPractice={() => setAppMode('PRACTICE')}
@@ -3570,6 +3921,8 @@ export default function App() {
           onShowSettings={() => setShowSettings(true)}
           onShowAchievements={() => setShowAchievements(true)}
           onShowStats={() => setShowStats(true)}
+          accountLabel={accountLabel}
+          accountConnected={Boolean(authSession?.user)}
           t={t}
         />
       </div>
