@@ -9,6 +9,7 @@
 ## 🎮 Features
 
 - **Online Multiplayer** — Real-time 1v1 battles over WebRTC (PeerJS P2P, no server required).
+- **Invite via Link** — Host a room and click **Copy Invite Link** to get a shareable URL. Your friend opens the link and lands directly in your room — no code typing needed.
 - **Time Attack Mode** — Solo speed-run through all 13 mini-games in sequence, as fast as possible.
 - **Practice Gym** — Train individual mini-games with adjustable difficulty.
 - **Skill System** — Before each online battle, secretly pick 2 of 3 skills. Your opponent can't see your choices!
@@ -47,6 +48,7 @@ The game features **13** distinct skill-based mini-games. Each online battle ran
 - **TailwindCSS** (CDN) — Styling and animations
 - **PeerJS** — WebRTC wrapper for P2P networking
 - **Vite** — Build tool and dev server
+- **Supabase** (optional) — Account system and cloud stats sync (requires `.env.local`)
 
 ## 🔒 Security Design
 

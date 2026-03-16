@@ -1200,29 +1200,51 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, isConnecting, error, t }: any) 
 const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic }: {
   roomId: string, onCancel: () => void, t: any,
   onOpenLobby: () => void, onCloseLobby: () => void, isPublic: boolean
-}) => (
-  <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
-    <div className="bg-white dark:bg-slate-800 p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
-      <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
-      <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-8 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-        <span className="text-blue-500 text-sm font-medium tracking-wide">{t.online_waiting}</span>
+}) => {
+  const [linkCopied, setLinkCopied] = React.useState(false);
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?join=${roomId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      audio.playClick();
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
+      <div className="bg-white dark:bg-slate-800 p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
+        <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
+        <div className="text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-8 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-8 py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <span className="text-blue-500 text-sm font-medium tracking-wide">{t.online_waiting}</span>
+        </div>
+        <button
+          onClick={handleCopyLink}
+          className={`mb-3 w-full px-5 py-3 rounded-xl text-sm font-bold tracking-widest uppercase transition-all active:scale-95 ${
+            linkCopied
+              ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400'
+              : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+          }`}
+        >
+          {linkCopied ? t.invite_link_copied : `🔗 ${t.invite_copy_link}`}
+        </button>
+        <button
+          onClick={() => { audio.playClick(); isPublic ? onCloseLobby() : onOpenLobby(); }}
+          className={`mb-6 px-5 py-2.5 rounded-xl text-sm font-bold tracking-widest uppercase transition-all active:scale-95 ${
+            isPublic
+              ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+          }`}
+        >
+          {isPublic ? t.lobby_listed : t.lobby_list_public}
+        </button>
+        <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
       </div>
-      <button
-        onClick={() => { audio.playClick(); isPublic ? onCloseLobby() : onOpenLobby(); }}
-        className={`mb-6 px-5 py-2.5 rounded-xl text-sm font-bold tracking-widest uppercase transition-all active:scale-95 ${
-          isPublic
-            ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200'
-            : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-        }`}
-      >
-        {isPublic ? t.lobby_listed : t.lobby_list_public}
-      </button>
-      <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
     </div>
-  </div>
-);
+  );
+};
 
 const PlayerBadge = ({ player, isMe, opponent, t, onFreeze, onDuel, oppInGame, onUseFunCard }: {
   player: PlayerState, isMe: boolean, opponent?: boolean, t: any,
@@ -1771,6 +1793,7 @@ export default function App() {
   const cloudSyncTimerRef = useRef<number | null>(null);
   const statsRef = useRef<UserStats>(DEFAULT_STATS);
   statsRef.current = stats;
+  const pendingInviteCodeRef = useRef<string | null>(null);
 
   // Helpers
   const t = TRANSLATIONS[settings.language];
@@ -2004,6 +2027,18 @@ export default function App() {
     persistHostResumeSession(undefined, phase, revision);
   };
 
+  // --- Invite link: detect ?join=XXXX on cold start ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('join');
+    if (code && /^\d{4}$/.test(code)) {
+      const cleaned = new URL(window.location.href);
+      cleaned.searchParams.delete('join');
+      window.history.replaceState({}, '', cleaned.toString());
+      pendingInviteCodeRef.current = code;
+    }
+  }, []);
+
   // --- Persistence ---
   useEffect(() => {
     try {
@@ -2018,6 +2053,12 @@ export default function App() {
       }
     } catch (e) { console.error('Load failed', e); }
     setLocalPersistenceReady(true);
+    if (pendingInviteCodeRef.current) {
+      const code = pendingInviteCodeRef.current;
+      pendingInviteCodeRef.current = null;
+      setAppMode('LOBBY');
+      joinGame(code);
+    }
   }, []);
 
   useEffect(() => {

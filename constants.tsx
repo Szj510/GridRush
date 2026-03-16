@@ -245,6 +245,8 @@ export const TRANSLATIONS = {
     net_phase_playing: "PLAY",
     net_phase_result: "RESULT",
     online_instruction: "Open this URL in a New Tab to simulate Player 2.",
+    invite_copy_link: "Copy Invite Link",
+    invite_link_copied: "\u2713 Copied!",
 
     game_steal: "STEAL",
     game_enemy: "Enemy",
@@ -516,8 +518,8 @@ export const TRANSLATIONS = {
     net_phase_rps: "猜拳",
     net_phase_playing: "对局",
     net_phase_result: "结算",
-    online_instruction: "在浏览器新标签页打开此链接以模拟玩家2。",
-
+    online_instruction: "在浏览器新标签页打开此链接以模拟玩家2。",    invite_copy_link: "复制邀请链接",
+    invite_link_copied: "\u2713 已复制！",
     game_steal: "抢夺",
     game_enemy: "对手",
     game_you: "你",
