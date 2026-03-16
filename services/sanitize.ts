@@ -1,8 +1,8 @@
 /**
  * sanitize.ts — Input/output validation & rate limiting.
  *
- * GridRush has no backend; all P2P messages, localStorage data, and
- * cross-tab (BroadcastChannel) events are treated as UNTRUSTED input
+ * GridRush has no backend; all P2P messages and localStorage data are
+ * treated as UNTRUSTED input
  * and must be validated before use.
  */
 
@@ -364,27 +364,6 @@ export const sanitizeRoomCode = (raw: string): string =>
 /** A valid room code is exactly 4 ASCII digits. */
 export const isValidRoomCode = (code: string): boolean =>
   /^\d{4}$/.test(code);
-
-// ─── BroadcastChannel message validator ──────────────────────────────────────
-
-export type LobbyMessage =
-  | { type: 'ROOM_OPEN';   code: string }
-  | { type: 'ROOM_CLOSED'; code: string }
-  | { type: 'ROOM_QUERY' };
-
-export function sanitizeLobbyMessage(raw: unknown): LobbyMessage | null {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const m = raw as Record<string, unknown>;
-
-  if (m.type === 'ROOM_QUERY') return { type: 'ROOM_QUERY' };
-
-  if (m.type === 'ROOM_OPEN' || m.type === 'ROOM_CLOSED') {
-    if (!isStr(m.code) || !isValidRoomCode(m.code)) return null;
-    return { type: m.type, code: m.code };
-  }
-
-  return null;
-}
 
 // ─── Rate limiter ─────────────────────────────────────────────────────────────
 

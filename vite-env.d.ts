@@ -8,7 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_PEERJS_PATH?: string;
   readonly VITE_PEERJS_SECURE?: string;
   readonly VITE_PEERJS_KEY?: string;
-  readonly VITE_PEERJS_ENABLE_DISCOVERY?: string;
   readonly VITE_NET_USE_SUPABASE_RELAY?: string;
 }
 

@@ -3,7 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove, GameMode, FunCardId } from './types';
 import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
-import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, sanitizeLobbyMessage, isValidRoomCode, RateLimiter } from './services/sanitize';
+import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
 import { AuthModal } from './components/AuthModal';
 import type { CloudSyncStatus } from './components/AuthModal';
@@ -112,7 +112,6 @@ const peerPortEnv = Number.parseInt(import.meta.env.VITE_PEERJS_PORT ?? '', 10);
 const peerSecureEnv = parseBooleanEnv(import.meta.env.VITE_PEERJS_SECURE, true);
 const peerPathEnv = normalizePeerPath(import.meta.env.VITE_PEERJS_PATH);
 const peerKeyEnv = import.meta.env.VITE_PEERJS_KEY?.trim();
-const peerDiscoveryEnabled = parseBooleanEnv(import.meta.env.VITE_PEERJS_ENABLE_DISCOVERY, false);
 const useSupabaseRelay = parseBooleanEnv(import.meta.env.VITE_NET_USE_SUPABASE_RELAY, hasSupabaseConfig);
 const relayChannelPrefix = 'gridrush-relay-';
 const relayBroadcastEvent = 'net-msg';
@@ -129,17 +128,6 @@ const peerOptions: Record<string, unknown> | null = (() => {
   if (Number.isFinite(peerPortEnv)) options.port = peerPortEnv;
   if (peerKeyEnv) options.key = peerKeyEnv;
   return options;
-})();
-
-const peerDiscoveryUrl = (() => {
-  if (!peerDiscoveryEnabled) return null;
-  const host = peerHostEnv || '0.peerjs.com';
-  const secure = peerSecureEnv;
-  const port = Number.isFinite(peerPortEnv) ? peerPortEnv : (secure ? 443 : 80);
-  const defaultPort = secure ? 443 : 80;
-  const portSegment = port === defaultPort ? '' : `:${port}`;
-  const protocol = secure ? 'https' : 'http';
-  return `${protocol}://${host}${portSegment}${peerPathEnv}/peers`;
 })();
 
 const createPeerClient = (id?: string) => {
@@ -1294,15 +1282,9 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
   const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen';
   const GUIDE_STEPS = 4;
   const [joinId, setJoinId] = useState('');
-  const [rooms, setRooms] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lobbyError, setLobbyError] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('STANDARD');
   const [showGuide, setShowGuide] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
-
-  const addRoom  = (code: string) => setRooms(prev => prev.includes(code) ? prev : [...prev, code]);
-  const dropRoom = (code: string) => setRooms(prev => prev.filter(c => c !== code));
 
   const markGuideSeen = () => {
     try {
@@ -1323,32 +1305,6 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
     setShowGuide(true);
   };
 
-  const fetchFromServer = async () => {
-    if (!peerDiscoveryUrl) {
-      setLobbyError(false);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 6000);
-      const res = await fetch(peerDiscoveryUrl, { signal: ac.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error();
-      const peers: string[] = await res.json();
-      peers
-        .filter(id => /^gridrush-pub-\d{4}$/.test(id))
-        .map(id => id.replace('gridrush-pub-', ''))
-        .forEach(addRoom);
-      setLobbyError(false);
-    } catch {
-      setLobbyError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     try {
       if (localStorage.getItem(ONLINE_GUIDE_SEEN_KEY) !== '1') {
@@ -1357,50 +1313,10 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
     } catch {
       setShowGuide(true);
     }
-
-    // 1. Read localStorage: rooms registered in this browser (any tab)
-    const now = Date.now();
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (!key?.startsWith('gridrush_room_')) continue;
-      const ts = parseInt(localStorage.getItem(key) || '0');
-      if (now - ts < 30 * 60 * 1000) {
-        addRoom(key.replace('gridrush_room_', ''));
-        setLoading(false);
-      } else {
-        localStorage.removeItem(key); // prune stale entries
-      }
-    }
-
-    // 2. BroadcastChannel: live announcements from host tabs
-    const bc = new BroadcastChannel('gridrush_lobby');
-    bc.onmessage = (e: MessageEvent) => {
-      const msg = sanitizeLobbyMessage(e.data);
-      if (!msg) return;
-      if (msg.type === 'ROOM_OPEN'   && msg.code) { addRoom(msg.code);  setLoading(false); }
-      if (msg.type === 'ROOM_CLOSED' && msg.code) { dropRoom(msg.code); }
-    };
-    // Ask any host tab that is already open to re-announce
-    setTimeout(() => bc.postMessage({ type: 'ROOM_QUERY' }), 150);
-
-    // 3. Optional discovery endpoint (disabled by default because public PeerJS cloud does not expose /peers)
-    let interval: number | null = null;
-    if (peerDiscoveryUrl) {
-      fetchFromServer();
-      interval = window.setInterval(fetchFromServer, 15000);
-    } else {
-      setLoading(false);
-    }
-
-    return () => {
-      bc.close();
-      if (interval !== null) window.clearInterval(interval);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const modeGuideActive = showGuide && guideStep === 0;
-  const createJoinGuideActive = showGuide && guideStep === 1;
-  const lobbyGuideActive = showGuide && guideStep === 2;
+  const createJoinGuideActive = showGuide && (guideStep === 1 || guideStep === 2);
   const summaryGuideActive = showGuide && guideStep === 3;
 
   return (
@@ -1473,48 +1389,6 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
             </div>
           </div>
 
-          {/* Public Lobby */}
-          <div className={`bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700 transition-all ${lobbyGuideActive ? 'ring-4 ring-violet-400/70 shadow-2xl shadow-violet-500/20' : ''}`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                🏛️ {t.lobby_rooms}
-                {!loading && (
-                  <span className="ml-2 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                    {rooms.length}
-                  </span>
-                )}
-              </h3>
-              <button onClick={() => { setRooms([]); setLoading(true); fetchFromServer(); }} className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors uppercase tracking-widest">
-                ↺ {t.lobby_refresh}
-              </button>
-            </div>
-
-            {loading && rooms.length === 0 ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm py-2">
-                <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
-                {t.lobby_loading}
-              </div>
-            ) : rooms.length === 0 ? (
-              <p className="text-sm text-slate-400 py-2">{lobbyError ? t.lobby_error : t.lobby_empty}</p>
-            ) : rooms.length === 0 ? (
-              <p className="text-sm text-slate-400 py-2">{t.lobby_empty}</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {rooms.map(code => (
-                  <div key={code} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 rounded-xl px-4 py-3 border border-slate-200 dark:border-slate-700">
-                    <span className="font-mono font-bold text-slate-700 dark:text-slate-200 tracking-widest">{code}</span>
-                    <button onClick={() => { audio.playClick(); onJoin(code, gameMode); }} className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold tracking-widest uppercase px-4 py-2 rounded-lg transition-all active:scale-95">
-                      {t.lobby_join_room}
-                    </button>
-                  </div>
-                ))}
-                <button onClick={() => { audio.playClick(); onJoin(rooms[0], gameMode); }} className="mt-1 w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-black text-sm tracking-widest uppercase rounded-xl shadow-lg shadow-yellow-400/30 transition-all active:scale-95">
-                  ⚡ {t.lobby_quick}
-                </button>
-              </div>
-            )}
-          </div>
-
           <p className={`text-[10px] text-slate-400 text-center max-w-md mx-auto transition-all ${summaryGuideActive ? 'text-emerald-500 dark:text-emerald-300 font-bold' : ''}`}>{t.online_instruction}</p>
         </div>
       )}
@@ -1543,9 +1417,8 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
   );
 };
 
-const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic }: {
+const WaitingRoom = ({ roomId, onCancel, t }: {
   roomId: string, onCancel: () => void, t: any,
-  onOpenLobby: () => void, onCloseLobby: () => void, isPublic: boolean
 }) => {
   const [linkCopied, setLinkCopied] = React.useState(false);
   const handleCopyLink = async () => {
@@ -1575,16 +1448,6 @@ const WaitingRoom = ({ roomId, onCancel, t, onOpenLobby, onCloseLobby, isPublic 
           }`}
         >
           {linkCopied ? t.invite_link_copied : `🔗 ${t.invite_copy_link}`}
-        </button>
-        <button
-          onClick={() => { audio.playClick(); isPublic ? onCloseLobby() : onOpenLobby(); }}
-          className={`mb-6 px-5 py-2.5 rounded-xl text-sm font-bold tracking-widest uppercase transition-all active:scale-95 ${
-            isPublic
-              ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-          }`}
-        >
-          {isPublic ? t.lobby_listed : t.lobby_list_public}
         </button>
         <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
       </div>
@@ -2109,12 +1972,6 @@ export default function App() {
   });
   const [rematchInviteFrom, setRematchInviteFrom] = useState<PlayerId | null>(null);
   const [rematchStatus, setRematchStatus] = useState<RematchUiStatus>('NONE');
-
-  // Public lobby beacon (gridrush-pub-XXXX signals the room is open)
-  const [isLobbyPublic, setIsLobbyPublic] = useState(false);
-  const beaconPeerRef = useRef<any>(null);
-  const beaconBcRef   = useRef<BroadcastChannel | null>(null);
-  const beaconCodeRef = useRef<string | null>(null);
 
   // Challenge
   const [challengeStartTime, setChallengeStartTime] = useState<number>(0);
@@ -3302,7 +3159,6 @@ export default function App() {
     clearReconnectTimer();
     clearGuestResumeSession();
     clearHostResumeSession();
-    teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
     teardownRelayChannel();
     resetOnlineProtocolState();
@@ -3968,7 +3824,6 @@ export default function App() {
     if (previousConn && previousConn !== connection && previousConn.open) previousConn.close();
 
     if (!isResume) {
-      teardownLobbyBeacon();
       guestSessionIdRef.current = generateGuestSessionId();
       p2SkillPicksRef.current = null;
       rpsP2PickRef.current = null;
@@ -4613,47 +4468,6 @@ export default function App() {
     });
   };
 
-  // --- Network Setup ---
-  const setupLobbyBeacon = (code: string) => {
-    if (beaconPeerRef.current) return; // already running
-    const beacon = createPeerClient(`gridrush-pub-${code}`);
-    beaconPeerRef.current = beacon;
-    beaconCodeRef.current = code;
-    setIsLobbyPublic(true);
-    beacon.on('error', () => { /* silently ignore — may already be taken */ });
-
-    // Local discovery: write to localStorage so other tabs can read it on open
-    localStorage.setItem(`gridrush_room_${code}`, Date.now().toString());
-
-    // BroadcastChannel: real-time announcement to any open Lobby tab
-    const bc = new BroadcastChannel('gridrush_lobby');
-    beaconBcRef.current = bc;
-    bc.postMessage({ type: 'ROOM_OPEN', code });
-    // Re-announce when a Lobby tab asks
-    bc.onmessage = (e: MessageEvent) => {
-      const msg = sanitizeLobbyMessage(e.data);
-      if (msg?.type === 'ROOM_QUERY') bc.postMessage({ type: 'ROOM_OPEN', code });
-    };
-  };
-
-  const teardownLobbyBeacon = () => {
-    const code = beaconCodeRef.current;
-    if (beaconPeerRef.current) {
-      beaconPeerRef.current.destroy();
-      beaconPeerRef.current = null;
-    }
-    if (beaconBcRef.current) {
-      if (code) beaconBcRef.current.postMessage({ type: 'ROOM_CLOSED', code });
-      beaconBcRef.current.close();
-      beaconBcRef.current = null;
-    }
-    if (code) {
-      localStorage.removeItem(`gridrush_room_${code}`);
-      beaconCodeRef.current = null;
-    }
-    setIsLobbyPublic(false);
-  };
-
   const setupHost = (gameMode: GameMode = 'STANDARD') => {
     gameModeRef.current = gameMode;
     manualDisconnectRef.current = false;
@@ -4746,7 +4560,6 @@ export default function App() {
     clearReconnectTimer();
     clearGuestResumeSession();
     clearHostResumeSession();
-    teardownLobbyBeacon();
     if (peerRef.current) peerRef.current.destroy();
     teardownRelayChannel();
     clearTutorialMode(false);
@@ -4885,8 +4698,7 @@ export default function App() {
   }
 
   if (myId === 'P1' && roomId && gameState.status === 'IDLE') {
-    return <WaitingRoom roomId={roomId} onCancel={resetGame} t={t}
-      onOpenLobby={() => setupLobbyBeacon(roomId)} onCloseLobby={teardownLobbyBeacon} isPublic={isLobbyPublic} />;
+    return <WaitingRoom roomId={roomId} onCancel={resetGame} t={t} />;
   }
 
   // --- GAME VIEW ---

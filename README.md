@@ -85,7 +85,6 @@ GridRush runs entirely in the browser with no backend. All game state lives on t
 | **Skill picks**               | Guest-sent skill IDs are filtered to a fixed allow-list (`STEAL`, `FREEZE`, `DUEL`).                                                            |
 | **Action rate-limiting**      | `RateLimiter` (token-bucket) enforces per-action limits: `HEARTBEAT` ≤ 3/s, `CLICK_CELL` ≤ 10/s, `INTERACTION` ≤ 20/s, `COMPLETE_GAME` ≤ 2/2 s. |
 | **Room code injection**       | `joinGame` validates input against `/^\d{4}$/` before passing it to PeerJS.                                                                     |
-| **BroadcastChannel events**   | Cross-tab lobby messages are validated by `sanitizeLobbyMessage` (type allow-list + regex-checked code).                                        |
 | **localStorage poisoning**    | `sanitizeSettings` / `sanitizeStats` rebuild objects field-by-field rather than spreading parsed JSON directly.                                 |
 | **Content Security Policy**   | A CSP `<meta>` tag restricts script sources, locks WebSocket/XHR to `*.peerjs.com`, and blocks `frame-src` / `object-src`.                      |
 
