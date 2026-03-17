@@ -89,6 +89,22 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'oddchar',     name: 'Odd One Out',   type: 'TIMED',    icon: '🔍', description: 'Find the different character!' },
 ];
 
+export const MINI_GAME_ZH_META: Record<string, { name: string; description: string }> = {
+  math: { name: '数学冲刺', description: '在限时内解出 3 道算式。' },
+  mash: { name: '动力连点', description: '疯狂点击，把能量条顶满。' },
+  stroop: { name: '色词冲突', description: '选出文字真实颜色，连对 5 次。' },
+  reaction: { name: '反应测试', description: '变绿瞬间点击，拼最快反应。' },
+  memory: { name: '矩阵记忆', description: '记住闪烁顺序并按序点回去。' },
+  lockpick: { name: '开锁挑战', description: '指针进绿色区时点击，连续成功。' },
+  password: { name: '密码乱序', description: '在乱序键盘里输入正确密码。' },
+  burst: { name: '准星打靶', description: '快速命中不断缩小的目标。' },
+  sequence: { name: '数字连点', description: '按 1 到 N 的顺序点击数字。' },
+  mousemaze: { name: '别碰红区', description: '沿白色通道移动，碰红即失败。' },
+  gravitymaze: { name: '重力迷宫', description: '点击翻转重力，躲障碍到终点。' },
+  rhythmcopy: { name: '节奏复刻', description: '观察后复刻同样的节奏序列。' },
+  oddchar: { name: '找不同字', description: '在字符阵列中找出唯一异类。' },
+};
+
 export const WIN_PATTERNS = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
   [0, 3, 6], [1, 4, 7], [2, 5, 8], // Cols
@@ -119,6 +135,8 @@ export const MINI_GAME_TRANSLATIONS = {
     oddone_instr: "Find the odd one!",
     maze_start: "Move cursor to the green circle",
     maze_playing: "Don't touch red!",
+    maze_start_touch: "Drag finger to the green circle",
+    maze_playing_touch: "Stay on the white path!",
     maze_hint: "Stay on the white path",
     tutorial_hint_math: "Hint: Correct answer is highlighted",
     tutorial_hint_goal: "Goal",
@@ -174,6 +192,8 @@ export const MINI_GAME_TRANSLATIONS = {
     oddone_instr: "找不同！",
     maze_start: "将鼠标移到绿色圆圈",
     maze_playing: "别碰红线！",
+    maze_start_touch: "拖动手指到绿色圆圈",
+    maze_playing_touch: "沿白色通道前进！",
     maze_hint: "保持在白色通道内",
     tutorial_hint_math: "提示：高亮的是正确答案",
     tutorial_hint_goal: "目标",

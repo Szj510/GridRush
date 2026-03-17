@@ -50,6 +50,13 @@ const useFeedback = () => {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const detectCoarsePointer = () => {
+  if (typeof window === 'undefined') return false;
+  const coarseByMedia = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const coarseByTouch = 'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0;
+  return coarseByMedia || coarseByTouch;
+};
+
 // 1. Math Rush
 const MathGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const [problem, setProblem] = useState({ q: '...', a: 0, options: [] as number[] });
@@ -294,6 +301,7 @@ const ReactionGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
   const [resultMs, setResultMs] = useState(0);
   const timeoutRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+  const isTouchDevice = React.useMemo(() => detectCoarsePointer(), []);
   const t = MINI_GAME_TRANSLATIONS[language];
   
   const threshold = {
@@ -326,12 +334,13 @@ const ReactionGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
       audio.playFailure();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     } else if (status === 'GO') {
-      const diff = Date.now() - startTimeRef.current;
-      setResultMs(diff);
-      if (diff <= threshold) {
+      const rawDiff = Date.now() - startTimeRef.current;
+      const adjustedDiff = isTouchDevice ? Math.max(0, rawDiff - 85) : rawDiff;
+      setResultMs(adjustedDiff);
+      if (adjustedDiff <= threshold) {
          setStatus('RESULT');
          audio.playSuccess();
-         setTimeout(() => onComplete(true, diff), 800);
+        setTimeout(() => onComplete(true, adjustedDiff), 800);
       } else {
          setStatus('SLOW');
          audio.playFailure();
@@ -343,7 +352,8 @@ const ReactionGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
     <div className="flex flex-col items-center gap-4 w-full">
         <div className="text-xs text-slate-400 uppercase font-mono mb-2">Target: &lt;{threshold}ms</div>
         <div 
-        onMouseDown={handleClick} 
+      onPointerDown={handleClick}
+      style={{ touchAction: 'manipulation' }}
         className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl relative
             ${status === 'WAIT' ? 'bg-red-500' : 
             status === 'GO' ? 'bg-green-500 scale-[1.02]' : 
@@ -879,6 +889,7 @@ const pointToSegDist = (px: number, py: number, ax: number, ay: number, bx: numb
 // 10. Mouse Maze – don't touch the red!
 const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
   const SIZE = 280;
+  const isTouchDevice = React.useMemo(() => detectCoarsePointer(), []);
   const t = MINI_GAME_TRANSLATIONS[language];
 
   const cfg = {
@@ -889,42 +900,46 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
   }[difficulty];
 
   const { waypoints, halfW } = cfg;
+  const channelHalfW = halfW + (isTouchDevice ? 4 : 0);
+  const endpointRadius = halfW + (isTouchDevice ? 8 : 0);
   const start = waypoints[0];
   const end   = waypoints[waypoints.length - 1];
 
   const [started, setStarted] = React.useState(false);
   const [failed,  setFailed]  = React.useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const completedRef = useRef(false);
 
   const inChannel = (mx: number, my: number) => {
     for (let i = 0; i < waypoints.length - 1; i++) {
       const [ax, ay] = waypoints[i];
       const [bx, by] = waypoints[i + 1];
-      if (pointToSegDist(mx, my, ax, ay, bx, by) <= halfW) return true;
+      if (pointToSegDist(mx, my, ax, ay, bx, by) <= channelHalfW) return true;
     }
     return false;
   };
 
-  const toSvgCoords = (e: React.MouseEvent<SVGSVGElement>) => {
+  const toSvgCoords = (clientX: number, clientY: number) => {
     const rect = svgRef.current!.getBoundingClientRect();
     return [
-      (e.clientX - rect.left) * (SIZE / rect.width),
-      (e.clientY - rect.top)  * (SIZE / rect.height),
+      (clientX - rect.left) * (SIZE / rect.width),
+      (clientY - rect.top)  * (SIZE / rect.height),
     ] as [number, number];
   };
 
   const triggerFail = () => {
+    if (completedRef.current) return;
     setFailed(true);
     audio.playFailure();
     setTimeout(() => { setStarted(false); setFailed(false); }, 700);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+  const handlePointer = (clientX: number, clientY: number) => {
     if (failed) return;
-    const [mx, my] = toSvgCoords(e);
+    const [mx, my] = toSvgCoords(clientX, clientY);
 
     if (!started) {
-      if (Math.hypot(mx - start[0], my - start[1]) <= halfW) {
+      if (Math.hypot(mx - start[0], my - start[1]) <= endpointRadius) {
         setStarted(true);
         if (onInteraction) onInteraction();
       }
@@ -935,20 +950,31 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
 
     if (!inChannel(mx, my)) { triggerFail(); return; }
 
-    if (Math.hypot(mx - end[0], my - end[1]) <= halfW) {
+    if (Math.hypot(mx - end[0], my - end[1]) <= endpointRadius) {
+      completedRef.current = true;
       audio.playSuccess();
       onComplete(true);
     }
   };
 
-  const handleMouseLeave = () => { if (started && !failed) triggerFail(); };
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    handlePointer(e.clientX, e.clientY);
+  };
+
+  const handlePointerLeave = () => {
+    if (started && !failed && !completedRef.current) triggerFail();
+  };
+
+  const handlePointerUp = () => {
+    if (started && !failed && !completedRef.current) triggerFail();
+  };
 
   const polyPts = waypoints.map(p => p.join(',')).join(' ');
 
   return (
     <div className="flex flex-col items-center gap-3 w-full h-full justify-center">
       <div className="text-sm font-mono text-slate-500 dark:text-slate-400 h-5 text-center">
-        {failed ? '❌' : started ? t.maze_playing : t.maze_start}
+        {failed ? '❌' : started ? (isTouchDevice ? t.maze_playing_touch : t.maze_playing) : (isTouchDevice ? t.maze_start_touch : t.maze_start)}
       </div>
       <div className={`rounded-2xl overflow-hidden border-4 transition-all duration-150 select-none ${
         failed  ? 'border-red-500 shadow-[0_0_24px_rgba(239,68,68,0.6)]'
@@ -960,15 +986,19 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
           width={SIZE} height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           className="block"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
+          onPointerDown={handlePointerMove}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{ touchAction: 'none' }}
         >
           {/* Danger zone background */}
           <rect width={SIZE} height={SIZE} fill="#dc2626" />
 
           {/* Safe path */}
           <polyline points={polyPts} fill="none" stroke="white"
-            strokeWidth={halfW * 2} strokeLinecap="round" strokeLinejoin="round" />
+            strokeWidth={channelHalfW * 2} strokeLinecap="round" strokeLinejoin="round" />
 
           {/* Tutorial: dashed guide line */}
           {tutorialEnabled && (
@@ -978,19 +1008,19 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
           )}
 
           {/* End zone – gold star */}
-          <circle cx={end[0]} cy={end[1]} r={halfW * 0.85} fill="#f59e0b" />
+          <circle cx={end[0]} cy={end[1]} r={endpointRadius * 0.85} fill="#f59e0b" />
           <text x={end[0]} y={end[1]} textAnchor="middle" dominantBaseline="central"
             fontSize={halfW > 18 ? 18 : 12} fill="white"
             style={{ pointerEvents: 'none', userSelect: 'none' }}>⭐</text>
 
           {/* Start zone – green circle with pulse when waiting */}
-          <circle cx={start[0]} cy={start[1]} r={halfW * 0.85}
+          <circle cx={start[0]} cy={start[1]} r={endpointRadius * 0.85}
             fill={started ? '#22c55e' : '#4ade80'} />
           {!started && (
-            <circle cx={start[0]} cy={start[1]} r={halfW * 0.85}
+            <circle cx={start[0]} cy={start[1]} r={endpointRadius * 0.85}
               fill="none" stroke="#4ade80" strokeWidth="3" opacity="0.7">
               <animate attributeName="r"
-                values={`${halfW * 0.85};${halfW * 1.4};${halfW * 0.85}`}
+                values={`${endpointRadius * 0.85};${endpointRadius * 1.4};${endpointRadius * 0.85}`}
                 dur="1.2s" repeatCount="indefinite" />
               <animate attributeName="opacity"
                 values="0.7;0;0.7" dur="1.2s" repeatCount="indefinite" />

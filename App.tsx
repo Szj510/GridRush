@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { GameState, PlayerId, PlayerState, CellData, GameAction, AppSettings, UserStats, PracticeConfig, PracticeRecord, GameType, Difficulty, MatchPhase, RpsMove, GameMode, FunCardId } from './types';
-import { MINI_GAMES, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
+import { MINI_GAMES, MINI_GAME_ZH_META, Icons, TRANSLATIONS, ACHIEVEMENTS_LIST, FUN_CARDS } from './constants';
 import { checkWinner, shuffleGames } from './services/gameLogic';
 import { sanitizeNetworkMessage, sanitizeSettings, sanitizeStats, isValidRoomCode, RateLimiter } from './services/sanitize';
 import { MiniGameRenderer } from './components/MiniGames';
@@ -814,6 +814,12 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
     return relevant.reduce((prev, curr) => prev.value < curr.value ? prev : curr);
   };
 
+  const getPracticeGameMeta = (game: { id: string; name: string; description: string }) => {
+    if (language !== 'zh') return { name: game.name, description: game.description };
+    const localized = MINI_GAME_ZH_META[game.id];
+    return localized ?? { name: game.name, description: game.description };
+  };
+
   const startPractice = () => {
     setStartTime(Date.now());
     setPaused(false); // Reset paused state
@@ -895,12 +901,13 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                     ) : (
                         allRecords.map((r, i) => {
                            const game = MINI_GAMES.find(g => g.id === r.gameId);
+                           const meta = game ? getPracticeGameMeta(game) : null;
                            return (
                                <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                    <div className="flex items-center gap-3">
                                        <div className="text-2xl">{game?.icon}</div>
                                        <div>
-                                           <div className="font-bold text-sm text-slate-900 dark:text-white">{game?.name}</div>
+                                   <div className="font-bold text-sm text-slate-900 dark:text-white">{meta?.name ?? game?.name}</div>
                                            <div className="text-[10px] text-slate-400 font-mono flex gap-2">
                                                <span>{r.config.difficulty}</span>
                                                {r.config.isBattlePreset && <span className="text-blue-500">BATTLE</span>}
@@ -923,9 +930,10 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
   }
 
   if (step === 'LIST') {
-     const filtered = MINI_GAMES.filter(g => {
+      const filtered = MINI_GAMES.filter(g => {
+        const meta = getPracticeGameMeta(g);
         if (filterType !== 'ALL' && g.type !== filterType) return false;
-        if (search && !g.name.toLowerCase().includes(search.toLowerCase())) return false;
+        if (search && !`${meta.name} ${meta.description}`.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
      });
 
@@ -964,7 +972,8 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
 
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filtered.map(game => {
+                 {filtered.map(game => {
+                   const meta = getPracticeGameMeta(game);
                    const wins = stats.practiceRecords.filter(r => r.gameId === game.id && r.isWin).length;
                    
                    return (
@@ -978,10 +987,10 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                         </div>
                         <div className="flex-1">
                            <div className="flex justify-between items-start">
-                              <h3 className="font-bold text-slate-900 dark:text-white text-lg">{game.name}</h3>
+                            <h3 className="font-bold text-slate-900 dark:text-white text-lg">{meta.name}</h3>
                               <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-1 rounded uppercase">{game.type}</span>
                            </div>
-                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{game.description}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{meta.description}</p>
                            <div className="mt-3 flex items-center gap-4 text-xs font-mono text-slate-400">
                               <span>Wins: {wins}</span>
                            </div>
@@ -997,14 +1006,15 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
 
   if (step === 'DETAIL' && selectedGameId) {
      const game = MINI_GAMES.find(g => g.id === selectedGameId)!;
+      const gameMeta = getPracticeGameMeta(game);
      const currentPB = getPB(selectedGameId, config);
 
      return (
         <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950">
            <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-lg mx-auto w-full animate-fade-in">
               <div className="text-6xl mb-6 drop-shadow-lg">{game.icon}</div>
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-wider mb-2">{game.name}</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-center mb-8">{game.description}</p>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-wider mb-2">{gameMeta.name}</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-center mb-8">{gameMeta.description}</p>
 
               {/* Config Section */}
               <div className="w-full bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 space-y-6">
