@@ -4866,6 +4866,8 @@ export default function App() {
 
   if (appMode === 'RPS') {
     const handleRpsPick = (move: RpsMove) => {
+      // Guard against stale UI/state edges: only count picks during actual online RPS phase.
+      if (roleRef.current === 'SOLO' || matchPhaseRef.current !== 'RPS') return;
       if (rpsState.myMove !== null || rpsState.seriesWinner !== null) return; // already picked
       rpsMyPickRef.current = move;
       setRpsState(prev => ({ ...prev, myMove: move }));

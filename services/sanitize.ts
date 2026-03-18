@@ -242,6 +242,26 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
         .slice(-50)
     : defaults.recentOnlineResults;
 
+  const safeRpsRoundsPlayed = clampInt(s.rpsRoundsPlayed, 0, 1_000_000, defaults.rpsRoundsPlayed);
+  const safeRpsSeriesPlayed = clampInt(s.rpsSeriesPlayed, 0, 1_000_000, defaults.rpsSeriesPlayed);
+  const safeRpsPickRock = clampInt(s.rpsPickRock, 0, 1_000_000, defaults.rpsPickRock);
+  const safeRpsPickPaper = clampInt(s.rpsPickPaper, 0, 1_000_000, defaults.rpsPickPaper);
+  const safeRpsPickScissors = clampInt(s.rpsPickScissors, 0, 1_000_000, defaults.rpsPickScissors);
+
+  // Data self-heal:
+  // If there has never been any resolved RPS round/series yet all three picks are exactly 1,
+  // treat it as legacy/corrupted analytics and reset pick distribution.
+  const looksLikeLegacyRpsSeed =
+    safeRpsRoundsPlayed === 0 &&
+    safeRpsSeriesPlayed === 0 &&
+    safeRpsPickRock === 1 &&
+    safeRpsPickPaper === 1 &&
+    safeRpsPickScissors === 1;
+
+  const normalizedRpsPickRock = looksLikeLegacyRpsSeed ? 0 : safeRpsPickRock;
+  const normalizedRpsPickPaper = looksLikeLegacyRpsSeed ? 0 : safeRpsPickPaper;
+  const normalizedRpsPickScissors = looksLikeLegacyRpsSeed ? 0 : safeRpsPickScissors;
+
   return {
     onlineWins:     clampInt(s.onlineWins,    0, 1_000_000, defaults.onlineWins),
     onlineLosses:   clampInt(s.onlineLosses,  0, 1_000_000, defaults.onlineLosses),
@@ -259,15 +279,15 @@ export function sanitizeStats(raw: unknown, defaults: UserStats): UserStats {
     totalFreezes:   clampInt(s.totalFreezes,  0, 1_000_000, defaults.totalFreezes),
     totalDuelWins:  clampInt(s.totalDuelWins, 0, 1_000_000, defaults.totalDuelWins),
     totalFunCardsUsed: clampInt(s.totalFunCardsUsed, 0, 1_000_000, defaults.totalFunCardsUsed),
-    rpsRoundsPlayed: clampInt(s.rpsRoundsPlayed, 0, 1_000_000, defaults.rpsRoundsPlayed),
+    rpsRoundsPlayed: safeRpsRoundsPlayed,
     rpsRoundsWon: clampInt(s.rpsRoundsWon, 0, 1_000_000, defaults.rpsRoundsWon),
     rpsRoundsDraw: clampInt(s.rpsRoundsDraw, 0, 1_000_000, defaults.rpsRoundsDraw),
-    rpsSeriesPlayed: clampInt(s.rpsSeriesPlayed, 0, 1_000_000, defaults.rpsSeriesPlayed),
+    rpsSeriesPlayed: safeRpsSeriesPlayed,
     rpsSeriesWon: clampInt(s.rpsSeriesWon, 0, 1_000_000, defaults.rpsSeriesWon),
     rpsSeriesDraw: clampInt(s.rpsSeriesDraw, 0, 1_000_000, defaults.rpsSeriesDraw),
-    rpsPickRock: clampInt(s.rpsPickRock, 0, 1_000_000, defaults.rpsPickRock),
-    rpsPickPaper: clampInt(s.rpsPickPaper, 0, 1_000_000, defaults.rpsPickPaper),
-    rpsPickScissors: clampInt(s.rpsPickScissors, 0, 1_000_000, defaults.rpsPickScissors),
+    rpsPickRock: normalizedRpsPickRock,
+    rpsPickPaper: normalizedRpsPickPaper,
+    rpsPickScissors: normalizedRpsPickScissors,
     recentOnlineResults,
     unlockedAchievements: Array.isArray(s.unlockedAchievements)
       ? (s.unlockedAchievements as unknown[])
