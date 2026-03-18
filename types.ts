@@ -168,7 +168,7 @@ export interface FunCard {
   descKey: string;
 }
 
-export type MatchPhase = 'WAITING' | 'SKILL_PICK' | 'RPS' | 'PLAYING' | 'RESULT';
+export type MatchPhase = 'WAITING' | 'BAN_PICK' | 'SKILL_PICK' | 'RPS' | 'PLAYING' | 'RESULT';
 export type RpsMove = 'R' | 'P' | 'S';
 
 export interface GuestResumeSession {
@@ -185,6 +185,8 @@ export interface HostResumeSession {
   revision: number;
   guestSessionId: string | null;
   gameState: GameState;
+  myBanPick: string | null;
+  p2BanPick: string | null;
   mySkillPicks: string[];
   p2SkillPicks: string[] | null;
   rpsState: {
@@ -206,6 +208,8 @@ export type NetworkMessage =
   | { type: 'HEARTBEAT'; id: PlayerId; timestamp: number }
   | { type: 'RESTART_REQUEST' }
   | { type: 'RESTART_RESPONSE'; accepted: boolean }
+  | { type: 'BAN_PHASE'; revision: number }                          // HOST → GUEST: enter ban screen
+  | { type: 'BAN_PICK'; gameId: string; phase: 'BAN_PICK' }          // GUEST → HOST: submit banned minigame id
   | { type: 'SKILL_PICK_PHASE'; revision: number }                // HOST → GUEST: enter skill pick screen
   | { type: 'SKILL_PICK'; skills: string[]; phase: 'SKILL_PICK' } // GUEST → HOST: submit chosen skill ids
   | { type: 'RPS_PHASE'; revision: number }                       // HOST → GUEST: enter RPS screen

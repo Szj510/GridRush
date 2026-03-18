@@ -10,9 +10,9 @@ import type { NetworkMessage, GameAction, AppSettings, UserStats, PracticeRecord
 
 // ─── Allow-lists ─────────────────────────────────────────────────────────────
 
-const VALID_MSG_TYPES    = new Set(['JOIN_REQUEST', 'SESSION_SYNC', 'PING', 'PONG', 'STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART_REQUEST', 'RESTART_RESPONSE', 'SKILL_PICK_PHASE', 'SKILL_PICK', 'RPS_PHASE', 'RPS_PICK', 'RPS_RESULT']);
+const VALID_MSG_TYPES    = new Set(['JOIN_REQUEST', 'SESSION_SYNC', 'PING', 'PONG', 'STATE_UPDATE', 'ACTION', 'HEARTBEAT', 'RESTART_REQUEST', 'RESTART_RESPONSE', 'BAN_PHASE', 'BAN_PICK', 'SKILL_PICK_PHASE', 'SKILL_PICK', 'RPS_PHASE', 'RPS_PICK', 'RPS_RESULT']);
 const VALID_RPS_MOVES    = new Set(['R', 'P', 'S']);
-const VALID_MATCH_PHASES = new Set(['WAITING', 'SKILL_PICK', 'RPS', 'PLAYING', 'RESULT']);
+const VALID_MATCH_PHASES = new Set(['WAITING', 'BAN_PICK', 'SKILL_PICK', 'RPS', 'PLAYING', 'RESULT']);
 const VALID_SESSION_SYNC_REASONS = new Set(['OK', 'ROOM_BUSY', 'SESSION_EXPIRED']);
 const VALID_ACTION_TYPES = new Set(['CLICK_CELL', 'ABANDON_CHALLENGE', 'DEFEND', 'INTERACTION', 'COMPLETE_GAME', 'USE_SKILL', 'DUEL_PICK_CELL', 'USE_FUN_CARD']);
 const VALID_SKILLS       = new Set(['STEAL', 'FREEZE', 'DUEL']);
@@ -28,6 +28,7 @@ const isStr  = (v: unknown): v is string  => typeof v === 'string';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
 const isNum  = (v: unknown): v is number  => typeof v === 'number' && Number.isFinite(v);
 const isMatchPhase = (v: unknown): v is MatchPhase => isStr(v) && VALID_MATCH_PHASES.has(v);
+const isSafeGameId = (v: unknown): v is string => isStr(v) && /^[a-z0-9_-]{1,32}$/i.test(v);
 
 /** Coerce v to an integer in [lo, hi], returning fb on failure. */
 const clampInt = (v: unknown, lo: number, hi: number, fb: number): number => {
@@ -160,8 +161,15 @@ export function sanitizeNetworkMessage(raw: unknown): NetworkMessage | null {
 
     case 'RESTART_REQUEST':  return { type: 'RESTART_REQUEST' };
     case 'RESTART_RESPONSE': return { type: 'RESTART_RESPONSE', accepted: isBool(m.accepted) ? m.accepted : false };
+    case 'BAN_PHASE':        return { type: 'BAN_PHASE', revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
     case 'SKILL_PICK_PHASE': return { type: 'SKILL_PICK_PHASE', revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
     case 'RPS_PHASE':        return { type: 'RPS_PHASE', revision: clampInt(m.revision, 0, Number.MAX_SAFE_INTEGER, 0) };
+
+    case 'BAN_PICK': {
+      if (m.phase !== 'BAN_PICK') return null;
+      if (!isSafeGameId(m.gameId)) return null;
+      return { type: 'BAN_PICK', gameId: m.gameId, phase: 'BAN_PICK' };
+    }
 
     case 'SKILL_PICK': {
       if (m.phase !== 'SKILL_PICK') return null;
@@ -312,6 +320,9 @@ export function sanitizeHostResumeSession(raw: unknown): HostResumeSession | nul
     ? (s.mySkillPicks as unknown[]).filter((v): v is string => isStr(v) && VALID_SKILLS.has(v)).slice(0, 2)
     : [];
 
+  const myBanPick = isSafeGameId(s.myBanPick) ? s.myBanPick : null;
+  const p2BanPick = isSafeGameId(s.p2BanPick) ? s.p2BanPick : null;
+
   const p2SkillPicks = s.p2SkillPicks === null
     ? null
     : (Array.isArray(s.p2SkillPicks)
@@ -340,6 +351,8 @@ export function sanitizeHostResumeSession(raw: unknown): HostResumeSession | nul
     revision: clampInt(s.revision, 0, Number.MAX_SAFE_INTEGER, 0),
     guestSessionId,
     gameState: stateMsg.state,
+    myBanPick,
+    p2BanPick,
     mySkillPicks,
     p2SkillPicks,
     rpsState: {

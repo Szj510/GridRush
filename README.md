@@ -14,6 +14,7 @@
 - **Invite via Link** — Host a room and click **Copy Invite Link** to get a shareable URL. Your friend opens the link and lands directly in your room — no code typing needed.
 - **Time Attack Mode** — Solo speed-run through all 13 mini-games in sequence, as fast as possible.
 - **Practice Gym** — Train individual mini-games with adjustable difficulty.
+- **Pre-Match Ban Phase** — Before drafting skills, each player bans 1 mini-game. Banned games are excluded from that match's 9-cell pool.
 - **Skill System** — Before each online battle, secretly pick 2 of 3 skills. Your opponent can't see your choices!
   - ⭐ **Steal** — Challenge an opponent's cell; they have 5 seconds to defend or lose it.
   - ❄️ **Freeze** — Lock the opponent's input for 2 seconds.
@@ -26,11 +27,12 @@
 
 ## ⚡ First Match in 30 Seconds
 
-1. In online mode, both players secretly pick 2 skills out of Steal, Freeze, and Duel.
-2. A best-of-3 Rock-Paper-Scissors decides who starts unfrozen. The loser begins the board phase frozen for 2 seconds.
-3. Click any `?` cell to enter its mini-game. The first player to clear it captures that cell.
-4. Entering an enemy-owned cell spends your Steal and creates a 5-second defend window for the owner.
-5. Win instantly by getting 3 in a row, or own more cells when the 9-cell board is full.
+1. In online mode, each player first bans 1 mini-game from the match pool.
+2. Then both players secretly pick 2 skills out of Steal, Freeze, and Duel.
+3. A best-of-3 Rock-Paper-Scissors decides who starts unfrozen. The loser begins the board phase frozen for 2 seconds.
+4. Click any `?` cell to enter its mini-game. The first player to clear it captures that cell.
+5. Entering an enemy-owned cell spends your Steal and creates a 5-second defend window for the owner.
+6. Win instantly by getting 3 in a row, or own more cells when the 9-cell board is full.
 
 If you are brand new to online mode, open the guided bot tutorial from the online lobby first. It walks through the board with step-by-step prompts during a real match.
 
@@ -42,7 +44,7 @@ If you are brand new to online mode, open the guided bot tutorial from the onlin
 
 ## 🧩 Mini-Games
 
-The game features **13** distinct skill-based mini-games. Each online battle randomly samples 9 of them:
+The game features **13** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
 
 | #   | Name                | Description                                                             |
 | --- | ------------------- | ----------------------------------------------------------------------- |
@@ -82,6 +84,7 @@ GridRush runs entirely in the browser with no backend. All game state lives on t
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P2P messages (host-side)**  | Every `NetworkMessage` is reconstructed by `services/sanitize.ts` — type-checked against an allow-list, numeric values range-clamped.           |
 | **P2P messages (guest-side)** | `STATE_UPDATE` from the host is shape-validated (status allow-list, cell-count bound, required objects present) before being applied.           |
+| **Ban picks**                 | Guest-sent ban IDs are validated against known mini-game IDs and accepted once per player per round.                                            |
 | **Skill picks**               | Guest-sent skill IDs are filtered to a fixed allow-list (`STEAL`, `FREEZE`, `DUEL`).                                                            |
 | **Action rate-limiting**      | `RateLimiter` (token-bucket) enforces per-action limits: `HEARTBEAT` ≤ 3/s, `CLICK_CELL` ≤ 10/s, `INTERACTION` ≤ 20/s, `COMPLETE_GAME` ≤ 2/2 s. |
 | **Room code injection**       | `joinGame` validates input against `/^\d{4}$/` before passing it to PeerJS.                                                                     |

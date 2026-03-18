@@ -1560,6 +1560,7 @@ const SKILL_DEFS = [
   { id: 'FREEZE', icon: '❄️',  nameKey: 'skill_freeze' as const },
   { id: 'DUEL',   icon: '⚔️',  nameKey: 'skill_duel'   as const },
 ];
+const ALL_MINI_GAME_IDS = MINI_GAMES.map(g => g.id);
 
 // --- Rock-Paper-Scissors ---
 
@@ -1599,6 +1600,7 @@ interface NetworkQualityState {
 const RPS_ICONS: Record<RpsMove, string> = { R: '✊', P: '✋', S: '✌️' };
 const MATCH_PHASE_LABEL_KEY: Record<MatchPhase, string> = {
   WAITING: 'net_phase_waiting',
+  BAN_PICK: 'net_phase_ban',
   SKILL_PICK: 'net_phase_skills',
   RPS: 'net_phase_rps',
   PLAYING: 'net_phase_playing',
@@ -1779,6 +1781,87 @@ interface SkillPickScreenProps {
   onConfirm: (picks: string[]) => void;
 }
 
+interface BanPickScreenProps {
+  t: Record<string, string>;
+  language: 'en' | 'zh';
+  waiting: boolean;
+  selectedGameId: string | null;
+  onConfirm: (gameId: string) => void;
+}
+
+const BanPickScreen: React.FC<BanPickScreenProps> = ({ t, language, waiting, selectedGameId, onConfirm }) => {
+  const [selected, setSelected] = React.useState<string | null>(selectedGameId);
+
+  React.useEffect(() => {
+    setSelected(selectedGameId);
+  }, [selectedGameId]);
+
+  const selectedGame = React.useMemo(
+    () => MINI_GAMES.find(game => game.id === (selected ?? selectedGameId ?? '')),
+    [selected, selectedGameId],
+  );
+
+  const getName = (id: string, fallback: string) => {
+    if (language !== 'zh') return fallback;
+    return MINI_GAME_ZH_META[id]?.name ?? fallback;
+  };
+
+  if (waiting) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center gap-6 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-4">
+        <div className="text-5xl animate-spin">⏳</div>
+        <p className="text-xl font-bold tracking-widest uppercase text-slate-500 dark:text-slate-300">{t.ban_pick_waiting}</p>
+        {selectedGame && (
+          <div className="px-5 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold tracking-wide">
+            {t.ban_pick_selected}: {selectedGame.icon} {getName(selectedGame.id, selectedGame.name)}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen w-screen flex flex-col items-center justify-center gap-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-4 py-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-black tracking-widest uppercase text-rose-500 dark:text-rose-400 mb-2">{t.ban_pick_title}</h1>
+        <p className="text-slate-500 dark:text-slate-400">{t.ban_pick_instr}</p>
+      </div>
+
+      <div className="w-full max-w-5xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {MINI_GAMES.map(game => {
+          const isSelected = selected === game.id;
+          return (
+            <button
+              key={game.id}
+              onClick={() => setSelected(game.id)}
+              className={`rounded-2xl border-2 px-3 py-4 flex flex-col items-center gap-2 text-center transition-all duration-200 ${
+                isSelected
+                  ? 'border-rose-400 bg-rose-400/10 shadow-lg shadow-rose-400/20 scale-105'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 hover:scale-105'
+              }`}
+            >
+              <span className="text-3xl">{game.icon}</span>
+              <span className="text-xs font-bold tracking-wide leading-tight">{getName(game.id, game.name)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => selected && onConfirm(selected)}
+        disabled={!selected}
+        className={`px-10 py-4 rounded-full font-black tracking-widest uppercase text-lg transition-all duration-200 ${
+          selected
+            ? 'bg-rose-500 text-white hover:bg-rose-400 shadow-lg shadow-rose-500/30 hover:scale-105'
+            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+        }`}
+      >
+        {t.ban_pick_confirm}
+      </button>
+    </div>
+  );
+};
+
 const SkillPickScreen: React.FC<SkillPickScreenProps> = ({ t, waiting, onConfirm }) => {
   const [selected, setSelected] = React.useState<string[]>([]);
 
@@ -1919,7 +2002,7 @@ const SoloDifficultyPicker = ({
 // --- App ---
 
 export default function App() {
-  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'SKILL_PICK' | 'SOLO_DIFFICULTY' | 'RPS'>('MENU');
+  const [appMode, setAppMode] = useState<'MENU' | 'LOBBY' | 'PRACTICE' | 'CHALLENGE' | 'GAME' | 'BAN_PICK' | 'SKILL_PICK' | 'SOLO_DIFFICULTY' | 'RPS'>('MENU');
   
   // Persisted State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -1964,6 +2047,12 @@ export default function App() {
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
   const [tutorialActive, setTutorialActive] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<TutorialMatchStep>('NONE');
+
+  // Ban phase (online only)
+  const [myBanPick, setMyBanPick] = useState<string | null>(null);
+  const myBanPickRef = useRef<string | null>(null);
+  myBanPickRef.current = myBanPick;
+  const p2BanPickRef = useRef<string | null>(null); // HOST stores P2's banned game
 
   // Skill pick phase (online only)
   const [mySkillPicks, setMySkillPicks] = useState<string[]>([]);
@@ -2044,6 +2133,17 @@ export default function App() {
   const ONLINE_TUTORIAL_DONE_KEY = 'gridrush_online_tutorial_done';
   const RULES_MODAL_SEEN_KEY = 'gridrush_rules_modal_seen';
 
+  const getOnlineAllowedGameIds = () => {
+    const banned = new Set<string>();
+    if (myBanPickRef.current) banned.add(myBanPickRef.current);
+    if (p2BanPickRef.current) banned.add(p2BanPickRef.current);
+    const allowed = ALL_MINI_GAME_IDS.filter(id => !banned.has(id));
+    // Safety fallback in case future game count drops below board size.
+    return allowed.length >= 9 ? allowed : ALL_MINI_GAME_IDS;
+  };
+
+  const getOnlineBoardGameIds = () => shuffleGames(getOnlineAllowedGameIds()).slice(0, 9);
+
   const setMatchPhaseLocal = (phase: MatchPhase) => {
     const phaseChanged = matchPhaseRef.current !== phase;
     matchPhaseRef.current = phase;
@@ -2058,6 +2158,7 @@ export default function App() {
   const setMatchPhaseAndUi = (phase: MatchPhase) => {
     setMatchPhaseLocal(phase);
     if (phase === 'WAITING' && roleRef.current === 'HOST') setAppMode('GAME');
+    if (phase === 'BAN_PICK') setAppMode('BAN_PICK');
     if (phase === 'SKILL_PICK') setAppMode('SKILL_PICK');
     if (phase === 'RPS') setAppMode('RPS');
     if (phase === 'PLAYING' || phase === 'RESULT') setAppMode('GAME');
@@ -2282,6 +2383,8 @@ export default function App() {
         revision: revisionOverride ?? authorityRevisionRef.current,
         guestSessionId: guestSessionIdRef.current,
         gameState: stateOverride ?? gameState,
+        myBanPick: myBanPickRef.current,
+        p2BanPick: p2BanPickRef.current,
         mySkillPicks: mySkillPicksRef.current,
         p2SkillPicks: p2SkillPicksRef.current,
         rpsState: {
@@ -2297,8 +2400,12 @@ export default function App() {
     }
   };
 
-  const sendPhaseMessage = (connection: any, phase: Extract<MatchPhase, 'SKILL_PICK' | 'RPS'>, revision: number) => {
+  const sendPhaseMessage = (connection: any, phase: Extract<MatchPhase, 'BAN_PICK' | 'SKILL_PICK' | 'RPS'>, revision: number) => {
     if (!connection?.open) return;
+    if (phase === 'BAN_PICK') {
+      connection.send({ type: 'BAN_PHASE', revision });
+      return;
+    }
     connection.send(phase === 'SKILL_PICK'
       ? { type: 'SKILL_PICK_PHASE', revision }
       : { type: 'RPS_PHASE', revision });
@@ -2310,7 +2417,7 @@ export default function App() {
       sendStateSnapshot(connection, gameState, matchPhaseRef.current, revision);
       return;
     }
-    if (matchPhaseRef.current === 'SKILL_PICK' || matchPhaseRef.current === 'RPS') {
+    if (matchPhaseRef.current === 'BAN_PICK' || matchPhaseRef.current === 'SKILL_PICK' || matchPhaseRef.current === 'RPS') {
       sendPhaseMessage(connection, matchPhaseRef.current, revision);
     }
   };
@@ -2353,9 +2460,12 @@ export default function App() {
     setReconnectAttempt(0);
     setNetworkQuality({ rttMs: null, jitterMs: null, lossPct: 0, phase: 'WAITING', revision: 0 });
     setMatchPhaseLocal('WAITING');
+    setMyBanPick(null);
+    myBanPickRef.current = null;
+    p2BanPickRef.current = null;
   };
 
-  const sendAuthoritativePhase = (phase: Extract<MatchPhase, 'SKILL_PICK' | 'RPS'>) => {
+  const sendAuthoritativePhase = (phase: Extract<MatchPhase, 'BAN_PICK' | 'SKILL_PICK' | 'RPS'>) => {
     const revision = nextAuthorityRevision();
     setMatchPhaseAndUi(phase);
     if (connRef.current) {
@@ -3096,10 +3206,10 @@ export default function App() {
     let numCells = 9;
 
     if (mode === 'SOLO') {
-       gameIds = options?.customGameIds?.length ? [...options.customGameIds] : shuffleGames(MINI_GAMES.map(g => g.id));
+       gameIds = options?.customGameIds?.length ? [...options.customGameIds] : shuffleGames(ALL_MINI_GAME_IDS);
        numCells = gameIds.length;
     } else {
-       gameIds = options?.customGameIds?.length ? [...options.customGameIds].slice(0, 9) : shuffleGames(MINI_GAMES.map(g => g.id)).slice(0, 9);
+       gameIds = options?.customGameIds?.length ? [...options.customGameIds].slice(0, 9) : getOnlineBoardGameIds();
     }
 
     const cells: CellData[] = Array(numCells).fill(null).map((_, i) => ({
@@ -3197,6 +3307,9 @@ export default function App() {
     setError(null);
     setRematchInviteFrom(null);
     setRematchStatus('NONE');
+    setMyBanPick(null);
+    myBanPickRef.current = null;
+    p2BanPickRef.current = null;
     setMySkillPicks(['STEAL', 'FREEZE']);
     mySkillPicksRef.current = ['STEAL', 'FREEZE'];
     p2SkillPicksRef.current = ['STEAL'];
@@ -3654,9 +3767,11 @@ export default function App() {
               })();
           if (targetIdx >= 0) {
             const currentGameId = ns.cells[targetIdx].gameId;
-            const otherGames = MINI_GAMES.map(g => g.id).filter(id => id !== currentGameId);
-            const newGameId = otherGames[Math.floor(Math.random() * otherGames.length)];
-            ns = { ...ns, cells: ns.cells.map((c, i) => i === targetIdx ? { ...c, gameId: newGameId } : c) };
+            const otherGames = getOnlineAllowedGameIds().filter(id => id !== currentGameId);
+            if (otherGames.length > 0) {
+              const newGameId = otherGames[Math.floor(Math.random() * otherGames.length)];
+              ns = { ...ns, cells: ns.cells.map((c, i) => i === targetIdx ? { ...c, gameId: newGameId } : c) };
+            }
           }
           break;
         }
@@ -3835,12 +3950,15 @@ export default function App() {
 
     if (!isResume) {
       guestSessionIdRef.current = generateGuestSessionId();
+      p2BanPickRef.current = null;
       p2SkillPicksRef.current = null;
       rpsP2PickRef.current = null;
       rpsMyPickRef.current = null;
       rpsScoresRef.current = { P1: 0, P2: 0 };
       rpsRoundRef.current = 1;
       setRpsState({ round: 1, myScore: 0, oppScore: 0, myMove: null, oppMove: null, roundResult: null, seriesWinner: null });
+      setMyBanPick(null);
+      myBanPickRef.current = null;
       setMySkillPicks([]);
       mySkillPicksRef.current = [];
     }
@@ -3856,7 +3974,7 @@ export default function App() {
     }
 
     if (!isResume && matchPhaseRef.current === 'WAITING') {
-      sendAuthoritativePhase('SKILL_PICK');
+      sendAuthoritativePhase('BAN_PICK');
     } else {
       replayAuthoritativeStateTo(connection);
     }
@@ -3916,6 +4034,17 @@ export default function App() {
       if (action.type === 'USE_SKILL' && action.skill === 'DUEL')   processUseDuel('P2');
       if (action.type === 'DUEL_PICK_CELL') processDuelPickCell('P2', action.cellIndex);
       if (action.type === 'USE_FUN_CARD') processUseFunCard('P2', action.cardId);
+    }
+    else if (msg.type === 'BAN_PICK') {
+      if (matchPhaseRef.current !== 'BAN_PICK' || msg.phase !== 'BAN_PICK') return;
+      if (!rl.allow('ban_pick', 2, 5000)) return;
+      if (!ALL_MINI_GAME_IDS.includes(msg.gameId)) return;
+      if (p2BanPickRef.current) return;
+      p2BanPickRef.current = msg.gameId;
+      persistHostResumeSession();
+      if (myBanPickRef.current) {
+        sendAuthoritativePhase('SKILL_PICK');
+      }
     }
     else if (msg.type === 'SKILL_PICK') {
       if (matchPhaseRef.current !== 'SKILL_PICK' || msg.phase !== 'SKILL_PICK') return;
@@ -4066,6 +4195,8 @@ export default function App() {
       clearGuestResumeSession();
       setIsConnecting(true);
       setError(null);
+      setMyBanPick(null);
+      myBanPickRef.current = null;
       setMySkillPicks([]);
       initialConnectTimerId = window.setTimeout(() => {
         setIsConnecting(false);
@@ -4238,6 +4369,9 @@ export default function App() {
         const previousPhase = matchPhaseRef.current;
         noteRemoteRevision(data.revision);
         setGameState(data.state);
+        if (data.phase === 'BAN_PICK' && previousPhase !== 'BAN_PICK') {
+          resetLocalRoundStateForBanPick();
+        }
         if (data.phase === 'SKILL_PICK' && previousPhase !== 'SKILL_PICK') {
           resetLocalRoundStateForSkillPick();
         }
@@ -4248,6 +4382,14 @@ export default function App() {
             const now = Date.now();
             timeOffsetRef.current = now - data.serverTime;
         }
+    }
+    else if (data.type === 'BAN_PHASE') {
+      if (!shouldApplyAuthoritativeMessage(data.revision)) return;
+      noteRemoteRevision(data.revision);
+      resetLocalRoundStateForBanPick();
+      setConnectionStatus('CONNECTED');
+      setMatchPhaseAndUi('BAN_PICK');
+      persistGuestResumeSession('BAN_PICK', data.revision);
     }
     else if (data.type === 'SKILL_PICK_PHASE') {
       if (!shouldApplyAuthoritativeMessage(data.revision)) return;
@@ -4407,6 +4549,8 @@ export default function App() {
       clearGuestResumeSession();
       setIsConnecting(true);
       setError(null);
+      setMyBanPick(null);
+      myBanPickRef.current = null;
       setMySkillPicks([]);
       initialConnectTimerId = window.setTimeout(() => {
         if (peer !== peerRef.current || manualDisconnectRef.current) return;
@@ -4518,12 +4662,19 @@ export default function App() {
     setRematchStatus('NONE');
   };
 
-  const startHostRematch = () => {
+  const resetLocalRoundStateForBanPick = () => {
+    setMyBanPick(null);
+    myBanPickRef.current = null;
+    p2BanPickRef.current = null;
     p2SkillPicksRef.current = null;
     resetLocalRoundStateForSkillPick();
+  };
+
+  const startHostRematch = () => {
+    resetLocalRoundStateForBanPick();
     resetRematchUiState();
     setGameState(DEFAULT_GAME_STATE);
-    sendAuthoritativePhase('SKILL_PICK');
+    sendAuthoritativePhase('BAN_PICK');
   };
 
   const respondRematchInvite = (accepted: boolean) => {
@@ -4541,7 +4692,7 @@ export default function App() {
     if (roleRef.current === 'HOST') {
       startHostRematch();
     } else {
-      resetLocalRoundStateForSkillPick();
+      resetLocalRoundStateForBanPick();
       setRematchStatus('WAIT_HOST');
     }
   };
@@ -4654,6 +4805,35 @@ export default function App() {
   if (appMode === 'LOBBY') {
     return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} onStartTutorial={startOnlineTutorialMatch} isConnecting={isConnecting} error={error} t={t} />;
   }
+
+  if (appMode === 'BAN_PICK') {
+    const handleBanConfirm = (gameId: string) => {
+      if (!ALL_MINI_GAME_IDS.includes(gameId)) return;
+      if (myBanPickRef.current) return;
+      setMyBanPick(gameId);
+      myBanPickRef.current = gameId;
+
+      if (roleRef.current === 'GUEST' && connRef.current) {
+        connRef.current.send({ type: 'BAN_PICK', gameId, phase: 'BAN_PICK' });
+      } else if (roleRef.current === 'HOST') {
+        persistHostResumeSession();
+        if (p2BanPickRef.current) {
+          sendAuthoritativePhase('SKILL_PICK');
+        }
+      }
+    };
+
+    return (
+      <BanPickScreen
+        t={t}
+        language={settings.language}
+        waiting={myBanPick !== null}
+        selectedGameId={myBanPick}
+        onConfirm={handleBanConfirm}
+      />
+    );
+  }
+
   if (appMode === 'SKILL_PICK') {
     const handleSkillConfirm = (picks: string[]) => {
       setMySkillPicks(picks);
