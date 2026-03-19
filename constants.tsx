@@ -87,6 +87,7 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'gravitymaze', name: 'Gravity Maze',  type: 'TIMED',    icon: '🔄', description: 'Flip gravity to reach the star!' },
   { id: 'rhythmcopy',  name: 'Rhythm Copy',   type: 'ACCURACY', icon: '🥁', description: 'Watch and copy the beat!' },
   { id: 'oddchar',     name: 'Odd One Out',   type: 'TIMED',    icon: '🔍', description: 'Find the different character!' },
+  { id: 'heartbeat',   name: 'Heartbeat',    type: 'ACCURACY', icon: '💓', description: 'Stop at the target time!' },
 ];
 
 export const MINI_GAME_ZH_META: Record<string, { name: string; description: string }> = {
@@ -103,6 +104,7 @@ export const MINI_GAME_ZH_META: Record<string, { name: string; description: stri
   gravitymaze: { name: '重力迷宫', description: '点击翻转重力，躲障碍到终点。' },
   rhythmcopy: { name: '节奏复刻', description: '观察后复刻同样的节奏序列。' },
   oddchar: { name: '找不同字', description: '在字符阵列中找出唯一异类。' },
+  heartbeat: { name: '心跳秒表', description: '凭心跳感应停在目标时间。' },
 };
 
 export const WIN_PATTERNS = [
@@ -168,6 +170,15 @@ export const MINI_GAME_TRANSLATIONS = {
     oddchar_start: "Find the odd character",
     oddchar_find: "Spot it!",
     oddchar_retry: "Time's up! Retry",
+    heartbeat_target: "Stop at",
+    heartbeat_watching: "Counting...",
+    heartbeat_perfect: "PERFECT!",
+    heartbeat_failed: "Failed!",
+    heartbeat_offby: "Off by",
+    heartbeat_threshold_easy: "(±0.25s tolerance)",
+    heartbeat_threshold_normal: "(±0.15s tolerance)",
+    heartbeat_threshold_hard: "(±0.08s tolerance)",
+    heartbeat_threshold_expert: "(±0.05s tolerance)",
   },
   zh: {
     mash_instr: "疯狂点击！",
@@ -225,6 +236,15 @@ export const MINI_GAME_TRANSLATIONS = {
     oddchar_start: "找出不同的字",
     oddchar_find: "快找！",
     oddchar_retry: "超时！重试",
+    heartbeat_target: "停在",
+    heartbeat_watching: "计数中...",
+    heartbeat_perfect: "完美！",
+    heartbeat_failed: "失败！",
+    heartbeat_offby: "差",
+    heartbeat_threshold_easy: "（误差±0.25秒）",
+    heartbeat_threshold_normal: "（误差±0.15秒）",
+    heartbeat_threshold_hard: "（误差±0.08秒）",
+    heartbeat_threshold_expert: "（误差±0.05秒）",
   }
 };
 

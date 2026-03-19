@@ -44,23 +44,24 @@ If you are brand new to online mode, open the guided bot tutorial from the onlin
 
 ## 🧩 Mini-Games
 
-The game features **13** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
+The game features **14** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
 
-| #   | Name                | Description                                                             |
-| --- | ------------------- | ----------------------------------------------------------------------- |
-| 1   | **Math Rush**       | Solve arithmetic problems before time runs out.                         |
-| 2   | **Power Mash**      | Mash the button to fill the energy bar.                                 |
-| 3   | **Stroop Test**     | Click the _color_ of the text, not the word.                            |
-| 4   | **Reaction**        | Wait for green, then click instantly.                                   |
-| 5   | **Matrix**          | Memorize a flash sequence, then reproduce it.                           |
-| 6   | **Lock Pick**       | Tap when the spinner lands in the green zone.                           |
-| 7   | **Scramble**        | Type a code on a constantly shuffling keypad.                           |
-| 8   | **Aim Lab**         | Hit shrinking targets before they disappear.                            |
-| 9   | **1-2-3 Sequence**  | Click numbers in ascending order.                                       |
-| 10  | **Don't Touch Red** | Navigate your cursor through a maze, avoiding red zones.                |
-| 11  | **Gravity Maze**    | Flip gravity to guide a block through spike-filled passages.            |
-| 12  | **Rhythm Copy**     | Watch a 3-instrument beat pattern, then replay it with S / D / F.       |
-| 13  | **Odd One Out**     | Spot the single different character hidden in a grid of identical ones. |
+| #   | Name                | Description                                                                         |
+| --- | ------------------- | ----------------------------------------------------------------------------------- |
+| 1   | **Math Rush**       | Solve arithmetic problems before time runs out.                                     |
+| 2   | **Power Mash**      | Mash the button to fill the energy bar.                                             |
+| 3   | **Stroop Test**     | Click the _color_ of the text, not the word.                                        |
+| 4   | **Reaction**        | Wait for green, then click instantly.                                               |
+| 5   | **Matrix**          | Memorize a flash sequence, then reproduce it.                                       |
+| 6   | **Lock Pick**       | Tap when the spinner lands in the green zone.                                       |
+| 7   | **Scramble**        | Type a code on a constantly shuffling keypad.                                       |
+| 8   | **Aim Lab**         | Hit shrinking targets before they disappear.                                        |
+| 9   | **1-2-3 Sequence**  | Click numbers in ascending order.                                                   |
+| 10  | **Don't Touch Red** | Navigate your cursor through a maze, avoiding red zones.                            |
+| 11  | **Gravity Maze**    | Flip gravity to guide a block through spike-filled passages.                        |
+| 12  | **Rhythm Copy**     | Watch a 3-instrument beat pattern, then replay it with S / D / F.                   |
+| 13  | **Odd One Out**     | Spot the single different character hidden in a grid of identical ones.             |
+| 14  | **Heartbeat**       | Feel the time: watch for 1s, then stop at the target moment. Pure timing challenge. |
 
 ## 🛠️ Tech Stack
 

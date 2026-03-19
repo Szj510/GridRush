@@ -1448,6 +1448,175 @@ const OddCharGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL
   );
 };
 
+const HeartbeatStopwatchGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
+  const [status, setStatus] = useState<'IDLE' | 'COUNTING' | 'STOPPED' | 'RESULT'>('IDLE');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [targetTime, setTargetTime] = useState(0);
+  const [displayTime, setDisplayTime] = useState('0.00');
+  const [finalError, setFinalError] = useState(0);
+  const [isSuccess, setIsSuccess] = useState(false);
+  
+  const timeoutRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const t = MINI_GAME_TRANSLATIONS[language];
+
+  const tolerance = {
+    EASY: 0.25,
+    NORMAL: 0.15,
+    HARD: 0.08,
+    EXPERT: 0.05
+  }[difficulty];
+
+  useEffect(() => {
+    // Set random target between 3 and 7 seconds (whole numbers only)
+    const targets = [3, 4, 5, 6, 7];
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    setTargetTime(target);
+    setStatus('COUNTING');
+    startTimeRef.current = Date.now();
+
+    // Show timer visuals for first 1 second
+    let elapsedMs = 0;
+    intervalRef.current = window.setInterval(() => {
+      elapsedMs = Date.now() - startTimeRef.current;
+      const seconds = elapsedMs / 1000;
+      
+      // After 1 second, hide the display (enter "blind" mode)
+      if (seconds >= 1.0) {
+        setDisplayTime('?');
+        setCurrentTime(seconds);
+      } else {
+        // Show precise time during first second
+        setDisplayTime(seconds.toFixed(2));
+        setCurrentTime(seconds);
+      }
+    }, 30);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleStop = () => {
+    if (onInteraction) onInteraction();
+    
+    if (status === 'COUNTING') {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setStatus('STOPPED');
+      
+      const elapsedMs = Date.now() - startTimeRef.current;
+      const stoppedAt = elapsedMs / 1000;
+      const error = Math.abs(stoppedAt - targetTime);
+      
+      setFinalError(error);
+      setCurrentTime(stoppedAt);
+      setDisplayTime(stoppedAt.toFixed(2));
+
+      const success = error <= tolerance;
+      setIsSuccess(success);
+
+      if (success) {
+        audio.playSuccess();
+      } else {
+        audio.playFailure();
+      }
+
+      setTimeout(() => {
+        setStatus('RESULT');
+        setTimeout(() => onComplete(success), 600);
+      }, 800);
+    }
+  };
+
+  const handleRetry = () => {
+    setStatus('IDLE');
+    setTimeout(() => {
+      setDisplayTime('0.00');
+      setCurrentTime(0);
+      setFinalError(0);
+      setIsSuccess(false);
+      const targets = [3, 4, 5, 6, 7];
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      setTargetTime(target);
+      setStatus('COUNTING');
+      startTimeRef.current = Date.now();
+
+      let elapsedMs = 0;
+      intervalRef.current = window.setInterval(() => {
+        elapsedMs = Date.now() - startTimeRef.current;
+        const seconds = elapsedMs / 1000;
+        
+        if (seconds >= 1.0) {
+          setDisplayTime('?');
+          setCurrentTime(seconds);
+        } else {
+          setDisplayTime(seconds.toFixed(2));
+          setCurrentTime(seconds);
+        }
+      }, 30);
+    }, 100);
+  };
+
+  const toleranceLabel = {
+    EASY: t.heartbeat_threshold_easy,
+    NORMAL: t.heartbeat_threshold_normal,
+    HARD: t.heartbeat_threshold_hard,
+    EXPERT: t.heartbeat_threshold_expert
+  }[difficulty];
+
+  return (
+    <div className="flex flex-col items-center gap-4 w-full px-4">
+      <div className="text-xs text-slate-400 uppercase font-mono mb-2">
+        {t.heartbeat_target} {Math.round(targetTime)}s {toleranceLabel}
+      </div>
+
+      <div 
+        onPointerDown={handleStop}
+        style={{ touchAction: 'manipulation' }}
+        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl relative
+          ${status === 'COUNTING' ? 'bg-gradient-to-br from-pink-500 to-rose-600 scale-[1.00] hover:scale-[1.02]' : 
+          status === 'STOPPED' ? 'bg-orange-500' :
+          isSuccess ? 'bg-green-500' :
+          'bg-red-500'}
+        `}
+      >
+        <span className="text-6xl font-bold tracking-widest text-white drop-shadow-lg font-mono">
+          {displayTime}
+        </span>
+        
+        {status === 'IDLE' && (
+          <div className="absolute bottom-4 text-white/70 text-sm animate-pulse">{t.heartbeat_watching}</div>
+        )}
+
+        {status === 'RESULT' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 rounded-3xl">
+            <div className="text-2xl font-bold text-white drop-shadow-lg mb-2">
+              {isSuccess ? t.heartbeat_perfect : t.heartbeat_failed}
+            </div>
+            <div className="text-sm text-white/90 drop-shadow-lg">
+              {t.heartbeat_offby} {finalError.toFixed(2)}s
+            </div>
+          </div>
+        )}
+
+        {tutorialEnabled && status === 'COUNTING' && currentTime < 1.0 && (
+          <div className="absolute top-4 text-white/70 text-xs text-center px-2 animate-pulse">
+            Watch for 1 second, then count to {Math.round(targetTime)}
+          </div>
+        )}
+      </div>
+
+      {status === 'RESULT' && (
+        <Button onClick={handleRetry} onInteraction={onInteraction} className="bg-slate-700 text-white">
+          {t.retry}
+        </Button>
+      )}
+    </div>
+  );
+};
+
 export const MiniGameRenderer = (props: Props) => {
   const { type } = props;
 
@@ -1465,6 +1634,7 @@ export const MiniGameRenderer = (props: Props) => {
     case 'gravitymaze': return <GravityMazeGame {...props} />;
     case 'rhythmcopy':  return <RhythmCopyGame {...props} />;
     case 'oddchar':     return <OddCharGame {...props} />;
+    case 'heartbeat':   return <HeartbeatStopwatchGame {...props} />;
     default: return <MashGame {...props} />;
   }
 };
