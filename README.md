@@ -44,7 +44,7 @@ If you are brand new to online mode, open the guided bot tutorial from the onlin
 
 ## 🧩 Mini-Games
 
-The game features **14** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
+The game features **15** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
 
 | #   | Name                | Description                                                                         |
 | --- | ------------------- | ----------------------------------------------------------------------------------- |
@@ -62,6 +62,7 @@ The game features **14** distinct skill-based mini-games. Each online battle ran
 | 12  | **Rhythm Copy**     | Watch a 3-instrument beat pattern, then replay it with S / D / F.                   |
 | 13  | **Odd One Out**     | Spot the single different character hidden in a grid of identical ones.             |
 | 14  | **Heartbeat**       | Feel the time: watch for 1s, then stop at the target moment. Pure timing challenge. |
+| 15  | **Pixel Eye**       | Match the reference line length by dragging to create an accurate line segment.     |
 
 ## 🛠️ Tech Stack
 

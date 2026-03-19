@@ -88,6 +88,7 @@ export const MINI_GAMES: MiniGameConfig[] = [
   { id: 'rhythmcopy',  name: 'Rhythm Copy',   type: 'ACCURACY', icon: '🥁', description: 'Watch and copy the beat!' },
   { id: 'oddchar',     name: 'Odd One Out',   type: 'TIMED',    icon: '🔍', description: 'Find the different character!' },
   { id: 'heartbeat',   name: 'Heartbeat',    type: 'ACCURACY', icon: '💓', description: 'Stop at the target time!' },
+  { id: 'pixeleye',    name: 'Pixel Eye',   type: 'ACCURACY', icon: '👁️', description: 'Match the reference line length!' },
 ];
 
 export const MINI_GAME_ZH_META: Record<string, { name: string; description: string }> = {
@@ -105,6 +106,7 @@ export const MINI_GAME_ZH_META: Record<string, { name: string; description: stri
   rhythmcopy: { name: '节奏复刻', description: '观察后复刻同样的节奏序列。' },
   oddchar: { name: '找不同字', description: '在字符阵列中找出唯一异类。' },
   heartbeat: { name: '心跳秒表', description: '凭心跳感应停在目标时间。' },
+  pixeleye: { name: '像素眼', description: '用视觉精准复现参照线段的长度。' },
 };
 
 export const WIN_PATTERNS = [
@@ -179,6 +181,12 @@ export const MINI_GAME_TRANSLATIONS = {
     heartbeat_threshold_normal: "(±0.15s tolerance)",
     heartbeat_threshold_hard: "(±0.08s tolerance)",
     heartbeat_threshold_expert: "(±0.05s tolerance)",
+    pixeleye_instr: "Match the reference line!",
+    pixeleye_drag: "Drag to create",
+    pixeleye_error: "Error",
+    pixeleye_perfect: "PERFECT!",
+    pixeleye_close: "Close enough!",
+    pixeleye_too_far: "Try again!",
   },
   zh: {
     mash_instr: "疯狂点击！",
@@ -245,6 +253,12 @@ export const MINI_GAME_TRANSLATIONS = {
     heartbeat_threshold_normal: "（误差±0.15秒）",
     heartbeat_threshold_hard: "（误差±0.08秒）",
     heartbeat_threshold_expert: "（误差±0.05秒）",
+    pixeleye_instr: "复现参照线的长度！",
+    pixeleye_drag: "拖拽创建",
+    pixeleye_error: "误差",
+    pixeleye_perfect: "完美！",
+    pixeleye_close: "足够接近！",
+    pixeleye_too_far: "继续尝试！",
   }
 };
 
