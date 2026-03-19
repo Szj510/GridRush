@@ -595,6 +595,14 @@ export const TRANSLATIONS = {
     fun_ice_desc: "Freeze opponent for 3.5 seconds",
     fun_swap: "Swap",
     fun_swap_desc: "Swap one of your cells with one of the opponent's",
+    // Feedback & Links
+    feedback_button: "Feedback",
+    feedback_title: "Share Your Ideas",
+    feedback_subtitle: "Have game ideas or improvements? We'd love to hear!",
+    feedback_email_button: "Send Email",
+    feedback_github_button: "Open GitHub Issues",
+    feedback_email_hint: "or send to: 3288085966@qq.com",
+    repo_link: "Repository",
   },
   zh: {
     menu_online: "在线对战",
@@ -928,6 +936,14 @@ export const TRANSLATIONS = {
     fun_ice_desc: "冻结对手操作3.5秒",
     fun_swap: "置换",
     fun_swap_desc: "将你的一格与对手的一格互换归属",
+    // 反馈与链接
+    feedback_button: "意见反馈",
+    feedback_title: "分享你的想法",
+    feedback_subtitle: "有游戏建议或改进意见？我们想听听你的想法！",
+    feedback_email_button: "发送邮件",
+    feedback_github_button: "打开 GitHub Issues",
+    feedback_email_hint: "邮箱：3288085966@qq.com",
+    repo_link: "源代码仓库",
   }
 };
 

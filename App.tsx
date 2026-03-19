@@ -9,7 +9,7 @@ import { AuthModal } from './components/AuthModal';
 import type { CloudSyncStatus } from './components/AuthModal';
 import { audio } from './services/audio';
 import { getDefaultNickname, isValidNickname, mergeUserStats, normalizeNickname } from './services/account';
-import { hasSupabaseConfig, supabase } from './services/supabase';
+import { hasSupabaseConfig, supabase, submitFeedback } from './services/supabase';
 import type { ProfileRow } from './services/supabase';
 
 declare global {
@@ -328,6 +328,186 @@ const SettingsModal = ({
         <button onClick={() => { audio.playClick(); onClose(); }} className="w-full mt-8 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-medium transition-colors hover:opacity-90 shadow-lg">
           {t.settings_close}
         </button>
+      </div>
+    </div>
+  );
+};
+
+const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [category, setCategory] = useState<'game_idea' | 'bug_report' | 'improvement'>('game_idea');
+  const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!hasSupabaseConfig) {
+      setError('Supabase not configured. Please try GitHub Issues instead.');
+      return;
+    }
+
+    if (!name.trim() || !email.trim() || !content.trim()) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Please enter a valid email');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await submitFeedback({
+        name: name.trim(),
+        email: email.trim(),
+        category,
+        content: content.trim(),
+      });
+      
+      setSuccess(true);
+      audio.playSuccess();
+      
+      setTimeout(() => {
+        onClose();
+        setName('');
+        setEmail('');
+        setCategory('game_idea');
+        setContent('');
+        setSuccess(false);
+      }, 2000);
+    } catch (err) {
+      audio.playFailure();
+      setError(err instanceof Error ? err.message : 'Failed to submit feedback');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 text-center">
+          <div className="text-4xl mb-4">✅</div>
+          <h2 className="text-xl font-bold mb-2 text-slate-900 dark:text-white">Thank You!</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Your feedback has been submitted successfully. We'll review it soon!</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800">
+        <h2 className="text-xl font-bold mb-2 text-slate-900 dark:text-white tracking-widest uppercase">
+          {t.feedback_title}
+        </h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+          {t.feedback_subtitle}
+        </p>
+        
+        {hasSupabaseConfig ? (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Your Name</label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., John"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+              <select 
+                value={category}
+                onChange={(e) => setCategory(e.target.value as any)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isSubmitting}
+              >
+                <option value="game_idea">💡 Game Idea</option>
+                <option value="bug_report">🐛 Bug Report</option>
+                <option value="improvement">🎨 Improvement</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Your Feedback</label>
+              <textarea 
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Share your thoughts, ideas, or issues..."
+                rows={4}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {error && (
+              <div className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-xs">
+                {error}
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full px-4 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white rounded-lg text-sm tracking-wider uppercase transition-colors font-medium"
+            >
+              {isSubmitting ? '⏳ Submitting...' : '✉ Submit Feedback'}
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => { audio.playClick(); onClose(); }}
+              disabled={isSubmitting}
+              className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3 mb-4">
+              <a
+                href="https://github.com/Szj510/grid-rush/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => { audio.playClick(); onClose(); }}
+                className="w-full px-4 py-3 bg-gray-800 hover:bg-gray-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg text-sm tracking-wider uppercase transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                → {t.feedback_github_button}
+              </a>
+            </div>
+            <button 
+              onClick={() => { audio.playClick(); onClose(); }} 
+              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-medium transition-colors hover:opacity-90 shadow-lg"
+            >
+              {t.settings_close}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -708,6 +888,7 @@ const MainMenu = ({
   onShowSettings,
   onShowAchievements,
   onShowStats,
+  onShowFeedback,
   accountLabel,
   accountConnected,
   t
@@ -747,6 +928,24 @@ const MainMenu = ({
       >
         ?
       </button>
+    </div>
+    
+    <div className="absolute bottom-6 right-6 flex gap-3 flex-col">
+      <button 
+        onClick={() => { audio.playClick(); onShowFeedback(); }}
+        className="h-10 px-3 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 transition-all font-medium text-xs uppercase tracking-widest"
+      >
+        💬 {t.feedback_button}
+      </button>
+      <a
+        href="https://github.com/Szj510/GridRush"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => audio.playClick()}
+        className="h-10 px-3 rounded-full bg-white dark:bg-slate-800 shadow-lg hover:scale-105 flex items-center gap-2 text-gray-700 dark:text-gray-300 transition-all font-medium text-xs uppercase tracking-widest"
+      >
+        ⭐ {t.repo_link}
+      </a>
     </div>
 
     <div className="mb-16 text-center">
@@ -2034,6 +2233,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [newAchievement, setNewAchievement] = useState<string | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('SIGN_IN');
@@ -4746,6 +4946,7 @@ export default function App() {
         {showSettings && <SettingsModal settings={settings} onUpdate={saveSettings} onClearData={clearData} onClose={() => setShowSettings(false)} t={t} />}
         {showAchievements && <AchievementsModal stats={stats} language={settings.language} onClose={() => setShowAchievements(false)} t={t} />}
         {showStats && <StatsModal stats={stats} onClose={() => setShowStats(false)} t={t} />}
+        {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} t={t} />}
         {showAccount && (
           <AuthModal
             t={t}
@@ -4781,6 +4982,7 @@ export default function App() {
           onShowSettings={() => setShowSettings(true)}
           onShowAchievements={() => setShowAchievements(true)}
           onShowStats={() => setShowStats(true)}
+          onShowFeedback={() => setShowFeedback(true)}
           accountLabel={accountLabel}
           accountConnected={Boolean(authSession?.user)}
           t={t}
