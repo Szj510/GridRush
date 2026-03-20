@@ -1801,18 +1801,26 @@ const PixelEyeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
     redrawCanvas();
   }, [redrawCanvas, isSuccess, error, status]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || status !== 'DRAWING') return;
     
+    e.preventDefault();
+
     const rect = canvas.getBoundingClientRect();
     const pointerX = e.clientX - rect.left;
     const pointerY = e.clientY - rect.top;
     const { rightMinX, rightMaxX, topY, bottomY, playerStartX, playerStartY } = areaData.current;
     const inRightZone = pointerX >= rightMinX && pointerX <= rightMaxX && pointerY >= topY && pointerY <= bottomY;
-    const nearAnchor = Math.hypot(pointerX - playerStartX, pointerY - playerStartY) <= 24;
+    const nearAnchor = Math.hypot(pointerX - playerStartX, pointerY - playerStartY) <= 36;
 
     if (!inRightZone || !nearAnchor) return;
+
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Some browsers may reject capture on non-primary pointers.
+    }
 
     onInteraction?.();
     startX.current = playerStartX;
@@ -1823,11 +1831,13 @@ const PixelEyeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
     redrawCanvas();
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing.current || status !== 'DRAWING') return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    e.preventDefault();
 
     const rect = canvas.getBoundingClientRect();
     const pointerX = e.clientX - rect.left;
@@ -1846,8 +1856,16 @@ const PixelEyeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
     redrawCanvas();
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing.current || status !== 'DRAWING') return;
+
+    if (canvasRef.current && e) {
+      try {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      } catch {
+        // Ignore release errors if pointer was not captured.
+      }
+    }
 
     isDrawing.current = false;
 
@@ -1895,10 +1913,10 @@ const PixelEyeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
 
       <canvas
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         style={{ touchAction: 'none' }}
         className="w-full max-w-md aspect-video rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 cursor-crosshair shadow-lg"
       />

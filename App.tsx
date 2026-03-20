@@ -346,17 +346,17 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
     e.preventDefault();
     
     if (!hasSupabaseConfig) {
-      setError('Supabase not configured. Please try GitHub Issues instead.');
+      setError(t.feedback_error_supabase);
       return;
     }
 
     if (!name.trim() || !email.trim() || !content.trim()) {
-      setError('Please fill in all fields');
+      setError(t.feedback_error_required);
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email');
+      setError(t.feedback_error_email);
       return;
     }
 
@@ -384,7 +384,7 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
       }, 2000);
     } catch (err) {
       audio.playFailure();
-      setError(err instanceof Error ? err.message : 'Failed to submit feedback');
+      setError(t.feedback_error_submit);
     } finally {
       setIsSubmitting(false);
     }
@@ -395,8 +395,8 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
       <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-md w-full animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 text-center">
           <div className="text-4xl mb-4">✅</div>
-          <h2 className="text-xl font-bold mb-2 text-slate-900 dark:text-white">Thank You!</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Your feedback has been submitted successfully. We'll review it soon!</p>
+          <h2 className="text-xl font-bold mb-2 text-slate-900 dark:text-white">{t.feedback_success_title}</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{t.feedback_success_desc}</p>
         </div>
       </div>
     );
@@ -415,49 +415,49 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
         {hasSupabaseConfig ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Your Name</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.feedback_name_label}</label>
               <input 
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., John"
+                placeholder={t.feedback_name_placeholder}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 disabled={isSubmitting}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.feedback_email_label}</label>
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={t.feedback_email_placeholder}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 disabled={isSubmitting}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.feedback_category_label}</label>
               <select 
                 value={category}
                 onChange={(e) => setCategory(e.target.value as any)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 disabled={isSubmitting}
               >
-                <option value="game_idea">💡 Game Idea</option>
-                <option value="bug_report">🐛 Bug Report</option>
-                <option value="improvement">🎨 Improvement</option>
+                <option value="game_idea">💡 {t.feedback_category_game_idea}</option>
+                <option value="bug_report">🐛 {t.feedback_category_bug_report}</option>
+                <option value="improvement">🎨 {t.feedback_category_improvement}</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Your Feedback</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.feedback_content_label}</label>
               <textarea 
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Share your thoughts, ideas, or issues..."
+                placeholder={t.feedback_content_placeholder}
                 rows={4}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 disabled={isSubmitting}
@@ -475,7 +475,7 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
               disabled={isSubmitting}
               className="w-full px-4 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white rounded-lg text-sm tracking-wider uppercase transition-colors font-medium"
             >
-              {isSubmitting ? '⏳ Submitting...' : '✉ Submit Feedback'}
+              {isSubmitting ? `⏳ ${t.feedback_submitting}` : `✉ ${t.feedback_submit}`}
             </button>
 
             <button 
@@ -484,7 +484,7 @@ const FeedbackModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
               disabled={isSubmitting}
               className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition-colors"
             >
-              Cancel
+              {t.feedback_cancel}
             </button>
           </form>
         ) : (
