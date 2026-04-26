@@ -12,7 +12,7 @@
 - **Reliable Relay Mode** — When Supabase env is configured, online messages default to Supabase Realtime relay to avoid fragile P2P hole-punching.
 - **Guided Bot Tutorial** — First-time online players can launch a scripted tutorial match that teaches capture, freeze, and steal flow against a slowed-down bot.
 - **Invite via Link** — Host a room and click **Copy Invite Link** to get a shareable URL. Your friend opens the link and lands directly in your room — no code typing needed.
-- **Time Attack Mode** — Solo speed-run through all 13 mini-games in sequence, as fast as possible.
+- **Time Attack Mode** — Solo speed-run through all 14 mini-games in sequence, as fast as possible.
 - **Practice Gym** — Train individual mini-games with adjustable difficulty.
 - **Pre-Match Ban Phase** — Before drafting skills, each player bans 1 mini-game. Banned games are excluded from that match's 9-cell pool.
 - **Skill System** — Before each online battle, secretly pick 2 of 3 skills. Your opponent can't see your choices!
@@ -44,7 +44,7 @@ If you are brand new to online mode, open the guided bot tutorial from the onlin
 
 ## 🧩 Mini-Games
 
-The game features **15** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
+The game features **14** distinct skill-based mini-games. Each online battle randomly samples 9 from the remaining pool after both players ban 1 game each:
 
 | #   | Name                | Description                                                                         |
 | --- | ------------------- | ----------------------------------------------------------------------------------- |
@@ -62,7 +62,6 @@ The game features **15** distinct skill-based mini-games. Each online battle ran
 | 12  | **Rhythm Copy**     | Watch a 3-instrument beat pattern, then replay it with S / D / F.                   |
 | 13  | **Odd One Out**     | Spot the single different character hidden in a grid of identical ones.             |
 | 14  | **Heartbeat**       | Feel the time: watch for 1s, then stop at the target moment. Pure timing challenge. |
-| 15  | **Pixel Eye**       | Match the reference line length by dragging to create an accurate line segment.     |
 
 ## 🛠️ Tech Stack
 

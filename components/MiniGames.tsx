@@ -732,14 +732,17 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
   const t = MINI_GAME_TRANSLATIONS[language];
   const reqRef = useRef(0);
   const failedRef = useRef(false);
+  const lastFrameRef = useRef(0);
+  const isTouchDevice = React.useMemo(() => detectCoarsePointer(), []);
 
-  // Config: Targets count and shrink speed
+  // Config: target count and shrink speed in size points per second.
   const config = {
-      EASY: { count: 3, shrink: 1.4 },
-      NORMAL: { count: 5, shrink: 1.6 },
-      HARD: { count: 8, shrink: 1.7 },
-      EXPERT: { count: 12, shrink: 1.8 }
+      EASY: { count: 3, shrinkPerSecond: 70 },
+      NORMAL: { count: 5, shrinkPerSecond: 95 },
+      HARD: { count: 8, shrinkPerSecond: 125 },
+      EXPERT: { count: 12, shrinkPerSecond: 155 }
   }[difficulty];
+  const shrinkPerSecond = config.shrinkPerSecond * (isTouchDevice ? 1.2 : 1);
 
   const createTarget = () => ({
     id: Math.random(),
@@ -756,10 +759,15 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
 
   useEffect(() => {
      const loop = () => {
+        const now = performance.now();
+        const deltaSeconds = lastFrameRef.current
+          ? Math.min((now - lastFrameRef.current) / 1000, 0.05)
+          : 0;
+        lastFrameRef.current = now;
         if (failedRef.current) return;
         setTarget(curr => {
            if (!curr) return null;
-           const nextSize = curr.size - config.shrink; 
+           const nextSize = curr.size - shrinkPerSecond * deltaSeconds;
            if (nextSize <= 0) {
               audio.playFailure();
               // In easy mode, maybe don't reset score? For now, keep punishment consistent
@@ -769,9 +777,10 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
         });
         reqRef.current = requestAnimationFrame(loop);
      };
+     lastFrameRef.current = performance.now();
      reqRef.current = requestAnimationFrame(loop);
      return () => cancelAnimationFrame(reqRef.current);
-  }, [config.shrink]); 
+  }, [shrinkPerSecond]);
 
   const hit = () => {
      if (onInteraction) onInteraction();
@@ -796,17 +805,18 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
        {target && (
          <button
            key={target.id}
-           onMouseDown={(e) => { e.stopPropagation(); hit(); }}
+           onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); hit(); }}
            className="absolute rounded-full bg-red-500 border-2 border-white shadow-lg active:scale-110 transition-transform"
-           style={{ 
-               top: `${target.y}%`, 
-               left: `${target.x}%`, 
+           style={{
+               top: `${target.y}%`,
+               left: `${target.x}%`,
                width: `${40 + target.size * 0.4}px`, // Min 40px
                height: `${40 + target.size * 0.4}px`,
                transform: 'translate(-50%, -50%)',
-               opacity: target.size / 100 + 0.2
+               opacity: target.size / 100 + 0.2,
+               touchAction: 'manipulation'
            }}
-         >
+          >
            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-1 h-1 bg-white rounded-full" />
            </div>
@@ -1462,10 +1472,10 @@ const HeartbeatStopwatchGame = ({ onComplete, onInteraction, language, difficult
   const t = MINI_GAME_TRANSLATIONS[language];
 
   const tolerance = {
-    EASY: 0.25,
-    NORMAL: 0.15,
-    HARD: 0.08,
-    EXPERT: 0.05
+    EASY: 0.35,
+    NORMAL: 0.25,
+    HARD: 0.15,
+    EXPERT: 0.08
   }[difficulty];
 
   useEffect(() => {
@@ -1617,343 +1627,6 @@ const HeartbeatStopwatchGame = ({ onComplete, onInteraction, language, difficult
   );
 };
 
-const PixelEyeGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', tutorialEnabled }: Props) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [status, setStatus] = useState<'IDLE' | 'DRAWING' | 'RESULT'>('IDLE');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState(0);
-  
-  const refData = useRef({ length: 0, angle: 0, startX: 60, startY: 0 });
-  const areaData = useRef({
-    dividerX: 0,
-    rightMinX: 0,
-    rightMaxX: 0,
-    topY: 0,
-    bottomY: 0,
-    playerStartX: 0,
-    playerStartY: 0,
-  });
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const endX = useRef(0);
-  const endY = useRef(0);
-  const isDrawing = useRef(false);
-  const canvasInfo = useRef({ width: 0, height: 0, dpr: 1 });
-  
-  const t = MINI_GAME_TRANSLATIONS[language];
-
-  const tolerance = {
-    EASY: 0.05,
-    NORMAL: 0.03,
-    HARD: 0.02,
-    EXPERT: 0.01
-  }[difficulty];
-
-  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-  const initializeReference = useCallback(() => {
-    const { height } = canvasInfo.current;
-    const { dividerX } = areaData.current;
-    const refStartX = 56;
-    const refStartY = height / 2;
-    // 左侧参照线保持较小角度，且长度受左半区约束，避免越界。
-    const angleRange = Math.PI / 9; // ~20 degrees
-    const angle = (Math.random() - 0.5) * 2 * angleRange;
-    const maxByZone = Math.max(70, dividerX - refStartX - 26);
-    const maxLength = Math.max(70, Math.min(140, maxByZone));
-    const minLength = Math.max(45, Math.min(85, maxLength - 40));
-    const length = minLength + Math.random() * (maxLength - minLength);
-    refData.current = { length, angle, startX: refStartX, startY: refStartY };
-  }, []);
-
-  const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const { width, height } = canvasInfo.current;
-    const { dividerX, topY, bottomY, playerStartX, playerStartY } = areaData.current;
-    const { length, angle, startX: refStartX, startY: refStartY } = refData.current;
-
-    // 背景分区：左参照区 + 右作图区
-    ctx.fillStyle = '#eff6ff';
-    ctx.fillRect(0, 0, dividerX, height);
-    ctx.fillStyle = '#fff7ed';
-    ctx.fillRect(dividerX, 0, width - dividerX, height);
-
-    // 分割线
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([6, 6]);
-    ctx.beginPath();
-    ctx.moveTo(dividerX, topY - 8);
-    ctx.lineTo(dividerX, bottomY + 8);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw reference line (left side)
-    const refEndX = refStartX + Math.cos(angle) * length;
-    const refEndY = refStartY + Math.sin(angle) * length;
-
-    ctx.strokeStyle = '#06b6d4';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(refStartX, refStartY);
-    ctx.lineTo(refEndX, refEndY);
-    ctx.stroke();
-
-    // Draw circle at reference start
-    ctx.fillStyle = '#06b6d4';
-    ctx.beginPath();
-    ctx.arc(refStartX, refStartY, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 右侧固定起点（玩家必须从这里开始）
-    ctx.fillStyle = '#f97316';
-    ctx.beginPath();
-    ctx.arc(playerStartX, playerStartY, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fdba74';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(playerStartX, playerStartY, 11, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Draw user line (right side)
-    if (endX.current !== 0 || endY.current !== 0) {
-      ctx.strokeStyle = isSuccess ? '#22c55e' : '#f97316';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(startX.current, startY.current);
-      ctx.lineTo(endX.current, endY.current);
-      ctx.stroke();
-
-      // Draw endpoint
-      ctx.fillStyle = isSuccess ? '#22c55e' : '#f97316';
-      ctx.beginPath();
-      ctx.arc(endX.current, endY.current, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Show error percentage
-      if (status === 'RESULT') {
-        ctx.fillStyle = '#1e293b';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${error.toFixed(1)}%`, (startX.current + endX.current) / 2, (startY.current + endY.current) / 2 - 20);
-      }
-    }
-
-    // Draw instruction text
-    ctx.fillStyle = '#64748b';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('Reference →', 10, 25);
-    ctx.textAlign = 'right';
-    ctx.fillText('← Draw', width - 10, 25);
-  }, [isSuccess, error, status]);
-
-  // Initialize canvas on mount
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.scale(dpr, dpr);
-
-    canvasInfo.current = { width: rect.width, height: rect.height, dpr };
-    const dividerX = rect.width * 0.5;
-    const zonePadding = 18;
-    const topY = 36;
-    const bottomY = rect.height - 18;
-    const rightMinX = dividerX + zonePadding;
-    const rightMaxX = rect.width - zonePadding;
-    const playerStartX = dividerX + (rect.width - dividerX) * 0.3;
-    const playerStartY = rect.height / 2;
-
-    areaData.current = {
-      dividerX,
-      rightMinX,
-      rightMaxX,
-      topY,
-      bottomY,
-      playerStartX,
-      playerStartY,
-    };
-
-    initializeReference();
-    redrawCanvas();
-    setStatus('DRAWING');
-  }, []);
-
-  // Redraw when needed
-  useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas, isSuccess, error, status]);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || status !== 'DRAWING') return;
-    
-    e.preventDefault();
-
-    const rect = canvas.getBoundingClientRect();
-    const pointerX = e.clientX - rect.left;
-    const pointerY = e.clientY - rect.top;
-    const { rightMinX, rightMaxX, topY, bottomY, playerStartX, playerStartY } = areaData.current;
-    const inRightZone = pointerX >= rightMinX && pointerX <= rightMaxX && pointerY >= topY && pointerY <= bottomY;
-    const nearAnchor = Math.hypot(pointerX - playerStartX, pointerY - playerStartY) <= 36;
-
-    if (!inRightZone || !nearAnchor) return;
-
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch {
-      // Some browsers may reject capture on non-primary pointers.
-    }
-
-    onInteraction?.();
-    startX.current = playerStartX;
-    startY.current = playerStartY;
-    endX.current = playerStartX;
-    endY.current = playerStartY;
-    isDrawing.current = true;
-    redrawCanvas();
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing.current || status !== 'DRAWING') return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    e.preventDefault();
-
-    const rect = canvas.getBoundingClientRect();
-    const pointerX = e.clientX - rect.left;
-    const pointerY = e.clientY - rect.top;
-    const { rightMinX, rightMaxX, topY, bottomY } = areaData.current;
-
-    endX.current = clamp(pointerX, rightMinX, rightMaxX);
-    endY.current = clamp(pointerY, topY, bottomY);
-
-    // Calculate error in real-time
-    const drawnLen = Math.sqrt(Math.pow(endX.current - startX.current, 2) + Math.pow(endY.current - startY.current, 2));
-    const errPercent = Math.abs(drawnLen - refData.current.length) / refData.current.length * 100;
-    setError(errPercent);
-
-    // Redraw
-    redrawCanvas();
-  };
-
-  const handlePointerUp = (e?: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing.current || status !== 'DRAWING') return;
-
-    if (canvasRef.current && e) {
-      try {
-        canvasRef.current.releasePointerCapture(e.pointerId);
-      } catch {
-        // Ignore release errors if pointer was not captured.
-      }
-    }
-
-    isDrawing.current = false;
-
-    const drawnLen = Math.sqrt(Math.pow(endX.current - startX.current, 2) + Math.pow(endY.current - startY.current, 2));
-
-    const err = Math.abs(drawnLen - refData.current.length) / refData.current.length;
-    const errPercent = err * 100;
-    setError(errPercent);
-
-    const success = err <= tolerance;
-    setIsSuccess(success);
-    setStatus('RESULT');
-
-    if (success) {
-      audio.playSuccess();
-    } else {
-      audio.playFailure();
-    }
-
-    setTimeout(() => {
-      if (success) {
-        onComplete(true, 100 - errPercent);
-      }
-    }, 1000);
-  };
-
-  const handleRetry = () => {
-    endX.current = 0;
-    endY.current = 0;
-    startX.current = 0;
-    startY.current = 0;
-    setError(0);
-    setIsSuccess(false);
-
-    initializeReference();
-    setStatus('DRAWING');
-    redrawCanvas();
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-4 w-full px-4">
-      <div className="text-xs text-slate-400 uppercase font-mono mb-2">
-        {t.pixeleye_instr}
-      </div>
-
-      <canvas
-        ref={canvasRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        style={{ touchAction: 'none' }}
-        className="w-full max-w-md aspect-video rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 cursor-crosshair shadow-lg"
-      />
-
-      {status === 'RESULT' && !isSuccess && (
-        <div className="text-center">
-          <div className="text-lg font-bold text-orange-500 mb-2">{t.pixeleye_too_far}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            {t.pixeleye_error}: {error.toFixed(2)}% ({error < 10 ? '💪 Close!' : '🎯 Keep trying'})
-          </div>
-        </div>
-      )}
-
-      {status === 'RESULT' && isSuccess && (
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-500 mb-2">{t.pixeleye_perfect}</div>
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            {t.pixeleye_error}: {error.toFixed(2)}%
-          </div>
-        </div>
-      )}
-
-      {status === 'RESULT' && (
-        <Button onClick={handleRetry} onInteraction={onInteraction} className="bg-slate-700 text-white">
-          {t.retry}
-        </Button>
-      )}
-
-      {tutorialEnabled && status === 'DRAWING' && (
-        <div className="text-xs text-slate-500 dark:text-slate-400 text-center animate-pulse">
-          {t.pixeleye_drag}: {language === 'zh' ? '请从右侧橙色起点开始拖拽，仅可在右半区作图。' : 'Start dragging from the orange point. Drawing is limited to the right zone.'}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const MiniGameRenderer = (props: Props) => {
   const { type } = props;
 
@@ -1972,7 +1645,6 @@ export const MiniGameRenderer = (props: Props) => {
     case 'rhythmcopy':  return <RhythmCopyGame {...props} />;
     case 'oddchar':     return <OddCharGame {...props} />;
     case 'heartbeat':   return <HeartbeatStopwatchGame {...props} />;
-    case 'pixeleye':    return <PixelEyeGame {...props} />;
     default: return <MashGame {...props} />;
   }
 };
