@@ -214,6 +214,7 @@ export function sanitizeSettings(raw: unknown, defaults: AppSettings): AppSettin
     theme:        (isStr(s.theme)    && VALID_THEMES.has(s.theme))       ? s.theme    as 'light' | 'dark' : defaults.theme,
     soundEnabled: isBool(s.soundEnabled) ? s.soundEnabled : defaults.soundEnabled,
     musicEnabled: isBool(s.musicEnabled) ? s.musicEnabled : defaults.musicEnabled,
+    guidesEnabled: isBool(s.guidesEnabled) ? s.guidesEnabled : defaults.guidesEnabled,
   };
 }
 

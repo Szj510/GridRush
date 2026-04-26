@@ -52,6 +52,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'light',
   soundEnabled: true,
   musicEnabled: true,
+  guidesEnabled: true,
 };
 
 const DEFAULT_STATS: UserStats = {
@@ -320,6 +321,20 @@ const SettingsModal = ({
                className={`w-12 h-6 rounded-full transition-colors relative ${settings.musicEnabled ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}
              >
                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.musicEnabled ? 'left-7' : 'left-1'}`} />
+             </button>
+          </div>
+
+          <div className="flex justify-between items-start gap-4">
+             <div className="min-w-0">
+               <div className="text-slate-600 dark:text-slate-300">{t.settings_guides}</div>
+               <p className="mt-1 text-xs leading-relaxed text-slate-400 dark:text-slate-500">{t.settings_guides_desc}</p>
+             </div>
+             <button
+               onClick={() => { audio.playClick(); onUpdate({ ...settings, guidesEnabled: !settings.guidesEnabled }); }}
+               className={`mt-1 w-12 h-6 rounded-full transition-colors relative shrink-0 ${settings.guidesEnabled ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+               aria-pressed={settings.guidesEnabled}
+             >
+               <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${settings.guidesEnabled ? 'left-7' : 'left-1'}`} />
              </button>
           </div>
 
@@ -1479,16 +1494,20 @@ const OnlineGuideOverlay = ({
   );
 };
 
-const OnlineTutorialCoach = ({ step, t, onExit }: { step: TutorialMatchStep; t: any; onExit: () => void }) => {
+const OnlineTutorialCoach = ({ step, t, onExit, onAdvance }: { step: TutorialMatchStep; t: any; onExit: () => void; onAdvance?: () => void }) => {
   const steps: Record<Exclude<TutorialMatchStep, 'NONE'>, { title: string; body: string }> = {
     CLICK_CENTER: { title: t.online_tutorial_step_1_title, body: t.online_tutorial_step_1_body },
     CENTER_MINIGAME: { title: t.online_tutorial_step_2_title, body: t.online_tutorial_step_2_body },
     WATCH_BOT_CAPTURE: { title: t.online_tutorial_step_3_title, body: t.online_tutorial_step_3_body },
-    USE_FREEZE: { title: t.online_tutorial_step_4_title, body: t.online_tutorial_step_4_body },
-    RACE_TOP_RIGHT: { title: t.online_tutorial_step_5_title, body: t.online_tutorial_step_5_body },
-    STEAL_TOP_LEFT: { title: t.online_tutorial_step_6_title, body: t.online_tutorial_step_6_body },
-    STEAL_CONTEST: { title: t.online_tutorial_step_7_title, body: t.online_tutorial_step_7_body },
-    VICTORY: { title: t.online_tutorial_step_8_title, body: t.online_tutorial_step_8_body },
+    BOT_CAPTURING: { title: t.online_tutorial_step_4_title, body: t.online_tutorial_step_4_body },
+    PREPARE_FREEZE: { title: t.online_tutorial_step_5_title, body: t.online_tutorial_step_5_body },
+    USE_FREEZE: { title: t.online_tutorial_step_6_title, body: t.online_tutorial_step_6_body },
+    RACE_TOP_RIGHT: { title: t.online_tutorial_step_7_title, body: t.online_tutorial_step_7_body },
+    STEAL_TOP_LEFT: { title: t.online_tutorial_step_8_title, body: t.online_tutorial_step_8_body },
+    STEAL_CONTEST: { title: t.online_tutorial_step_9_title, body: t.online_tutorial_step_9_body },
+    CLAIM_FINAL_CELL: { title: t.online_tutorial_step_10_title, body: t.online_tutorial_step_10_body },
+    FINAL_MINIGAME: { title: t.online_tutorial_step_11_title, body: t.online_tutorial_step_11_body },
+    VICTORY: { title: t.online_tutorial_step_12_title, body: t.online_tutorial_step_12_body },
   };
 
   if (step === 'NONE') return null;
@@ -1506,11 +1525,19 @@ const OnlineTutorialCoach = ({ step, t, onExit }: { step: TutorialMatchStep; t: 
         </button>
       </div>
       <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{current.body}</p>
+      {onAdvance && (
+        <button
+          onClick={() => { audio.playClick(); onAdvance(); }}
+          className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold uppercase tracking-widest text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95"
+        >
+          {t.online_tutorial_continue}
+        </button>
+      )}
     </div>
   );
 };
 
-const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, error, t }: any) => {
+const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, error, t, guidesEnabled = true }: any) => {
   const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen_v2';
   const GUIDE_STEPS = 6;
   const [joinId, setJoinId] = useState('');
@@ -1538,6 +1565,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
   };
 
   useEffect(() => {
+    if (!guidesEnabled) return;
     try {
       if (localStorage.getItem(ONLINE_GUIDE_SEEN_KEY) !== '1') {
         setShowGuide(true);
@@ -1545,7 +1573,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
     } catch {
       setShowGuide(true);
     }
-  }, []);
+  }, [guidesEnabled]);
 
   const modeGuideActive = showGuide && guideStep === 1;
   const createJoinGuideActive = showGuide && guideStep === 2;
@@ -1795,10 +1823,14 @@ type TutorialMatchStep =
   | 'CLICK_CENTER'
   | 'CENTER_MINIGAME'
   | 'WATCH_BOT_CAPTURE'
+  | 'BOT_CAPTURING'
+  | 'PREPARE_FREEZE'
   | 'USE_FREEZE'
   | 'RACE_TOP_RIGHT'
   | 'STEAL_TOP_LEFT'
   | 'STEAL_CONTEST'
+  | 'CLAIM_FINAL_CELL'
+  | 'FINAL_MINIGAME'
   | 'VICTORY';
 
 interface RpsDisplayState {
@@ -2341,8 +2373,9 @@ export default function App() {
   tutorialActiveRef.current = tutorialActive;
   const tutorialBotTimersRef = useRef<number[]>([]);
   const tutorialScriptRef = useRef({
-    leftCaptureQueued: false,
-    topRightRaceQueued: false,
+    botCaptureStarted: false,
+    prepareFreezeShown: false,
+    topRightRaceStarted: false,
     stealDefendQueued: false,
     completed: false,
   });
@@ -2438,8 +2471,9 @@ export default function App() {
   const clearTutorialMode = (markComplete = false) => {
     clearTutorialBotTimers();
     tutorialScriptRef.current = {
-      leftCaptureQueued: false,
-      topRightRaceQueued: false,
+      botCaptureStarted: false,
+      prepareFreezeShown: false,
+      topRightRaceStarted: false,
       stealDefendQueued: false,
       completed: markComplete ? true : false,
     };
@@ -2712,17 +2746,19 @@ export default function App() {
   // --- Persistence ---
   useEffect(() => {
     try {
+      let loadedSettings = DEFAULT_SETTINGS;
       const savedSettings = localStorage.getItem('gridrush_settings');
       if (savedSettings) {
-        try { setSettings(sanitizeSettings(JSON.parse(savedSettings), DEFAULT_SETTINGS)); } catch { /* bad JSON */ }
+        try { loadedSettings = sanitizeSettings(JSON.parse(savedSettings), DEFAULT_SETTINGS); } catch { /* bad JSON */ }
       }
+      setSettings(loadedSettings);
 
       const savedStats = localStorage.getItem('gridrush_stats');
       if (savedStats) {
         try { setStats(sanitizeStats(JSON.parse(savedStats), DEFAULT_STATS)); } catch { /* bad JSON */ }
       }
 
-      if (localStorage.getItem(RULES_MODAL_SEEN_KEY) !== '1') {
+      if (loadedSettings.guidesEnabled && localStorage.getItem(RULES_MODAL_SEEN_KEY) !== '1') {
         setShowRules(true);
         localStorage.setItem(RULES_MODAL_SEEN_KEY, '1');
       }
@@ -2842,6 +2878,8 @@ export default function App() {
     localStorage.removeItem('gridrush_stats');
     localStorage.removeItem('gridrush_settings');
     localStorage.removeItem(RULES_MODAL_SEEN_KEY);
+    localStorage.removeItem(ONLINE_TUTORIAL_DONE_KEY);
+    localStorage.removeItem('gridrush_online_guide_seen_v2');
     clearGuestResumeSession();
     clearHostResumeSession();
     setStats(DEFAULT_STATS);
@@ -3337,20 +3375,14 @@ export default function App() {
       return;
     }
 
-    if (tutorialStep === 'CENTER_MINIGAME' && gameState.cells[4]?.owner === 'P1' && !tutorialScriptRef.current.leftCaptureQueued) {
-      tutorialScriptRef.current.leftCaptureQueued = true;
+    if (tutorialStep === 'CENTER_MINIGAME' && gameState.cells[4]?.owner === 'P1') {
       setTutorialStep('WATCH_BOT_CAPTURE');
-      queueTutorialBotAction(1400, () => processCellClick('P2', 0));
-      queueTutorialBotAction(3600, () => processGameComplete('P2', true));
       return;
     }
 
-    if (tutorialStep === 'WATCH_BOT_CAPTURE' && gameState.cells[0]?.owner === 'P2' && !tutorialScriptRef.current.topRightRaceQueued) {
-      tutorialScriptRef.current.topRightRaceQueued = true;
-      queueTutorialBotAction(1200, () => {
-        processCellClick('P2', 2);
-        setTutorialStep('USE_FREEZE');
-      });
+    if (tutorialStep === 'BOT_CAPTURING' && gameState.cells[0]?.owner === 'P2' && !tutorialScriptRef.current.prepareFreezeShown) {
+      tutorialScriptRef.current.prepareFreezeShown = true;
+      setTutorialStep('PREPARE_FREEZE');
       return;
     }
 
@@ -3373,6 +3405,16 @@ export default function App() {
       tutorialScriptRef.current.stealDefendQueued = true;
       setTutorialStep('STEAL_CONTEST');
       queueTutorialBotAction(900, () => processDefend('P2'));
+      return;
+    }
+
+    if (tutorialStep === 'STEAL_CONTEST' && gameState.cells[0]?.owner === 'P1') {
+      setTutorialStep('CLAIM_FINAL_CELL');
+      return;
+    }
+
+    if (tutorialStep === 'CLAIM_FINAL_CELL' && gameState.p1.activeCell === 8) {
+      setTutorialStep('FINAL_MINIGAME');
     }
   }, [tutorialActive, tutorialStep, gameState]);
 
@@ -3508,8 +3550,9 @@ export default function App() {
 
     clearTutorialBotTimers();
     tutorialScriptRef.current = {
-      leftCaptureQueued: false,
-      topRightRaceQueued: false,
+      botCaptureStarted: false,
+      prepareFreezeShown: false,
+      topRightRaceStarted: false,
       stealDefendQueued: false,
       completed: false,
     };
@@ -5028,7 +5071,7 @@ export default function App() {
   }
   
   if (appMode === 'LOBBY') {
-    return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} onStartTutorial={startOnlineTutorialMatch} isConnecting={isConnecting} error={error} t={t} />;
+    return <OnlineLobby onCreate={setupHost} onJoin={joinGame} onBack={resetGame} onStartTutorial={startOnlineTutorialMatch} isConnecting={isConnecting} error={error} t={t} guidesEnabled={settings.guidesEnabled} />;
   }
 
   if (appMode === 'BAN_PICK') {
@@ -5130,8 +5173,15 @@ export default function App() {
       ? 2
       : tutorialStep === 'STEAL_TOP_LEFT'
         ? 0
-        : null;
-  const tutorialGridLocked = isTutorialMatch && (tutorialStep === 'WATCH_BOT_CAPTURE' || tutorialStep === 'USE_FREEZE');
+        : tutorialStep === 'CLAIM_FINAL_CELL'
+          ? 8
+          : null;
+  const tutorialGridLocked = isTutorialMatch && (
+    tutorialStep === 'WATCH_BOT_CAPTURE' ||
+    tutorialStep === 'BOT_CAPTURING' ||
+    tutorialStep === 'PREPARE_FREEZE' ||
+    tutorialStep === 'USE_FREEZE'
+  );
   const freezeTutorialActive = isTutorialMatch && tutorialStep === 'USE_FREEZE';
 
   // Fun mode effect checks (evaluated at render time using tick-driven re-renders)
@@ -5147,12 +5197,31 @@ export default function App() {
   // In Solo, we ALWAYS play until finished (activeCell is the level index).
   const isPlayingMiniGame = isSolo ? (myActiveCellIdx !== null) : (myActiveCellIdx !== null);
   const miniGameId = isPlayingMiniGame && myActiveCellIdx !== null ? gameState.cells[myActiveCellIdx].gameId : null;
+  const handleTutorialCoachAdvance = () => {
+    if (!tutorialActiveRef.current) return;
+    if (tutorialStep === 'WATCH_BOT_CAPTURE' && !tutorialScriptRef.current.botCaptureStarted) {
+      tutorialScriptRef.current.botCaptureStarted = true;
+      processCellClick('P2', 0);
+      setTutorialStep('BOT_CAPTURING');
+      queueTutorialBotAction(4500, () => processGameComplete('P2', true));
+      return;
+    }
+
+    if (tutorialStep === 'PREPARE_FREEZE' && !tutorialScriptRef.current.topRightRaceStarted) {
+      tutorialScriptRef.current.topRightRaceStarted = true;
+      processCellClick('P2', 2);
+      setTutorialStep('USE_FREEZE');
+    }
+  };
+  const tutorialCoachAdvance = tutorialStep === 'WATCH_BOT_CAPTURE' || tutorialStep === 'PREPARE_FREEZE'
+    ? handleTutorialCoachAdvance
+    : undefined;
 
   return (
     <div className="h-screen w-screen flex flex-col relative overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
       {showRules && <RulesModal onClose={closeRulesModal} t={t} />}
-      {isTutorialMatch && <OnlineTutorialCoach step={tutorialStep} t={t} onExit={resetGame} />}
+      {isTutorialMatch && <OnlineTutorialCoach step={tutorialStep} t={t} onExit={resetGame} onAdvance={tutorialCoachAdvance} />}
 
       {/* Disconnection / Reconnect Modal */}
       {connectionStatus !== 'CONNECTED' && !isTutorialMatch && (

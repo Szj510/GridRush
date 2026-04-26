@@ -107,6 +107,7 @@ export interface AppSettings {
   theme: Theme;
   soundEnabled: boolean;
   musicEnabled: boolean;
+  guidesEnabled: boolean;
 }
 
 export interface Achievement {
