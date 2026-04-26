@@ -25,7 +25,7 @@ const Button = ({ onClick, children, className, style, disabled, onInteraction }
       }
     }}
     disabled={disabled}
-    className={`px-6 py-3 rounded-xl font-bold text-lg active:scale-95 transition-transform select-none shadow-sm ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+    className={`px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-bold text-base md:text-lg active:scale-95 transition-transform select-none shadow-sm ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     style={style}
   >
     {children}
@@ -124,16 +124,16 @@ const MathGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
          <span>{t.score}: {score}/{config.target}</span>
          <span className="text-[10px] uppercase bg-slate-200 dark:bg-slate-700 px-2 rounded">{difficulty}</span>
       </div>
-      <div className="text-5xl font-black mb-4 tracking-wider text-slate-900 dark:text-white drop-shadow-sm min-h-[3.5rem] flex items-center justify-center">
+      <div className="text-4xl md:text-5xl font-black mb-3 md:mb-4 tracking-wider text-slate-900 dark:text-white drop-shadow-sm min-h-[3rem] md:min-h-[3.5rem] flex items-center justify-center">
           {problem.q}
       </div>
-      <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 w-full max-w-xs">
         {problem.options.map((opt, i) => (
           <Button 
             key={i} 
             onClick={() => handleAnswer(opt)}
             onInteraction={onInteraction}
-            className={`bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-6 text-2xl border border-slate-200 dark:border-slate-600 ${tutorialEnabled && opt === problem.a ? 'ring-4 ring-green-400 ring-opacity-50 animate-pulse' : ''}`}
+            className={`bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-800 dark:text-white py-4 md:py-6 text-xl md:text-2xl border border-slate-200 dark:border-slate-600 ${tutorialEnabled && opt === problem.a ? 'ring-4 ring-green-400 ring-opacity-50 animate-pulse' : ''}`}
           >
             {opt}
           </Button>
@@ -204,7 +204,7 @@ const MashGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL', 
       <Button 
         onClick={mash}
         onInteraction={onInteraction}
-        className="w-40 h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-2xl flex items-center justify-center hover:bg-red-400 relative overflow-hidden"
+        className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-red-500 border-b-8 border-red-700 active:border-b-0 active:translate-y-2 text-white text-xl md:text-2xl flex items-center justify-center hover:bg-red-400 relative overflow-hidden"
       >
         <span className="relative z-10">MASH!</span>
         {tutorialEnabled && <div className="absolute inset-0 bg-white opacity-20 animate-ping rounded-full" />}
@@ -276,7 +276,7 @@ const StroopGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL'
                 </div>
           )}
       </div>
-      <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 w-full max-w-xs">
          {colors.map(c => (
            <Button 
              key={c.id} 
@@ -789,7 +789,7 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
   };
 
   return (
-    <div className="w-full h-full relative min-h-[300px] bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden cursor-crosshair">
+    <div className="w-full h-full relative min-h-[240px] md:min-h-[300px] bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden cursor-crosshair">
        <div className="absolute top-2 left-4 text-xs font-mono text-slate-500 pointer-events-none select-none z-10">
           {t.burst_instr} {score}/{config.count}
        </div>
@@ -858,7 +858,7 @@ const SequenceGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
   return (
     <div className={`flex flex-col items-center gap-6 w-full h-full justify-center rounded-3xl transition-colors ${bgClass}`}>
       <div className="text-xl text-slate-800 dark:text-white">{t.sequence_instr} <span className="font-bold text-blue-500">1 → {maxNum.count}</span></div>
-      <div className="flex flex-wrap gap-4 justify-center max-w-[320px]">
+      <div className="flex flex-wrap gap-3 md:gap-4 justify-center max-w-[320px]">
         {buttons.map(n => {
           const isNext = tutorialEnabled && n === next;
           return (
@@ -866,7 +866,7 @@ const SequenceGame = ({ onComplete, onInteraction, language, difficulty = 'NORMA
                 key={n} 
                 onClick={() => click(n)} 
                 onInteraction={onInteraction}
-                className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-20 h-20 text-3xl transition-all duration-200 ${isNext ? 'ring-4 ring-blue-400 animate-pulse' : ''}`}
+                className={`${n < next ? 'bg-green-500 opacity-20 scale-90 text-white' : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'} w-16 h-16 md:w-20 md:h-20 text-2xl md:text-3xl transition-all duration-200 ${isNext ? 'ring-4 ring-blue-400 animate-pulse' : ''}`}
             >
                 {n}
             </Button>
@@ -985,7 +985,7 @@ const MouseMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NORM
           ref={svgRef}
           width={SIZE} height={SIZE}
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="block"
+          className="block max-w-full h-auto"
           onPointerDown={handlePointerMove}
           onPointerMove={handlePointerMove}
           onPointerLeave={handlePointerLeave}
@@ -1151,7 +1151,7 @@ const GravityMazeGame = ({ onComplete, onInteraction, language, difficulty = 'NO
         }`}
         onMouseDown={handleClick}
       >
-        <svg width={W} height={H} className="block" style={{ background: '#0f172a' }}>
+        <svg width={W} height={H} className="block max-w-full h-auto" style={{ background: '#0f172a' }}>
           {/* Top & bottom wall spikes */}
           {Array.from({ length: spikeCount }, (_, i) => (
             <React.Fragment key={i}>
@@ -1575,14 +1575,14 @@ const HeartbeatStopwatchGame = ({ onComplete, onInteraction, language, difficult
       <div 
         onPointerDown={handleStop}
         style={{ touchAction: 'manipulation' }}
-        className={`w-full max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl relative
+        className={`w-full max-w-[18rem] md:max-w-sm aspect-square rounded-3xl flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-100 shadow-xl relative
           ${status === 'COUNTING' ? 'bg-gradient-to-br from-pink-500 to-rose-600 scale-[1.00] hover:scale-[1.02]' : 
           status === 'STOPPED' ? 'bg-orange-500' :
           isSuccess ? 'bg-green-500' :
           'bg-red-500'}
         `}
       >
-        <span className="text-6xl font-bold tracking-widest text-white drop-shadow-lg font-mono">
+        <span className="text-5xl md:text-6xl font-bold tracking-widest text-white drop-shadow-lg font-mono">
           {displayTime}
         </span>
         

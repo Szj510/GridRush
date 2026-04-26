@@ -75,9 +75,9 @@ export function AuthModal({
           : t.account_env_missing;
 
   return (
-    <div className="absolute inset-0 z-[110] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-emerald-50 via-sky-50 to-cyan-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
+    <div className="absolute inset-0 z-[110] bg-black/55 backdrop-blur-sm flex items-start md:items-center justify-center p-3 md:p-4 mobile-safe overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full max-h-[calc(100dvh-2rem)] flex flex-col animate-fade-in shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="px-5 md:px-6 py-4 md:py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-emerald-50 via-sky-50 to-cyan-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
           <div>
             <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-widest uppercase">{t.menu_account}</h2>
             <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">{isAuthenticated ? t.account_connected : t.account_guest_desc}</p>
@@ -85,7 +85,7 @@ export function AuthModal({
           <button onClick={onClose} className="text-2xl text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">✕</button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-4 md:p-6 space-y-4 overflow-y-auto">
           {!isSupabaseConfigured && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200">
               <div className="font-bold mb-1">{t.account_env_missing}</div>
