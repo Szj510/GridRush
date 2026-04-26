@@ -39,8 +39,8 @@ const INITIAL_PLAYER_STATE = (id: PlayerId, name: string): PlayerState => ({
 const DEFAULT_GAME_STATE: GameState = {
   status: 'IDLE',
   cells: [],
-  p1: INITIAL_PLAYER_STATE('P1', 'Player Blue'),
-  p2: INITIAL_PLAYER_STATE('P2', 'Player Red'),
+  p1: INITIAL_PLAYER_STATE('P1', 'P1'),
+  p2: INITIAL_PLAYER_STATE('P2', 'P2'),
   winner: null,
   stealNotification: null,
   duelState: null,
@@ -91,6 +91,18 @@ const DEFAULT_PRACTICE_CONFIG: PracticeConfig = {
   difficulty: 'NORMAL',
   isBattlePreset: true,
   tutorialEnabled: false
+};
+
+const getLocalizedMiniGameMeta = (game: { id: string; name: string; description: string }, language: AppSettings['language']) => {
+  if (language !== 'zh') return { name: game.name, description: game.description };
+  const localized = MINI_GAME_ZH_META[game.id];
+  return localized ?? { name: game.name, description: game.description };
+};
+
+const getLocalizedMiniGameName = (gameId: string | null | undefined, language: AppSettings['language']) => {
+  if (!gameId) return '';
+  const game = MINI_GAMES.find(g => g.id === gameId);
+  return game ? getLocalizedMiniGameMeta(game, language).name : gameId;
 };
 
 const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
@@ -646,9 +658,9 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
   const actionsPerMatch = totalOnline > 0 ? actionTotal / totalOnline : 0;
 
   const rpsPickRows = [
-    { key: t.stats_pick_rock ?? 'Rock', icon: '✊', value: rpsPickRock, bar: 'bg-slate-500' },
-    { key: t.stats_pick_paper ?? 'Paper', icon: '✋', value: rpsPickPaper, bar: 'bg-blue-400' },
-    { key: t.stats_pick_scissors ?? 'Scissors', icon: '✌️', value: rpsPickScissors, bar: 'bg-rose-400' },
+    { key: t.stats_pick_rock, icon: '✊', value: rpsPickRock, bar: 'bg-slate-500' },
+    { key: t.stats_pick_paper, icon: '✋', value: rpsPickPaper, bar: 'bg-blue-400' },
+    { key: t.stats_pick_scissors, icon: '✌️', value: rpsPickScissors, bar: 'bg-rose-400' },
   ];
   const totalPicks = Math.max(1, rpsPickRock + rpsPickPaper + rpsPickScissors);
 
@@ -708,13 +720,13 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
                   <div className="text-lg font-black text-amber-700 dark:text-amber-300">{onlineDraws}</div>
                 </div>
                 <div className="rounded-xl bg-sky-100/70 dark:bg-sky-900/20 px-3 py-2">
-                  <div className="text-[11px] text-sky-700 dark:text-sky-300 uppercase tracking-wider">{t.stats_current_streak ?? 'Current Streak'}</div>
+                  <div className="text-[11px] text-sky-700 dark:text-sky-300 uppercase tracking-wider">{t.stats_current_streak}</div>
                   <div className="text-lg font-black text-sky-700 dark:text-sky-300">{currentWinStreak}</div>
                 </div>
               </div>
 
               <div className="mt-3">
-                <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_recent_trend ?? 'Recent Form'}</div>
+                <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_recent_trend}</div>
                 {trend.length === 0 ? (
                   <div className="text-xs text-slate-500 dark:text-slate-400">{t.stats_recent_empty}</div>
                 ) : (
@@ -729,7 +741,7 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
                     })}
                   </div>
                 )}
-                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.stats_best_streak ?? 'Best Win Streak'}: {bestWinStreak}</div>
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t.stats_best_streak}: {bestWinStreak}</div>
               </div>
             </div>
 
@@ -740,14 +752,14 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
                 <div>{t.stats_best_solo}: <span className="font-bold text-slate-900 dark:text-white">{fmtMs(stats.fastestSoloRun)}</span></div>
                 <div>{t.stats_ach_unlocked}: <span className="font-bold text-slate-900 dark:text-white">{stats.unlockedAchievements.length}</span></div>
                 <div>{t.stats_practice_records}: <span className="font-bold text-slate-900 dark:text-white">{stats.practiceRecords.length}</span></div>
-                <div>{t.stats_actions_per_match ?? 'Actions per Match'}: <span className="font-bold text-slate-900 dark:text-white">{actionsPerMatch.toFixed(2)}</span></div>
+                <div>{t.stats_actions_per_match}: <span className="font-bold text-slate-900 dark:text-white">{actionsPerMatch.toFixed(2)}</span></div>
               </div>
             </div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-2">
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
-              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_mode_split ?? 'MODE SPLIT'}</div>
+              <div className="text-xs uppercase tracking-widest text-slate-400 mb-3">{t.stats_mode_split}</div>
               <div className="space-y-3">
                 <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
                   <div className="flex justify-between text-xs text-slate-500 dark:text-slate-300 mb-1">
@@ -801,7 +813,7 @@ const StatsModal = ({ stats, onClose, t }: { stats: UserStats, onClose: () => vo
                 </div>
 
                 <div className="pt-1">
-                  <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_pick_distribution ?? 'Pick Distribution'}</div>
+                  <div className="text-[11px] uppercase tracking-widest text-slate-400 mb-2">{t.stats_pick_distribution}</div>
                   <div className="space-y-2">
                     {rpsPickRows.map(row => (
                       <div key={row.key}>
@@ -1042,9 +1054,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
   };
 
   const getPracticeGameMeta = (game: { id: string; name: string; description: string }) => {
-    if (language !== 'zh') return { name: game.name, description: game.description };
-    const localized = MINI_GAME_ZH_META[game.id];
-    return localized ?? { name: game.name, description: game.description };
+    return getLocalizedMiniGameMeta(game, language);
   };
 
   const startPractice = () => {
@@ -1103,9 +1113,9 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
         <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950 mobile-safe-top">
              <div className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <button onClick={() => setStep('LIST')} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
-                    ← Back
+                    ← {t.common_back}
                 </button>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">MY PRACTICE</h2>
+                 <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">{t.practice_history_title}</h2>
                 <div className="w-16" /> 
              </div>
              
@@ -1113,18 +1123,18 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Total Wins</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">{t.practice_total_wins}</div>
                         <div className="text-2xl font-black text-green-500">{stats.practiceRecords.filter(r => r.isWin).length}</div>
                     </div>
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
-                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Total Attempts</div>
+                        <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">{t.practice_total_attempts}</div>
                         <div className="text-2xl font-black text-blue-500">{stats.practiceRecords.length}</div>
                     </div>
                 </div>
 
                 <div className="space-y-3">
                     {allRecords.length === 0 ? (
-                        <div className="text-center text-slate-400 py-10">No records yet. Go practice!</div>
+                        <div className="text-center text-slate-400 py-10">{t.practice_no_records}</div>
                     ) : (
                         allRecords.map((r, i) => {
                            const game = MINI_GAMES.find(g => g.id === r.gameId);
@@ -1137,14 +1147,14 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                                    <div className="font-bold text-sm text-slate-900 dark:text-white">{meta?.name ?? game?.name}</div>
                                            <div className="text-[10px] text-slate-400 font-mono flex gap-2">
                                                <span>{r.config.difficulty}</span>
-                                               {r.config.isBattlePreset && <span className="text-blue-500">BATTLE</span>}
-                                               {r.config.tutorialEnabled && <span className="text-yellow-500">TUTORIAL</span>}
+                                                {r.config.isBattlePreset && <span className="text-blue-500">{t.practice_battle_label}</span>}
+                                                {r.config.tutorialEnabled && <span className="text-yellow-500">{t.practice_tutorial_label}</span>}
                                                <span>{new Date(r.timestamp).toLocaleDateString()}</span>
                                            </div>
                                        </div>
                                    </div>
                                    <div className={`font-mono font-bold ${r.isWin ? 'text-slate-900 dark:text-white' : 'text-red-500'}`}>
-                                       {r.isWin ? (r.gameId === 'reaction' ? `${r.value}ms` : `${(r.value/1000).toFixed(2)}s`) : 'FAIL'}
+                                        {r.isWin ? (r.gameId === 'reaction' ? `${r.value}ms` : `${(r.value/1000).toFixed(2)}s`) : t.practice_fail_label}
                                    </div>
                                </div>
                            );
@@ -1168,7 +1178,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
         <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950 mobile-safe-top">
           <div className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
              <button onClick={onBack} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-2 text-sm font-bold uppercase tracking-widest">
-                ← Back
+                 ← {t.common_back}
              </button>
              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter">{t.menu_practice}</h2>
              <button onClick={() => setStep('HISTORY')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-blue-500 transition-colors">
@@ -1219,7 +1229,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                            </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{meta.description}</p>
                            <div className="mt-3 flex items-center gap-4 text-xs font-mono text-slate-400">
-                              <span>Wins: {wins}</span>
+                              <span>{t.practice_wins_label}: {wins}</span>
                            </div>
                         </div>
                      </button>
@@ -1247,7 +1257,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
               <div className="w-full bg-white dark:bg-slate-900 rounded-3xl p-4 md:p-6 shadow-xl border border-slate-100 dark:border-slate-800 space-y-5 md:space-y-6">
                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
                     <span className="font-bold text-slate-700 dark:text-slate-300">{t.prac_config_title}</span>
-                    <span className="text-xs font-mono text-slate-400">ID: {game.id}</span>
+                     <span className="text-xs font-mono text-slate-400">{t.practice_id_label}: {game.id}</span>
                  </div>
 
                  {/* Settings */}
@@ -1314,7 +1324,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
     return (
        <div className="absolute inset-0 z-30 flex flex-col bg-slate-50 dark:bg-slate-950 mobile-safe-top">
           <div className="absolute top-4 left-4 md:top-6 md:left-6 z-40">
-              <button onClick={() => setStep('DETAIL')} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-bold uppercase tracking-widest text-xs">← Quit</button>
+               <button onClick={() => setStep('DETAIL')} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-bold uppercase tracking-widest text-xs">← {t.prac_quit}</button>
           </div>
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-4 md:p-6">
              <div className="bg-white dark:bg-slate-900 p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-2xl relative flex flex-col items-center justify-center w-full max-w-lg max-md:h-[calc(100dvh-5rem)] max-md:max-h-[34rem] max-md:aspect-auto md:aspect-square border border-slate-200 dark:border-slate-800">
@@ -1362,7 +1372,7 @@ const PracticeMode = ({ onBack, t, language, stats, onSaveRecord }: { onBack: ()
                     {t.prac_restart}
                  </button>
                  <button onClick={() => setStep('DETAIL')} className="w-full bg-slate-700 text-slate-300 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-slate-600 transition-colors">
-                    Back to Config
+                  {t.practice_back_to_config}
                  </button>
               </div>
            </div>
@@ -1581,7 +1591,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
 
   return (
     <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-start md:justify-center p-4 md:p-6 mobile-safe overflow-y-auto">
-      <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-4 left-4 md:top-6 md:left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← Back</button>
+      <button onClick={() => { audio.playClick(); onBack(); }} className="absolute top-4 left-4 md:top-6 md:left-6 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors uppercase tracking-widest text-xs">← {t.common_back}</button>
       <button onClick={() => { audio.playClick(); openGuide(); }} className="absolute top-4 right-4 md:top-6 md:right-6 px-3 md:px-4 py-2 rounded-full bg-white dark:bg-slate-800 shadow-lg text-slate-600 dark:text-slate-200 hover:scale-105 transition-all text-xs font-bold uppercase tracking-widest">
         ? {t.online_guide_open}
       </button>
@@ -1597,7 +1607,7 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
         <div className={`flex flex-col gap-4 md:gap-6 w-full max-w-2xl items-stretch animate-fade-in ${summaryGuideActive ? 'rounded-3xl ring-4 ring-emerald-400/70 shadow-2xl shadow-emerald-500/10' : ''}`}>
           {/* Mode Selector */}
           <div className={`bg-white dark:bg-slate-800 rounded-2xl p-3 md:p-4 shadow-lg border border-slate-200 dark:border-slate-700 transition-all ${modeGuideActive ? 'ring-4 ring-blue-400/70 shadow-2xl shadow-blue-500/20' : ''}`}>
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 text-center">{t.online_mode_label ?? 'GAME MODE'}</h3>
+        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3 text-center">{t.online_mode_label}</h3>
             <div className="flex gap-3">
               <button
                 onClick={() => setGameMode('STANDARD')}
@@ -1693,7 +1703,7 @@ const WaitingRoom = ({ roomId, onCancel, t }: {
   return (
     <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4 md:p-6 mobile-safe">
       <div className="bg-white dark:bg-slate-800 p-6 md:p-10 rounded-3xl flex flex-col items-center max-w-md w-full animate-fade-in shadow-2xl">
-        <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">Room Code</h2>
+        <h2 className="text-slate-400 mb-4 text-xs font-mono uppercase tracking-widest">{t.waiting_room_code}</h2>
         <div className="text-5xl md:text-6xl font-mono font-bold tracking-widest text-slate-900 dark:text-white mb-8 select-all cursor-pointer bg-slate-100 dark:bg-slate-900 px-6 md:px-8 py-5 md:py-6 rounded-2xl border border-slate-200 dark:border-slate-700">{roomId}</div>
         <div className="flex items-center gap-3 mb-6">
           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
@@ -1709,7 +1719,7 @@ const WaitingRoom = ({ roomId, onCancel, t }: {
         >
           {linkCopied ? t.invite_link_copied : `🔗 ${t.invite_copy_link}`}
         </button>
-        <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">Cancel</button>
+        <button onClick={() => { audio.playClick(); onCancel(); }} className="text-slate-400 hover:text-slate-800 dark:hover:text-white text-xs uppercase tracking-widest transition-colors">{t.common_cancel}</button>
       </div>
     </div>
   );
@@ -3531,8 +3541,8 @@ export default function App() {
     let newGame: GameState = {
       status: 'PLAYING',
       cells,
-      p1: makePlayer('P1', options?.customNames?.p1 ?? 'Player Blue', skillOverrides?.p1),
-      p2: makePlayer('P2', options?.customNames?.p2 ?? 'Player Red',  skillOverrides?.p2),
+      p1: makePlayer('P1', options?.customNames?.p1 ?? t.default_player_blue, skillOverrides?.p1),
+      p2: makePlayer('P2', options?.customNames?.p2 ?? t.default_player_red,  skillOverrides?.p2),
       winner: null,
       stealNotification: null,
       duelState: null,
@@ -4402,7 +4412,7 @@ export default function App() {
     if (!supabase) {
       setIsConnecting(false);
       setConnectionStatus('DISCONNECTED');
-      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      setError(t.conn_signal_failed);
       return;
     }
 
@@ -4472,7 +4482,7 @@ export default function App() {
     if (!supabase) {
       setIsConnecting(false);
       setConnectionStatus('DISCONNECTED');
-      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      setError(t.conn_signal_failed);
       return;
     }
 
@@ -4503,7 +4513,7 @@ export default function App() {
       initialConnectTimerId = window.setTimeout(() => {
         setIsConnecting(false);
         setConnectionStatus('DISCONNECTED');
-        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+        setError(t.conn_signal_failed);
       }, INITIAL_CONNECT_TIMEOUT_MS);
     } else {
       setIsConnecting(false);
@@ -4858,7 +4868,7 @@ export default function App() {
         if (peer !== peerRef.current || manualDisconnectRef.current) return;
         setIsConnecting(false);
         setConnectionStatus('DISCONNECTED');
-        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+        setError(t.conn_signal_failed);
       }, INITIAL_CONNECT_TIMEOUT_MS);
     } else {
       setIsConnecting(false);
@@ -4891,7 +4901,7 @@ export default function App() {
         if (conn !== connRef.current || manualDisconnectRef.current) return;
         clearInitialConnectTimer();
         setIsConnecting(false);
-        setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+        setError(t.conn_signal_failed);
         scheduleGuestReconnect();
       });
 
@@ -4907,7 +4917,7 @@ export default function App() {
       if (peer !== peerRef.current || manualDisconnectRef.current) return;
       clearInitialConnectTimer();
       setIsConnecting(false);
-      setError(t.conn_signal_failed ?? 'Cannot reach signaling server. Check network and retry.');
+      setError(t.conn_signal_failed);
       scheduleGuestReconnect();
     });
 
@@ -4937,7 +4947,7 @@ export default function App() {
   };
 
   const joinGame = (code: string, gameMode: GameMode = 'STANDARD') => {
-    if (!isValidRoomCode(code)) { setError('Invalid room code'); return; }
+    if (!isValidRoomCode(code)) { setError(t.invalid_room_code); return; }
     gameModeRef.current = gameMode; // Will be confirmed/overridden by HOST SESSION_SYNC
     manualDisconnectRef.current = false;
     clearHostResumeSession();
@@ -5233,6 +5243,7 @@ export default function App() {
   // In Solo, we ALWAYS play until finished (activeCell is the level index).
   const isPlayingMiniGame = isSolo ? (myActiveCellIdx !== null) : (myActiveCellIdx !== null);
   const miniGameId = isPlayingMiniGame && myActiveCellIdx !== null ? gameState.cells[myActiveCellIdx].gameId : null;
+  const miniGameTitle = getLocalizedMiniGameName(miniGameId, settings.language);
   const handleTutorialCoachAdvance = () => {
     if (!tutorialActiveRef.current) return;
     if (tutorialStep === 'WATCH_BOT_CAPTURE' && !tutorialScriptRef.current.botCaptureStarted) {
@@ -5294,7 +5305,7 @@ export default function App() {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 fade-in duration-300">
            <div className="bg-yellow-500 text-white px-6 py-3 rounded-full font-bold shadow-xl flex items-center gap-2 border border-yellow-400">
              <Icons.Trophy className="w-5 h-5" />
-             <span>Unlocked: {newAchievement}</span>
+              <span>{t.achievement_unlocked}: {newAchievement}</span>
            </div>
         </div>
       )}
@@ -5306,7 +5317,7 @@ export default function App() {
             <h2 className="text-5xl md:text-7xl font-black mb-4 text-white">
               {isSolo ? t.msg_challenge_complete : (gameState.winner === 'DRAW' ? t.msg_draw : (gameState.winner === myId ? t.msg_win : t.msg_lose))}
             </h2>
-            {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">TIME: {challengeTime}</div>}
+            {isSolo && <div className="text-3xl font-mono text-yellow-400 mb-6">{t.game_time_label}: {challengeTime}</div>}
             <div className="flex gap-4 mt-8 justify-center flex-wrap">
               <button onClick={handleRematch} className="px-8 py-3 bg-yellow-400 text-black hover:bg-yellow-300 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{isTutorialMatch ? t.online_tutorial_replay : t.game_rematch}</button>
               <button onClick={resetGame} className="px-8 py-3 bg-white text-black hover:bg-slate-200 rounded-full transition-colors font-bold uppercase tracking-widest shadow-lg">{t.conn_exit_menu}</button>
@@ -5314,21 +5325,21 @@ export default function App() {
             {!isSolo && (
               <div className="mt-4 flex flex-col items-center gap-3">
                 {rematchStatus === 'REQUEST_SENT' && (
-                  <p className="text-sm font-bold uppercase tracking-widest text-yellow-300">{t.game_rematch_request_sent ?? 'REQUEST SENT...'}</p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-yellow-300">{t.game_rematch_request_sent}</p>
                 )}
                 {rematchStatus === 'WAIT_HOST' && (
-                  <p className="text-sm font-bold uppercase tracking-widest text-cyan-300">{t.game_rematch_wait_host ?? 'WAITING FOR HOST...'}</p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-cyan-300">{t.game_rematch_wait_host}</p>
                 )}
                 {rematchStatus === 'DECLINED' && (
-                  <p className="text-sm font-bold uppercase tracking-widest text-rose-300">{t.game_rematch_declined ?? 'REMATCH DECLINED'}</p>
+                  <p className="text-sm font-bold uppercase tracking-widest text-rose-300">{t.game_rematch_declined}</p>
                 )}
 
                 {rematchInviteFrom && (
                   <div className="rounded-2xl border border-white/25 bg-black/40 px-5 py-4 shadow-xl">
-                    <p className="text-sm font-bold uppercase tracking-widest text-white mb-3">{t.game_rematch_invite ?? 'OPPONENT INVITED A REMATCH'}</p>
+                    <p className="text-sm font-bold uppercase tracking-widest text-white mb-3">{t.game_rematch_invite}</p>
                     <div className="flex items-center justify-center gap-3">
-                      <button onClick={() => respondRematchInvite(true)} className="px-5 py-2 rounded-full bg-green-400 text-slate-900 hover:bg-green-300 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_accept ?? 'ACCEPT'}</button>
-                      <button onClick={() => respondRematchInvite(false)} className="px-5 py-2 rounded-full bg-rose-500 text-white hover:bg-rose-400 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_decline ?? 'DECLINE'}</button>
+                      <button onClick={() => respondRematchInvite(true)} className="px-5 py-2 rounded-full bg-green-400 text-slate-900 hover:bg-green-300 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_accept}</button>
+                      <button onClick={() => respondRematchInvite(false)} className="px-5 py-2 rounded-full bg-rose-500 text-white hover:bg-rose-400 font-bold uppercase tracking-widest transition-colors">{t.game_rematch_decline}</button>
                     </div>
                   </div>
                 )}
@@ -5350,9 +5361,7 @@ export default function App() {
             const isDefender = myId === defenderId;
             const bgClass = isDefender ? 'bg-red-500 shadow-red-500/50' : 'bg-blue-500 shadow-blue-500/50';
             const showDefendBtn = isDefender && me.activeCell !== cellId;
-            const descTemplate = isDefender
-              ? (t.msg_steal_attack_desc ?? 'Opponent is stealing Cell {cell}! Tap DEFEND to contest, or ignore if your current race matters more.')
-              : (t.msg_steal_doing_desc ?? 'Stealing Cell {cell} from opponent!');
+            const descTemplate = isDefender ? t.msg_steal_attack_desc : t.msg_steal_doing_desc;
             const desc = descTemplate.replace('{cell}', String(cellId + 1));
 
             return (
@@ -5451,8 +5460,8 @@ export default function App() {
                     <div className="text-3xl font-black italic text-slate-100 dark:text-slate-800 tracking-widest absolute center-x top-1/2 -translate-y-1/2 pointer-events-none">VS</div>
                 <div className="flex items-center gap-1 md:gap-2 md:mt-4 bg-slate-100 dark:bg-slate-800 px-2 md:px-3 py-1 md:py-1.5 rounded-full max-w-[8.5rem] md:max-w-none">
                         <div className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500 animate-pulse' : connectionStatus === 'RECONNECTING' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
-                  <div className="text-[9px] md:text-[10px] text-slate-400 font-mono truncate">{isTutorialMatch ? `${t.online_tutorial_label}: BOT` : `ROOM: ${roomId}`}</div>
-                        {isFunMode && <div className="hidden md:block text-[10px] font-bold text-purple-500 uppercase tracking-widest">{t.fun_mode_badge ?? '🎉 FUN'}</div>}
+                  <div className="text-[9px] md:text-[10px] text-slate-400 font-mono truncate">{isTutorialMatch ? `${t.online_tutorial_label}: ${t.game_bot_label}` : `${t.game_room_label}: ${roomId}`}</div>
+                        {isFunMode && <div className="hidden md:block text-[10px] font-bold text-purple-500 uppercase tracking-widest">{t.fun_mode_badge}</div>}
                     </div>
                 <div className="hidden md:block">
                   <NetworkQualityPanel
@@ -5477,7 +5486,7 @@ export default function App() {
          {/* Mobile Exit (replaces badge or sits near it) */}
          <div className="md:hidden flex flex-col items-end gap-1">
              {isSolo ? null : <PlayerBadge player={opponent} isMe={false} opponent t={t} />}
-             <button onClick={resetGame} className="text-[10px] text-red-500 underline uppercase tracking-widest font-bold">EXIT</button>
+              <button onClick={resetGame} className="text-[10px] text-red-500 underline uppercase tracking-widest font-bold">{t.exit_game}</button>
          </div>
          
          <div className="hidden md:block">
@@ -5514,11 +5523,11 @@ export default function App() {
                         onClick={() => { audio.playClick(); sendAction({ type: 'ABANDON_CHALLENGE' }); }}
                         className="absolute top-4 right-4 md:top-6 md:right-6 text-[10px] md:text-xs font-bold text-red-500 hover:text-red-600 hover:underline uppercase tracking-widest transition-colors"
                       >
-                         Give Up
+                         {t.game_give_up}
                       </button>
                   )}
 
-                  <h3 className="text-center text-xl md:text-3xl font-black mb-4 md:mb-10 px-8 md:px-0 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{MINI_GAMES.find(g => g.id === miniGameId)?.name}</h3>
+                  <h3 className="text-center text-xl md:text-3xl font-black mb-4 md:mb-10 px-8 md:px-0 text-slate-900 dark:text-white uppercase tracking-widest drop-shadow-sm">{miniGameTitle}</h3>
                   <div className="w-full min-h-0 flex-1 relative">
                      {/* Frozen overlay — blocks interaction when this player is frozen */}
                      {me.frozenUntil > Date.now() && (
@@ -5526,7 +5535,7 @@ export default function App() {
                             style={{ background: 'rgba(59,130,246,0.45)', backdropFilter: 'blur(3px)' }}
                        >
                          <span className="text-5xl select-none">❄️</span>
-                         <span className="text-white font-black text-xl uppercase tracking-widest select-none">FROZEN</span>
+                          <span className="text-white font-black text-xl uppercase tracking-widest select-none">{t.game_frozen}</span>
                        </div>
                      )}
                      <MiniGameRenderer 

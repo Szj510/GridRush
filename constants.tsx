@@ -501,6 +501,18 @@ export const TRANSLATIONS = {
 
     exit_game: "Quit",
     level_progress: "Level",
+    common_back: "Back",
+    common_cancel: "Cancel",
+    game_room_label: "ROOM",
+    waiting_room_code: "Room Code",
+    invalid_room_code: "Invalid room code",
+    default_player_blue: "Player Blue",
+    default_player_red: "Player Red",
+    game_bot_label: "BOT",
+    game_give_up: "Give Up",
+    game_frozen: "FROZEN",
+    game_time_label: "TIME",
+    achievement_unlocked: "Unlocked",
 
     // Practice Mode
     prac_search: "Search games...",
@@ -528,6 +540,16 @@ export const TRANSLATIONS = {
     prac_res_fail: "FAILED",
     prac_new_record: "NEW RECORD!",
     prac_history: "Recent History",
+    practice_history_title: "MY PRACTICE",
+    practice_total_wins: "Total Wins",
+    practice_total_attempts: "Total Attempts",
+    practice_no_records: "No records yet. Go practice!",
+    practice_battle_label: "BATTLE",
+    practice_tutorial_label: "TUTORIAL",
+    practice_fail_label: "FAIL",
+    practice_wins_label: "Wins",
+    practice_id_label: "ID",
+    practice_back_to_config: "Back to Config",
 
     // Skills
     skill_steal: "STEAL",
@@ -882,6 +904,18 @@ export const TRANSLATIONS = {
 
     exit_game: "退出",
     level_progress: "关卡",
+    common_back: "返回",
+    common_cancel: "取消",
+    game_room_label: "房间",
+    waiting_room_code: "房间号",
+    invalid_room_code: "房间号无效",
+    default_player_blue: "蓝方玩家",
+    default_player_red: "红方玩家",
+    game_bot_label: "机器人",
+    game_give_up: "放弃",
+    game_frozen: "冻结中",
+    game_time_label: "用时",
+    achievement_unlocked: "已解锁",
 
     // Practice Mode
     prac_search: "搜索小游戏...",
@@ -909,6 +943,16 @@ export const TRANSLATIONS = {
     prac_res_fail: "挑战失败",
     prac_new_record: "新纪录！",
     prac_history: "最近记录",
+    practice_history_title: "练习记录",
+    practice_total_wins: "总胜场",
+    practice_total_attempts: "总尝试",
+    practice_no_records: "还没有练习记录，先去练一把吧。",
+    practice_battle_label: "对战预设",
+    practice_tutorial_label: "教学",
+    practice_fail_label: "失败",
+    practice_wins_label: "胜场",
+    practice_id_label: "ID",
+    practice_back_to_config: "返回配置",
 
     // Skills
     skill_steal: "夺旗",
