@@ -48,7 +48,7 @@ const DEFAULT_GAME_STATE: GameState = {
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
-  language: 'en',
+  language: 'zh',
   theme: 'light',
   soundEnabled: true,
   musicEnabled: true,
@@ -144,6 +144,7 @@ const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
   const flowItems = [t.rules_flow_1, t.rules_flow_2, t.rules_flow_3, t.rules_flow_4];
   const penaltyItems = [t.rules_penalty_1, t.rules_penalty_2];
   const tipItems = [t.rules_tip_1, t.rules_tip_2, t.rules_tip_3];
+  const modeItems = [t.rules_mode_online, t.rules_mode_solo, t.rules_mode_practice];
 
   return (
     <div className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -159,6 +160,18 @@ const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
         <div className="space-y-5 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed overflow-y-auto max-h-[65vh] pr-1">
           <div className="bg-slate-100 dark:bg-slate-800/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-900 dark:text-white">{t.rules_goal}</p>
+          </div>
+
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
+            <h3 className="text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_mode_title}</h3>
+            <ul className="space-y-2.5">
+              {modeItems.map((item: string, index: number) => (
+                <li key={index} className="flex gap-3 items-start">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400 dark:bg-emerald-300" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/50">
@@ -220,12 +233,12 @@ const RulesModal = ({ onClose, t }: { onClose: () => void, t: any }) => {
             <p>{t.rules_fun_desc}</p>
           </div>
 
-          <div className="bg-emerald-50 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
-            <h3 className="text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_tips_title}</h3>
+          <div className="bg-lime-50 dark:bg-lime-950/30 p-4 rounded-2xl border border-lime-100 dark:border-lime-900/50">
+            <h3 className="text-lime-700 dark:text-lime-300 font-bold uppercase tracking-widest text-xs mb-3">{t.rules_tips_title}</h3>
             <ul className="space-y-2.5">
               {tipItems.map((item: string, index: number) => (
                 <li key={index} className="flex gap-3 items-start">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400 dark:bg-emerald-300" />
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-lime-400 dark:bg-lime-300" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -1385,6 +1398,16 @@ const OnlineGuideOverlay = ({
       body: t.online_guide_4_body,
       hint: t.online_guide_4_hint,
     },
+    {
+      title: t.online_guide_5_title,
+      body: t.online_guide_5_body,
+      hint: t.online_guide_5_hint,
+    },
+    {
+      title: t.online_guide_6_title,
+      body: t.online_guide_6_body,
+      hint: t.online_guide_6_hint,
+    },
   ];
 
   const currentStep = steps[step];
@@ -1488,8 +1511,8 @@ const OnlineTutorialCoach = ({ step, t, onExit }: { step: TutorialMatchStep; t: 
 };
 
 const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, error, t }: any) => {
-  const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen';
-  const GUIDE_STEPS = 4;
+  const ONLINE_GUIDE_SEEN_KEY = 'gridrush_online_guide_seen_v2';
+  const GUIDE_STEPS = 6;
   const [joinId, setJoinId] = useState('');
   const [gameMode, setGameMode] = useState<GameMode>('STANDARD');
   const [showGuide, setShowGuide] = useState(false);
@@ -1524,9 +1547,9 @@ const OnlineLobby = ({ onCreate, onJoin, onBack, onStartTutorial, isConnecting, 
     }
   }, []);
 
-  const modeGuideActive = showGuide && guideStep === 0;
-  const createJoinGuideActive = showGuide && (guideStep === 1 || guideStep === 2);
-  const summaryGuideActive = showGuide && guideStep === 3;
+  const modeGuideActive = showGuide && guideStep === 1;
+  const createJoinGuideActive = showGuide && guideStep === 2;
+  const summaryGuideActive = showGuide && (guideStep === 0 || guideStep >= 3);
 
   return (
     <div className="absolute inset-0 z-20 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-start md:justify-center p-4 md:p-6 mobile-safe overflow-y-auto">
@@ -2331,7 +2354,7 @@ export default function App() {
   const GUEST_RESUME_STORAGE_KEY = 'gridrush_guest_resume';
   const HOST_RESUME_STORAGE_KEY = 'gridrush_host_resume';
   const ONLINE_TUTORIAL_DONE_KEY = 'gridrush_online_tutorial_done';
-  const RULES_MODAL_SEEN_KEY = 'gridrush_rules_modal_seen';
+  const RULES_MODAL_SEEN_KEY = 'gridrush_rules_modal_seen_v2';
 
   const getOnlineAllowedGameIds = () => {
     const banned = new Set<string>();
