@@ -2400,6 +2400,33 @@ export default function App() {
 
   const getOnlineBoardGameIds = () => shuffleGames(getOnlineAllowedGameIds()).slice(0, 9);
 
+  const normalizeGameIdList = (gameIds: string[], fallbackIds = ALL_MINI_GAME_IDS) => {
+    const fallbackPool = fallbackIds.length > 0 ? shuffleGames(fallbackIds) : ALL_MINI_GAME_IDS;
+    let fallbackIndex = 0;
+    return gameIds.map(id => {
+      if (ALL_MINI_GAME_IDS.includes(id)) return id;
+      const replacement = fallbackPool[fallbackIndex % fallbackPool.length] ?? ALL_MINI_GAME_IDS[0];
+      fallbackIndex += 1;
+      return replacement;
+    });
+  };
+
+  const normalizeGameStateGameIds = (state: GameState): GameState => {
+    let changed = false;
+    const usedValidIds = new Set(state.cells.map(cell => cell.gameId).filter(id => ALL_MINI_GAME_IDS.includes(id)));
+    const replacementPool = shuffleGames(ALL_MINI_GAME_IDS.filter(id => !usedValidIds.has(id)));
+    let replacementIndex = 0;
+    const cells = state.cells.map((cell, index) => {
+      if (ALL_MINI_GAME_IDS.includes(cell.gameId)) return cell;
+      changed = true;
+      const replacement = replacementPool[replacementIndex % replacementPool.length]
+        ?? ALL_MINI_GAME_IDS[index % ALL_MINI_GAME_IDS.length];
+      replacementIndex += 1;
+      return { ...cell, gameId: replacement };
+    });
+    return changed ? { ...state, cells } : state;
+  };
+
   const setMatchPhaseLocal = (phase: MatchPhase) => {
     const phaseChanged = matchPhaseRef.current !== phase;
     matchPhaseRef.current = phase;
@@ -2544,9 +2571,10 @@ export default function App() {
 
   const sendStateSnapshot = (connection: any, state: GameState, phase: MatchPhase, revision: number) => {
     if (!connection?.open) return;
+    const normalizedState = normalizeGameStateGameIds(state);
     connection.send({
       type: 'STATE_UPDATE',
-      state,
+      state: normalizedState,
       phase,
       revision,
       serverTime: Date.now(),
@@ -2634,12 +2662,13 @@ export default function App() {
     if (tutorialActiveRef.current) return;
     if (roleRef.current !== 'HOST' || !roomIdRef.current) return;
     try {
+      const stateToPersist = normalizeGameStateGameIds(stateOverride ?? gameState);
       localStorage.setItem(HOST_RESUME_STORAGE_KEY, JSON.stringify({
         roomId: roomIdRef.current,
         phase: phaseOverride ?? matchPhaseRef.current,
         revision: revisionOverride ?? authorityRevisionRef.current,
         guestSessionId: guestSessionIdRef.current,
-        gameState: stateOverride ?? gameState,
+        gameState: stateToPersist,
         myBanPick: myBanPickRef.current,
         p2BanPick: p2BanPickRef.current,
         mySkillPicks: mySkillPicksRef.current,
@@ -3322,6 +3351,13 @@ export default function App() {
   };
 
   useEffect(() => {
+    const normalizedState = normalizeGameStateGameIds(gameState);
+    if (normalizedState !== gameState) {
+      setGameState(normalizedState);
+    }
+  }, [gameState]);
+
+  useEffect(() => {
     if (suppressNextSyncRef.current) { suppressNextSyncRef.current = false; return; }
     if (roleRef.current === 'HOST' && gameState.status !== 'IDLE') {
       if (connRef.current && connRef.current.open) {
@@ -3471,10 +3507,10 @@ export default function App() {
     let numCells = 9;
 
     if (mode === 'SOLO') {
-       gameIds = options?.customGameIds?.length ? [...options.customGameIds] : shuffleGames(ALL_MINI_GAME_IDS);
+       gameIds = options?.customGameIds?.length ? normalizeGameIdList([...options.customGameIds]) : shuffleGames(ALL_MINI_GAME_IDS);
        numCells = gameIds.length;
     } else {
-       gameIds = options?.customGameIds?.length ? [...options.customGameIds].slice(0, 9) : getOnlineBoardGameIds();
+       gameIds = options?.customGameIds?.length ? normalizeGameIdList([...options.customGameIds].slice(0, 9)) : getOnlineBoardGameIds();
     }
 
     const cells: CellData[] = Array(numCells).fill(null).map((_, i) => ({
@@ -4634,7 +4670,7 @@ export default function App() {
         if (!shouldApplyAuthoritativeMessage(data.revision)) return;
         const previousPhase = matchPhaseRef.current;
         noteRemoteRevision(data.revision);
-        setGameState(data.state);
+        setGameState(normalizeGameStateGameIds(data.state));
         if (data.phase === 'BAN_PICK' && previousPhase !== 'BAN_PICK') {
           resetLocalRoundStateForBanPick();
         }

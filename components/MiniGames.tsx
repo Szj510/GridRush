@@ -742,7 +742,7 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
       HARD: { count: 8, shrinkPerSecond: 125 },
       EXPERT: { count: 12, shrinkPerSecond: 155 }
   }[difficulty];
-  const shrinkPerSecond = config.shrinkPerSecond * (isTouchDevice ? 1.2 : 1);
+  const shrinkPerSecond = config.shrinkPerSecond * (isTouchDevice ? 2 : 1);
 
   const createTarget = () => ({
     id: Math.random(),
