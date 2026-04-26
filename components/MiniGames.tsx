@@ -733,16 +733,15 @@ const BurstGame = ({ onComplete, onInteraction, language, difficulty = 'NORMAL',
   const reqRef = useRef(0);
   const failedRef = useRef(false);
   const lastFrameRef = useRef(0);
-  const isTouchDevice = React.useMemo(() => detectCoarsePointer(), []);
 
   // Config: target count and shrink speed in size points per second.
   const config = {
-      EASY: { count: 3, shrinkPerSecond: 70 },
-      NORMAL: { count: 5, shrinkPerSecond: 95 },
-      HARD: { count: 8, shrinkPerSecond: 125 },
-      EXPERT: { count: 12, shrinkPerSecond: 155 }
+      EASY: { count: 5, shrinkPerSecond: 200 },
+      NORMAL: { count: 8, shrinkPerSecond: 250 },
+      HARD: { count: 11, shrinkPerSecond: 280 },
+      EXPERT: { count: 14, shrinkPerSecond: 310 }
   }[difficulty];
-  const shrinkPerSecond = config.shrinkPerSecond * (isTouchDevice ? 2 : 1);
+  const shrinkPerSecond = config.shrinkPerSecond;
 
   const createTarget = () => ({
     id: Math.random(),
